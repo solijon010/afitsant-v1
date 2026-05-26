@@ -22,7 +22,24 @@ export function getDb(): Database.Database {
   db.pragma('mmap_size = 268435456')
 
   runMigrations(db)
+  clearMockData(db)
   return db
+}
+
+function clearMockData(d: Database.Database): void {
+  try {
+    d.transaction(() => {
+      // Avval mock tablelerga tegishli orderlarni o'chirish (FK constraint)
+      d.prepare(`DELETE FROM order_items WHERE order_id IN (SELECT o.id FROM orders o JOIN tables t ON o.table_id = t.id WHERE t.server_id IS NULL)`).run()
+      d.prepare(`DELETE FROM orders WHERE table_id IN (SELECT id FROM tables WHERE server_id IS NULL)`).run()
+      // Keyin mock datani o'chirish
+      d.prepare(`DELETE FROM waiters WHERE server_id IS NULL`).run()
+      d.prepare(`DELETE FROM areas WHERE server_id IS NULL`).run()
+      d.prepare(`DELETE FROM categories WHERE server_id IS NULL`).run()
+    })()
+  } catch (e: any) {
+    console.warn('[DB] clearMockData error (ignored):', e?.message)
+  }
 }
 
 function runMigrations(d: Database.Database): void {

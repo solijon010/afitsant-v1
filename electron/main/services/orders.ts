@@ -126,12 +126,12 @@ export async function syncAllItems(input: {
 
 export async function closeOrderOnServer(serverOrderId: string): Promise<void> {
   const api = getApi()
-  await api.patch(`/api/order/status/${serverOrderId}`, { status: 'SUCCESS' })
+  await api.patch(`/api/order/status/${serverOrderId}`, null, { params: { status: 'SUCCESS' } })
 }
 
 export async function cancelOrderOnServer(serverOrderId: string): Promise<void> {
   const api = getApi()
-  await api.patch(`/api/order/status/${serverOrderId}`, { status: 'CANCELED' })
+  await api.patch(`/api/order/status/${serverOrderId}`, null, { params: { status: 'CANCELED' } })
 }
 
 export function upsertOpenOrder(input: {

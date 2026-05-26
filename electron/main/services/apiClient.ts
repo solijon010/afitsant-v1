@@ -13,6 +13,22 @@ export function getApi(): AxiosInstance {
     headers: s.apiToken ? { Authorization: `Bearer ${s.apiToken}` } : {}
   })
 
+  instance.interceptors.request.use((config) => {
+    console.log(`[API] --> ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, config.data ?? '')
+    return config
+  })
+
+  instance.interceptors.response.use(
+    (response) => {
+      console.log(`[API] <-- ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data)
+      return response
+    },
+    (error) => {
+      console.error(`[API] ERR ${error.response?.status ?? 'NO_RESP'} ${error.config?.method?.toUpperCase()} ${error.config?.url}`, error.response?.data ?? error.message)
+      return Promise.reject(error)
+    }
+  )
+
   cached = { instance, baseUrl: s.serverUrl, token: s.apiToken }
   return instance
 }

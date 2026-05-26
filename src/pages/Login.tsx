@@ -1,10 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Coffee, Eye, EyeOff, Lock, Phone } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/stores/auth'
+import { useSettings } from '@/stores/settings'
+import { useMenu } from '@/stores/menu'
+import { useTables } from '@/stores/tables'
 import { cn } from '@/lib/cn'
+
+function ServerUrlDisplay(): JSX.Element {
+  const { settings, load } = useSettings()
+  useEffect(() => { if (!settings) void load() }, [settings, load])
+  return (
+    <p className="mt-4 text-center text-xs text-ink-dim">
+      Server: {settings?.serverUrl ?? '…'}
+    </p>
+  )
+}
 
 export default function LoginPage(): JSX.Element {
   const [identifier, setIdentifier] = useState('')
@@ -13,6 +26,8 @@ export default function LoginPage(): JSX.Element {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const setServerAuth = useAuth((s) => s.setServerAuth)
+  const loadMenu = useMenu((s) => s.load)
+  const loadTables = useTables((s) => s.load)
 
   const handleLogin = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -34,6 +49,17 @@ export default function LoginPage(): JSX.Element {
       const isSuperAdmin = role === 'SUPERADMIN'
       const hasBranch = !!result.user?.branchId
 
+      const syncAll = async (): Promise<void> => {
+        toast.loading("Ma'lumotlar yuklanmoqda…", { id: 'sync' })
+        const res = await window.afisant.sync.fullPull()
+        toast.dismiss('sync')
+        if (!res.ok) {
+          toast.error("Serverdan ma'lumot yuklab bo'lmadi")
+        } else {
+          await Promise.all([loadMenu(), loadTables()])
+        }
+      }
+
       if (isSuperAdmin && !hasBranch) {
         if (!result.branches || result.branches.length === 0) {
           toast.error("Filial topilmadi. Avval filial yarating.")
@@ -42,7 +68,7 @@ export default function LoginPage(): JSX.Element {
         if (result.branches.length === 1) {
           await window.afisant.auth.selectBranch(result.branches[0].id, result.branches[0].name)
           toast.success(`${result.branches[0].name} fililiga ulandi`)
-          await window.afisant.sync.fullPull()
+          await syncAll()
           navigate('/select-waiter', { replace: true })
         } else {
           navigate('/select-branch', { replace: true, state: { branches: result.branches } })
@@ -50,9 +76,7 @@ export default function LoginPage(): JSX.Element {
         return
       }
 
-      toast.loading("Ma'lumotlar yuklanmoqda…", { id: 'sync' })
-      await window.afisant.sync.fullPull()
-      toast.dismiss('sync')
+      await syncAll()
 
       if (role === 'SUPER_AFITSANT' || role === 'MANAGER' || isSuperAdmin) {
         navigate('/select-waiter', { replace: true })
@@ -133,9 +157,7 @@ export default function LoginPage(): JSX.Element {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-ink-dim">
-          Server: localhost:5000
-        </p>
+        <ServerUrlDisplay />
       </motion.div>
     </div>
   )

@@ -2,8 +2,8 @@ import { getDb } from '../db/connection'
 import type { Lang, Settings } from '@shared/types'
 
 const DEFAULTS: Settings = {
-  serverUrl: 'http://localhost:5000',
-  serverWsUrl: 'ws://localhost:5000',
+  serverUrl: 'https://api-restaurant.hisobchim.uz',
+  serverWsUrl: 'wss://api-restaurant.hisobchim.uz',
   apiToken: null,
   branchId: null,
   language: 'uz-latn',

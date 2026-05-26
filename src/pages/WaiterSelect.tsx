@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import type { Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
+import { useCart } from '@/stores/cart'
 import { initials } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
@@ -17,6 +18,7 @@ export default function WaiterSelect(): JSX.Element {
   const navigate = useNavigate()
   const settings = useSettings((s) => s.settings)
   const logout = useAuth((s) => s.logout)
+  const login = useAuth((s) => s.login)
 
   const loadWaiters = (): void => {
     setLoading(true)
@@ -103,7 +105,11 @@ export default function WaiterSelect(): JSX.Element {
             {waiters.map((w, idx) => (
               <motion.button
                 key={w.id}
-                onClick={() => navigate(`/pin/${w.id}`)}
+                onClick={() => {
+                  login(w)
+                  useCart.setState({ orderId: null, tableId: null, lines: [] })
+                  navigate('/tables', { replace: true })
+                }}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.04 }}

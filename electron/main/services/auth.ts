@@ -19,6 +19,8 @@ function mapRole(backendRole: string): string {
 }
 
 export async function loginWithServer(identifier: string, password: string): Promise<ServerLoginResult> {
+  const s = getSettings()
+  console.log(`[AUTH] loginWithServer called — serverUrl: ${s.serverUrl}, identifier: ${identifier}`)
   const api = getApi()
   try {
     const res = await api.post('/api/auth/login', { identifier, password })
@@ -31,8 +33,8 @@ export async function loginWithServer(identifier: string, password: string): Pro
 
     if (user.branchId) {
       setSettings({ branchId: user.branchId })
-      await syncWaitersForBranch(user.branchId)
     }
+    await syncWaitersForBranch(user.branchId ?? null)
 
     return { ok: true, token: accessToken, user, branches }
   } catch (e: any) {
@@ -64,10 +66,12 @@ export async function selectBranch(branchId: string, branchName: string): Promis
   }
 }
 
-export async function syncWaitersForBranch(branchId: string): Promise<void> {
+export async function syncWaitersForBranch(branchId?: string | null): Promise<void> {
   const api = getApi()
   try {
-    const res = await api.get(`/api/user/my/${branchId}`)
+    const res = branchId
+      ? await api.get(`/api/user/my/${branchId}`)
+      : await api.get(`/api/user/waiters`)
     const data = res.data as any
     const users: any[] = Array.isArray(data) ? data : (data?.data ?? [])
     const afitsants = users.filter((u: any) =>

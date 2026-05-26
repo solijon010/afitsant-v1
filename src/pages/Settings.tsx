@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Languages, Printer, Server, Store, TestTube2 } from 'lucide-react'
+import { ArrowLeft, Languages, Printer, Store, TestTube2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Lang, Settings } from '@shared/types'
 import { useSettings } from '@/stores/settings'
@@ -95,30 +95,6 @@ export default function SettingsPage(): JSX.Element {
           </div>
         </Section>
 
-        <Section title="Server" icon={<Server size={16} />}>
-          <Field label="API URL">
-            <input
-              className="input font-mono text-xs"
-              value={form.serverUrl}
-              onChange={(e) => update('serverUrl', e.target.value)}
-            />
-          </Field>
-          <Field label="WebSocket URL">
-            <input
-              className="input font-mono text-xs"
-              value={form.serverWsUrl}
-              onChange={(e) => update('serverWsUrl', e.target.value)}
-            />
-          </Field>
-          <Field label="API Token">
-            <input
-              type="password"
-              className="input font-mono text-xs"
-              value={form.apiToken ?? ''}
-              onChange={(e) => update('apiToken', e.target.value || null)}
-            />
-          </Field>
-        </Section>
 
         <Section title="Printer" icon={<Printer size={16} />}>
           <Field label="Turi">

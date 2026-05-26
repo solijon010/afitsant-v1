@@ -120,8 +120,8 @@ async function printViaThermalLib(payload: ReceiptPayload): Promise<{ ok: true }
   const { ThermalPrinter, PrinterTypes } = mod as any
   let iface = ''
   if (s.printerType === 'network' && s.printerIp) iface = `tcp://${s.printerIp}:9100`
-  else if (s.printerType === 'windows' && s.printerName) iface = `printer:${s.printerName}`
-  else return { ok: false, error: 'Printer manzili to\'g\'ri sozlanmagan' }
+  else if ((s.printerType === 'windows' || s.printerType === 'usb') && s.printerName) iface = `printer:${s.printerName}`
+  else return { ok: false, error: 'Printer nomi kiritilmagan (Sozlamalar > Printer nomi)' }
 
   const printer = new ThermalPrinter({
     type: PrinterTypes.EPSON,
@@ -180,11 +180,12 @@ export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true 
   const s = getSettings()
   if (!s.printerType) return { ok: false, error: 'Printer sozlanmagan' }
 
-  if (s.printerType === 'usb' || s.printerType === 'raw') {
-    const data = buildEscPos(payload)
-    return printRaw(data)
+  // Linux da USB: to'g'ridan device pathga yozish
+  if (s.printerType === 'usb' && process.platform !== 'win32') {
+    return printRaw(buildEscPos(payload))
   }
 
+  // Windows USB + network + windows: node-thermal-printer orqali
   return printViaThermalLib(payload)
 }
 

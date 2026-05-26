@@ -4,6 +4,8 @@ import { motion } from 'framer-motion'
 import { Building2, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import type { BranchInfo } from '@shared/types'
+import { useMenu } from '@/stores/menu'
+import { useTables } from '@/stores/tables'
 import { cn } from '@/lib/cn'
 
 export default function BranchSelectPage(): JSX.Element {
@@ -12,6 +14,8 @@ export default function BranchSelectPage(): JSX.Element {
   const [branches, setBranches] = useState<BranchInfo[]>([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+  const loadMenu = useMenu((s) => s.load)
+  const loadTables = useTables((s) => s.load)
 
   useEffect(() => {
     const state = location.state as { branches?: BranchInfo[] } | null
@@ -32,9 +36,14 @@ export default function BranchSelectPage(): JSX.Element {
         return
       }
       toast.loading("Ma'lumotlar yuklanmoqda…", { id: 'sync' })
-      await window.afisant.sync.fullPull()
+      const syncRes = await window.afisant.sync.fullPull()
       toast.dismiss('sync')
-      toast.success(`${branch.name} fililiga ulandi`)
+      if (syncRes.ok) {
+        await Promise.all([loadMenu(), loadTables()])
+        toast.success(`${branch.name} fililiga ulandi`)
+      } else {
+        toast.error("Ma'lumotlar yuklanmadi, qayta urinib ko'ring")
+      }
       navigate('/select-waiter', { replace: true })
     } catch {
       toast.error('Xatolik yuz berdi')

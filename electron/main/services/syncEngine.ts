@@ -4,6 +4,7 @@ import { getApi } from './apiClient'
 import { getSettings } from './settings'
 import { getDb } from '../db/connection'
 import { dequeueBatch, markDone, markFailed, queuedCount } from './syncQueue'
+import { syncWaitersForBranch } from './auth'
 
 let socket: Socket | null = null
 let flushTimer: NodeJS.Timeout | null = null
@@ -105,18 +106,19 @@ export async function fullPull(): Promise<{
   counts?: { categories: number; products: number; areas: number; tables: number; waiters: number }
 }> {
   const s = getSettings()
-  if (!s.apiToken || !s.branchId) return { ok: false }
+  if (!s.apiToken) return { ok: false }
 
   const api = getApi()
   const branchId = s.branchId
   const db = getDb()
 
+  const toArray = (raw: any): any[] => (Array.isArray(raw) ? raw : (raw?.data ?? []))
+
   try {
-    const [roomCatsRes, roomsRes, catsRes, prodsRes] = await Promise.allSettled([
-      api.get(`/api/room-category/all/${branchId}`),
-      api.get(`/api/room/all/${branchId}`),
-      api.get(`/api/category/all/${branchId}`),
-      api.get(`/api/product/all/${branchId}?page=1&limit=500`)
+    // 1-qadam: kategoriyalar va xona kategoriyalari (parallel)
+    const [catsRes, roomCatsRes] = await Promise.allSettled([
+      branchId ? api.get(`/api/category/all/${branchId}`) : api.get(`/api/category/all`),
+      branchId ? api.get(`/api/room-category/all/${branchId}`) : api.get(`/api/room-category/all`)
     ])
 
     let areaCount = 0
@@ -124,26 +126,92 @@ export async function fullPull(): Promise<{
     let categoryCount = 0
     let productCount = 0
 
+    // Kategoriyalarni saqlash
+    if (catsRes.status === 'fulfilled') {
+      const cats = toArray(catsRes.value.data)
+      console.log(`[SYNC] categories raw count: ${cats.length}`)
+      const upsertCat = db.prepare(
+        `INSERT INTO categories (server_id, name_uz_latn, name_uz_cyrl, icon, color, sort_order, is_active)
+         VALUES (?, ?, NULL, NULL, NULL, ?, ?)
+         ON CONFLICT(server_id) DO UPDATE SET
+           name_uz_latn = excluded.name_uz_latn,
+           sort_order = excluded.sort_order,
+           is_active = excluded.is_active`
+      )
+      db.transaction(() => {
+        for (let i = 0; i < cats.length; i++) {
+          const c = cats[i]
+          upsertCat.run(c.id, c.name, i, c.status === 'ACTIVE' ? 1 : 0)
+          categoryCount++
+        }
+      })()
+    }
+
+    // Xona kategoriyalarini (areas) saqlash
     if (roomCatsRes.status === 'fulfilled') {
-      const roomCats = roomCatsRes.value.data as any[]
+      const roomCats = toArray(roomCatsRes.value.data)
+      console.log(`[SYNC] room-categories raw count: ${roomCats.length}`)
       const upsertArea = db.prepare(
         `INSERT INTO areas (server_id, name, type, icon, color, sort_order)
          VALUES (?, ?, 'xona', NULL, NULL, ?)
          ON CONFLICT(server_id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order`
       )
-      const tx = db.transaction(() => {
+      db.transaction(() => {
         for (let i = 0; i < roomCats.length; i++) {
           const rc = roomCats[i]
           if (rc.status !== 'ACTIVE') continue
           upsertArea.run(rc.id, rc.name, i)
           areaCount++
         }
-      })
-      tx()
+      })()
     }
 
+    // 2-qadam: mahsulotlar va xonalar (kategoriyalar/arealar DB'da bo'lgandan keyin)
+    const [prodsRes, roomsRes] = await Promise.allSettled([
+      branchId
+        ? api.get(`/api/product/all/${branchId}?page=1&limit=500`)
+        : api.get(`/api/product/all?page=1&limit=500`),
+      branchId ? api.get(`/api/room/all/${branchId}`) : api.get(`/api/room/all`)
+    ])
+
+    // Mahsulotlarni saqlash
+    if (prodsRes.status === 'fulfilled') {
+      const prods = toArray(prodsRes.value.data)
+      console.log(`[SYNC] products raw count: ${prods.length}`)
+      const upsertProd = db.prepare(
+        `INSERT INTO products (server_id, category_id, name_uz_latn, name_uz_cyrl, price, unit, image_url, emoji, is_available, stock, sort_order)
+         SELECT ?, categories.id, ?, NULL, ?, ?, ?, NULL, 1, NULL, ?
+         FROM categories WHERE categories.server_id = ?
+         ON CONFLICT(server_id) DO UPDATE SET
+           name_uz_latn = excluded.name_uz_latn,
+           price = excluded.price,
+           unit = excluded.unit,
+           image_url = excluded.image_url,
+           category_id = (SELECT id FROM categories WHERE server_id = excluded.server_id)`
+      )
+      db.transaction(() => {
+        for (let i = 0; i < prods.length; i++) {
+          const p = prods[i]
+          if (p.status !== 'ACTIVE') continue
+          const unit = (p.unit ?? 'DONA').toLowerCase()
+          const safeUnit = ['dona', 'kg', 'porsiya', 'litr'].includes(unit) ? unit : 'dona'
+          const catServerId = p.productCategoryId ?? p.categoryId ?? null
+          if (!catServerId) continue
+          const photoUrl = p.photo ? `${getSettings().serverUrl}/api/image/${p.photo}` : null
+          try {
+            upsertProd.run(p.id, p.name, Math.round(Number(p.price)), safeUnit, photoUrl, i, catServerId)
+            productCount++
+          } catch (err: any) {
+            console.warn(`[SYNC] product skip: ${p.name} — ${err?.message}`)
+          }
+        }
+      })()
+    }
+
+    // Xonalarni (tables) saqlash
     if (roomsRes.status === 'fulfilled') {
-      const rooms = roomsRes.value.data as any[]
+      const rooms = toArray(roomsRes.value.data)
+      console.log(`[SYNC] rooms raw count: ${rooms.length}`)
       const upsertTable = db.prepare(
         `INSERT INTO tables (server_id, area_id, name, capacity, sort_order)
          SELECT ?, areas.id, ?, NULL, ?
@@ -152,73 +220,23 @@ export async function fullPull(): Promise<{
            name = excluded.name,
            area_id = (SELECT id FROM areas WHERE server_id = excluded.server_id)`
       )
-      const tx = db.transaction(() => {
+      db.transaction(() => {
         for (let i = 0; i < rooms.length; i++) {
           const r = rooms[i]
           if (r.status !== 'ACTIVE') continue
           try {
             upsertTable.run(r.id, r.name, i, r.roomCategoryId)
             tableCount++
-          } catch {}
+          } catch (err: any) {
+            console.warn(`[SYNC] room skip: ${r.name} — ${err?.message}`)
+          }
         }
-      })
-      tx()
+      })()
     }
 
-    if (catsRes.status === 'fulfilled') {
-      const cats = catsRes.value.data as any[]
-      const upsertCat = db.prepare(
-        `INSERT INTO categories (server_id, name_uz_latn, name_uz_cyrl, icon, color, sort_order, is_active)
-         VALUES (?, ?, NULL, NULL, NULL, ?, 1)
-         ON CONFLICT(server_id) DO UPDATE SET
-           name_uz_latn = excluded.name_uz_latn,
-           sort_order = excluded.sort_order,
-           is_active = CASE WHEN excluded.is_active = 1 THEN 1 ELSE 0 END`
-      )
-      const tx = db.transaction(() => {
-        for (let i = 0; i < cats.length; i++) {
-          const c = cats[i]
-          upsertCat.run(c.id, c.name, i, c.status === 'ACTIVE' ? 1 : 0)
-          categoryCount++
-        }
-      })
-      tx()
-    }
+    await syncWaitersForBranch(branchId)
 
-    if (prodsRes.status === 'fulfilled') {
-      const raw = prodsRes.value.data as any
-      const prods: any[] = Array.isArray(raw) ? raw : (raw?.data ?? [])
-      const upsertProd = db.prepare(
-        `INSERT INTO products (server_id, category_id, name_uz_latn, name_uz_cyrl, price, unit, image_url, emoji, is_available, stock, sort_order)
-         SELECT ?, categories.id, ?, NULL, ?, ?, ?, NULL, ?, NULL, ?
-         FROM categories WHERE categories.server_id = ?
-         ON CONFLICT(server_id) DO UPDATE SET
-           name_uz_latn = excluded.name_uz_latn,
-           price = excluded.price,
-           unit = excluded.unit,
-           image_url = excluded.image_url,
-           is_available = excluded.is_available,
-           category_id = (SELECT id FROM categories WHERE server_id = excluded.server_id)`
-      )
-      const tx = db.transaction(() => {
-        for (let i = 0; i < prods.length; i++) {
-          const p = prods[i]
-          if (p.status !== 'ACTIVE') continue
-          const unit = (p.unit ?? 'DONA').toLowerCase() as string
-          const validUnits = ['dona', 'kg', 'porsiya', 'litr']
-          const safeUnit = validUnits.includes(unit) ? unit : 'dona'
-          const catServerId = p.productCategoryId ?? p.categoryId ?? null
-          if (!catServerId) continue
-          const photoUrl = p.photo ? `${getSettings().serverUrl}/api/image/${p.photo}` : null
-          try {
-            upsertProd.run(p.id, p.name, Math.round(Number(p.price)), safeUnit, photoUrl, 1, i, catServerId)
-            productCount++
-          } catch {}
-        }
-      })
-      tx()
-    }
-
+    console.log(`[SYNC] fullPull done — areas:${areaCount} tables:${tableCount} cats:${categoryCount} prods:${productCount}`)
     lastSyncAt = Date.now()
     return {
       ok: true,
