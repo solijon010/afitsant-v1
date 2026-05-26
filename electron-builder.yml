@@ -1,0 +1,42 @@
+appId: uz.sohil.afisant
+productName: Afisant
+copyright: Copyright © 2026 Sohil Choyxona
+
+directories:
+  buildResources: build
+  output: dist-app
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,test,__tests__,tests,powered-test,example,examples}'
+  - '!**/node_modules/.bin'
+  - '!**/*.{map,md,markdown,ts}'
+
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+  - '**/node_modules/bcryptjs/**'
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: Afisant-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Afisant
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+
+portable:
+  artifactName: Afisant-${version}-portable.exe
+
+publish: null
