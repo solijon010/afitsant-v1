@@ -2,17 +2,19 @@ import { getDb } from '../db/connection'
 import type { Lang, Settings } from '@shared/types'
 
 const DEFAULTS: Settings = {
-  serverUrl: 'https://api-restaurant.hisobchim.uz',
-  serverWsUrl: 'wss://api-restaurant.hisobchim.uz',
+  serverUrl: 'http://localhost:5000',
+  serverWsUrl: 'ws://localhost:5000',
   apiToken: null,
+  branchId: null,
   language: 'uz-latn',
   printerType: null,
   printerVid: null,
   printerPid: null,
   printerIp: null,
   printerName: null,
-  organizationName: 'Sohil Choyxona',
-  serviceFeePercent: 1,
+  printerDevicePath: '/dev/usb/lp0',
+  organizationName: 'Restoran',
+  serviceFeePercent: 0,
   receiptHeader: 'Xush kelibsiz!',
   receiptFooter: 'Tashrifingiz uchun rahmat!'
 }
@@ -29,14 +31,16 @@ export function getSettings(): Settings {
     serverUrl: get('serverUrl', (v) => v ?? DEFAULTS.serverUrl),
     serverWsUrl: get('serverWsUrl', (v) => v ?? DEFAULTS.serverWsUrl),
     apiToken: get('apiToken', (v) => (v ? v : null)),
+    branchId: get('branchId', (v) => (v ? v : null)),
     language: get('language', (v) => ((v as Lang) ?? DEFAULTS.language)),
     printerType: get('printerType', (v) => (v ? (v as Settings['printerType']) : null)),
     printerVid: get('printerVid', (v) => (v ? v : null)),
     printerPid: get('printerPid', (v) => (v ? v : null)),
     printerIp: get('printerIp', (v) => (v ? v : null)),
     printerName: get('printerName', (v) => (v ? v : null)),
+    printerDevicePath: get('printerDevicePath', (v) => v ?? DEFAULTS.printerDevicePath),
     organizationName: get('organizationName', (v) => v ?? DEFAULTS.organizationName),
-    serviceFeePercent: get('serviceFeePercent', (v) => (v ? Number(v) : DEFAULTS.serviceFeePercent)),
+    serviceFeePercent: get('serviceFeePercent', (v) => (v !== null && v !== '' ? Number(v) : DEFAULTS.serviceFeePercent)),
     receiptHeader: get('receiptHeader', (v) => (v ? v : DEFAULTS.receiptHeader)),
     receiptFooter: get('receiptFooter', (v) => (v ? v : DEFAULTS.receiptFooter))
   }

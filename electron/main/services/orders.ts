@@ -1,10 +1,138 @@
 import { randomUUID } from 'node:crypto'
 import { getDb } from '../db/connection'
 import { mapOrder, mapOrderItem } from '../db/mappers'
-import type { Order, OrderItem } from '@shared/types'
+import { getApi } from './apiClient'
+import { getSettings } from './settings'
+import type { Order, OrderItem, OrderWithItems } from '@shared/types'
 import { enqueue } from './syncQueue'
 
 const now = () => Date.now()
+
+function buildOrderWithItems(orderId: number): OrderWithItems | null {
+  const db = getDb()
+  const order = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId) as any
+  if (!order) return null
+  const items = db.prepare(`SELECT * FROM order_items WHERE order_id = ? ORDER BY id`).all(orderId) as any[]
+  return { ...mapOrder(order), items: items.map(mapOrderItem) }
+}
+
+export async function getOrderByRoom(roomServerId: string): Promise<OrderWithItems | null> {
+  const s = getSettings()
+  if (!s.apiToken || !s.branchId) return null
+
+  const api = getApi()
+  try {
+    const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+    const data = res.data as any
+    const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+    const active = orders.find(
+      (o: any) =>
+        o.room?.id === roomServerId &&
+        (o.status === 'PENDING' || o.status === 'READY')
+    )
+    if (!active) return null
+
+    const table = getDb()
+      .prepare(`SELECT * FROM tables WHERE server_id = ?`)
+      .get(roomServerId) as any
+    const tableId = table?.id ?? 0
+
+    const waiter = getDb()
+      .prepare(`SELECT * FROM waiters WHERE server_id = ?`)
+      .get(active.user?.id ?? '') as any
+    const waiterId = waiter?.id ?? 1
+
+    const items = (active.orderItem ?? [])
+      .filter((it: any) => it.status !== 'CANCELED')
+      .map((it: any, idx: number) => {
+        const product = getDb()
+          .prepare(`SELECT * FROM products WHERE server_id = ?`)
+          .get(it.product?.id ?? '') as any
+        return {
+          id: idx + 1,
+          serverId: it.id,
+          localUuid: it.id,
+          orderId: 0,
+          productId: product?.id ?? 0,
+          productName: it.product?.name ?? '',
+          unitPrice: Math.round(Number(it.product?.price ?? 0)),
+          quantity: Number(it.count ?? 1),
+          notes: null,
+          syncStatus: 'synced' as const,
+          createdAt: now(),
+          updatedAt: now()
+        }
+      })
+
+    const subtotal = items.reduce((s: number, it: any) => s + it.unitPrice * it.quantity, 0)
+
+    return {
+      id: 0,
+      serverId: active.id,
+      localUuid: active.id,
+      tableId,
+      waiterId,
+      status: 'open',
+      subtotal,
+      serviceFee: 0,
+      total: subtotal,
+      openedAt: new Date(active.createdAt).getTime(),
+      closedAt: null,
+      printedAt: null,
+      notes: null,
+      syncStatus: 'synced',
+      createdAt: new Date(active.createdAt).getTime(),
+      updatedAt: now(),
+      items
+    }
+  } catch (e: any) {
+    console.error('getOrderByRoom error:', e?.message)
+    return null
+  }
+}
+
+export async function syncAllItems(input: {
+  roomServerId: string
+  waiterServerId: string
+  items: Array<{ productServerId: string; count: number }>
+}): Promise<{ serverId: string }> {
+  const s = getSettings()
+  if (!s.apiToken || !s.branchId) throw new Error('Token yoki branchId yo\'q')
+
+  const api = getApi()
+  const { roomServerId, waiterServerId, items } = input
+
+  const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+  const data = res.data as any
+  const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+  const existing = orders.find(
+    (o: any) =>
+      o.room?.id === roomServerId &&
+      (o.status === 'PENDING' || o.status === 'READY')
+  )
+
+  if (existing) {
+    await api.patch(`/api/order/sync-items/${existing.id}`, { items })
+    return { serverId: existing.id }
+  }
+
+  const createRes = await api.post('/api/order', {
+    roomId: roomServerId,
+    waiterId: waiterServerId,
+    orderItems: items.map((it) => ({ productId: it.productServerId, count: it.count }))
+  })
+  return { serverId: createRes.data.id }
+}
+
+export async function closeOrderOnServer(serverOrderId: string): Promise<void> {
+  const api = getApi()
+  await api.patch(`/api/order/status/${serverOrderId}`, { status: 'SUCCESS' })
+}
+
+export async function cancelOrderOnServer(serverOrderId: string): Promise<void> {
+  const api = getApi()
+  await api.patch(`/api/order/status/${serverOrderId}`, { status: 'CANCELED' })
+}
 
 export function upsertOpenOrder(input: {
   tableId: number
@@ -29,13 +157,6 @@ export function upsertOpenOrder(input: {
     .run(localUuid, input.tableId, input.waiterId, ts, input.notes ?? null, ts, ts)
 
   const order = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(info.lastInsertRowid) as any
-  enqueue('order', Number(info.lastInsertRowid), 'create', {
-    localUuid,
-    tableId: input.tableId,
-    waiterId: input.waiterId,
-    serviceFeePercent: input.serviceFeePercent,
-    notes: input.notes ?? null
-  })
   return mapOrder(order)
 }
 
@@ -78,18 +199,6 @@ export function addItems(
     recalculateOrder(orderId)
   })
   tx()
-
-  enqueue('order_items', orderId, 'create', {
-    orderId,
-    items: items.map((i) => ({
-      localUuid: i.localUuid,
-      productId: i.productId,
-      unitPrice: i.unitPrice,
-      quantity: i.quantity,
-      notes: i.notes ?? null
-    }))
-  })
-
   return inserted
 }
 
@@ -105,7 +214,6 @@ export function updateItem(itemId: number, patch: { quantity?: number; notes?: s
 
   recalculateOrder(existing.order_id)
   const row = db.prepare(`SELECT * FROM order_items WHERE id = ?`).get(itemId) as any
-  enqueue('order_item', itemId, 'update', { localUuid: existing.local_uuid, ...patch })
   return mapOrderItem(row)
 }
 
@@ -115,7 +223,6 @@ export function removeItem(itemId: number): void {
   if (!existing) return
   db.prepare(`DELETE FROM order_items WHERE id = ?`).run(itemId)
   recalculateOrder(existing.order_id)
-  enqueue('order_item', itemId, 'delete', { localUuid: existing.local_uuid })
 }
 
 export function closeOrder(orderId: number): Order {
@@ -125,7 +232,6 @@ export function closeOrder(orderId: number): Order {
     `UPDATE orders SET status = 'closed', closed_at = ?, printed_at = ?, sync_status = 'pending', updated_at = ? WHERE id = ?`
   ).run(ts, ts, ts, orderId)
   const row = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId) as any
-  enqueue('order', orderId, 'update', { status: 'closed', closedAt: ts, printedAt: ts })
   return mapOrder(row)
 }
 
@@ -136,7 +242,6 @@ export function cancelOrder(orderId: number): Order {
     `UPDATE orders SET status = 'cancelled', closed_at = ?, sync_status = 'pending', updated_at = ? WHERE id = ?`
   ).run(ts, ts, orderId)
   const row = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId) as any
-  enqueue('order', orderId, 'update', { status: 'cancelled', closedAt: ts })
   return mapOrder(row)
 }
 
@@ -146,14 +251,10 @@ function recalculateOrder(orderId: number): void {
     .prepare(`SELECT unit_price, quantity FROM order_items WHERE order_id = ?`)
     .all(orderId) as Array<{ unit_price: number; quantity: number }>
   const subtotal = items.reduce((s, it) => s + Math.round(it.unit_price * it.quantity), 0)
-
-  const feeRow = db
-    .prepare(`SELECT value FROM settings WHERE key = 'serviceFeePercent'`)
-    .get() as { value: string } | undefined
+  const feeRow = db.prepare(`SELECT value FROM settings WHERE key = 'serviceFeePercent'`).get() as { value: string } | undefined
   const pct = feeRow ? Number(feeRow.value) : 0
   const serviceFee = Math.round((subtotal * pct) / 100)
   const total = subtotal + serviceFee
-
   db.prepare(
     `UPDATE orders SET subtotal = ?, service_fee = ?, total = ?, updated_at = ? WHERE id = ?`
   ).run(subtotal, serviceFee, total, now(), orderId)

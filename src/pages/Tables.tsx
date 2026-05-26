@@ -11,9 +11,9 @@ import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
 
 const AREA_ICON: Record<string, JSX.Element> = {
-  sori: <Sofa size={14} />,
-  xona: <Users size={14} />,
-  katta_xona: <Crown size={14} />
+  sori: <Sofa size={16} />,
+  xona: <Users size={16} />,
+  katta_xona: <Crown size={16} />
 }
 
 const AREA_TONE: Record<string, string> = {
@@ -50,7 +50,7 @@ export default function TablesPage(): JSX.Element {
 
   const handleLogout = (): void => {
     logout()
-    navigate('/login', { replace: true })
+    navigate('/select-waiter', { replace: true })
   }
 
   return (
@@ -104,21 +104,28 @@ function AreaBlock({
   onPick: (tableId: number) => void
 }): JSX.Element {
   const tone = AREA_TONE[area.type] ?? 'text-ink-soft'
+  const bgMap: Record<string, string> = {
+    sori: 'bg-brand-success/10 border-brand-success/20',
+    xona: 'bg-brand-purple/10 border-brand-purple/20',
+    katta_xona: 'bg-brand-primary/10 border-brand-primary/20'
+  }
+  const bgTone = bgMap[area.type] ?? 'bg-bg-elevated border-line'
   const occupied = tables.filter((t) => t.order).length
 
   return (
-    <section className="mb-8">
-      <div className="mb-3 flex items-center gap-3">
-        <span className={cn('inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider', tone)}>
-          {AREA_ICON[area.type] ?? <Sofa size={14} />} {area.name}
+    <section className="mb-10">
+      <div className={cn('mb-4 flex items-center gap-4 rounded-2xl border px-5 py-3', bgTone)}>
+        <span className={cn('inline-flex items-center gap-2 text-base font-bold uppercase tracking-wide', tone)}>
+          {AREA_ICON[area.type] ?? <Sofa size={16} />} {area.name}
         </span>
         {occupied > 0 && (
-          <span className="chip">{occupied} band</span>
+          <span className={cn('rounded-full px-3 py-0.5 text-xs font-semibold', tone, 'bg-current/10 border border-current/20')}>
+            {occupied} band
+          </span>
         )}
-        <span className="ml-auto text-xs text-ink-dim">{tables.length} ta</span>
-        <div className="ml-2 h-px flex-1 bg-line" />
+        <span className="ml-auto text-sm text-ink-dim">{tables.length} ta xona</span>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
         {tables.map((tw, i) => (
           <TableCard key={tw.table.id} tw={tw} idx={i} tone={tone} onClick={() => onPick(tw.table.id)} />
         ))}
@@ -145,27 +152,36 @@ function TableCard({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.015 }}
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.97 }}
       className={cn(
-        'relative flex h-32 flex-col justify-between rounded-2xl border p-4 text-left transition-all',
+        'relative flex h-36 flex-col justify-between rounded-2xl border p-4 text-left transition-all',
         isOpen
-          ? 'border-brand-success/40 bg-brand-success/5 shadow-glow'
+          ? 'border-brand-success/50 bg-brand-success/8 shadow-glow'
           : 'border-line bg-bg-card hover:border-line-strong hover:bg-bg-elevated'
       )}
     >
+      {isOpen && (
+        <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-gradient-to-r from-transparent via-brand-success/60 to-transparent" />
+      )}
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-semibold leading-tight">{tw.table.name}</p>
+          <p className="text-base font-bold leading-tight">{tw.table.name}</p>
           <p className="mt-1 text-xs text-ink-soft">
             {isOpen ? `${tw.order!.items.length} mahsulot` : "Bo'sh"}
           </p>
         </div>
-        {isOpen && <span className="h-2 w-2 animate-pulse rounded-full bg-brand-success shadow-glow" />}
+        {isOpen && <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-brand-success shadow-glow" />}
       </div>
-      {isOpen && (
+      {isOpen ? (
         <div className="text-right">
-          <p className={cn('text-base font-semibold', tone)}>{fmtMoney(tw.order!.total)} so'm</p>
+          <p className={cn('text-lg font-bold', tone)}>{fmtMoney(tw.order!.total)}</p>
+          <p className="text-xs text-ink-dim">so'm</p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 text-xs text-ink-dim">
+          <span className="h-1.5 w-1.5 rounded-full bg-ink-dim/40" />
+          Bo&apos;sh
         </div>
       )}
     </motion.button>

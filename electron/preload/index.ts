@@ -5,6 +5,8 @@ const api: BridgeAPI = {
   ping: () => ipcRenderer.invoke(IPC.ping),
 
   auth: {
+    loginServer: (identifier, password) => ipcRenderer.invoke(IPC.authLoginServer, identifier, password),
+    selectBranch: (branchId, branchName) => ipcRenderer.invoke(IPC.authSelectBranch, branchId, branchName),
     listWaiters: () => ipcRenderer.invoke(IPC.authListWaiters),
     verifyPin: (waiterId, pin) => ipcRenderer.invoke(IPC.authVerifyPin, waiterId, pin),
     logout: () => ipcRenderer.invoke(IPC.authLogout)
@@ -27,12 +29,14 @@ const api: BridgeAPI = {
   },
 
   orders: {
+    getByRoom: (roomServerId) => ipcRenderer.invoke(IPC.ordersGetByRoom, roomServerId),
     upsert: (input) => ipcRenderer.invoke(IPC.ordersUpsert, input),
+    syncAll: (input) => ipcRenderer.invoke(IPC.ordersSyncAll, input),
     addItems: (orderId, items) => ipcRenderer.invoke(IPC.ordersAddItems, orderId, items),
     updateItem: (itemId, patch) => ipcRenderer.invoke(IPC.ordersUpdateItem, itemId, patch),
     removeItem: (itemId) => ipcRenderer.invoke(IPC.ordersRemoveItem, itemId),
-    close: (orderId) => ipcRenderer.invoke(IPC.ordersClose, orderId),
-    cancel: (orderId) => ipcRenderer.invoke(IPC.ordersCancel, orderId)
+    close: (orderId, serverOrderId) => ipcRenderer.invoke(IPC.ordersClose, orderId, serverOrderId),
+    cancel: (orderId, serverOrderId) => ipcRenderer.invoke(IPC.ordersCancel, orderId, serverOrderId)
   },
 
   printer: {

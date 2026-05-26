@@ -5,23 +5,24 @@ import type { Product } from '@shared/types'
 export interface CartLine {
   localUuid: string
   productId: number
+  productServerId: string | null
   productName: string
   unitPrice: number
   quantity: number
   notes: string | null
-  /** server'ga yuborilganmi? */
   flushed: boolean
-  /** server'dagi order_item id (flush bo'lgandan keyin) */
   itemId: number | null
   addedAt: number
 }
 
 interface CartState {
   orderId: number | null
+  serverOrderId: string | null
   tableId: number | null
+  roomServerId: string | null
   lines: CartLine[]
   serviceFeePercent: number
-  setOrder: (orderId: number | null, tableId: number | null) => void
+  setOrder: (orderId: number | null, tableId: number | null, serverOrderId?: string | null, roomServerId?: string | null) => void
   hydrateFromOrder: (lines: CartLine[]) => void
   add: (product: Product, quantity?: number) => void
   increment: (localUuid: string) => void
@@ -37,10 +38,13 @@ interface CartState {
 
 export const useCart = create<CartState>((set, get) => ({
   orderId: null,
+  serverOrderId: null,
   tableId: null,
+  roomServerId: null,
   lines: [],
-  serviceFeePercent: 1,
-  setOrder: (orderId, tableId) => set({ orderId, tableId, lines: [] }),
+  serviceFeePercent: 0,
+  setOrder: (orderId, tableId, serverOrderId = null, roomServerId = null) =>
+    set({ orderId, tableId, serverOrderId, roomServerId, lines: [] }),
   hydrateFromOrder: (lines) => set({ lines }),
   add: (product, quantity = 1) => {
     const lines = get().lines
@@ -57,6 +61,7 @@ export const useCart = create<CartState>((set, get) => ({
         {
           localUuid: nanoid(),
           productId: product.id,
+          productServerId: product.serverId ?? null,
           productName: product.nameUzLatn,
           unitPrice: product.price,
           quantity,
@@ -100,8 +105,7 @@ export const useCart = create<CartState>((set, get) => ({
   },
   clear: () => set({ lines: [] }),
   pendingCount: () => get().lines.filter((l) => !l.flushed).length,
-  subtotal: () =>
-    get().lines.reduce((s, l) => s + Math.round(l.unitPrice * l.quantity), 0),
+  subtotal: () => get().lines.reduce((s, l) => s + Math.round(l.unitPrice * l.quantity), 0),
   serviceFee: () => Math.round((get().subtotal() * get().serviceFeePercent) / 100),
   total: () => get().subtotal() + get().serviceFee()
 }))

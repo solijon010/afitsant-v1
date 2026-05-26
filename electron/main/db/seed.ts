@@ -116,17 +116,19 @@ const DEFAULT_CATEGORIES: Array<{
 ]
 
 const DEFAULT_SETTINGS: Record<string, string> = {
-  serverUrl: 'https://api-restaurant.hisobchim.uz',
-  serverWsUrl: 'wss://api-restaurant.hisobchim.uz',
+  serverUrl: 'http://localhost:5000',
+  serverWsUrl: 'ws://localhost:5000',
   apiToken: '',
+  branchId: '',
   language: 'uz-latn',
   printerType: '',
   printerVid: '',
   printerPid: '',
   printerIp: '',
   printerName: '',
-  organizationName: 'Sohil Choyxona',
-  serviceFeePercent: '1',
+  printerDevicePath: '/dev/usb/lp0',
+  organizationName: 'Restoran',
+  serviceFeePercent: '0',
   receiptHeader: 'Xush kelibsiz!',
   receiptFooter: 'Tashrifingiz uchun rahmat!'
 }

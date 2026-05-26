@@ -1,5 +1,6 @@
 import type {
   Area,
+  BranchInfo,
   Category,
   Lang,
   Order,
@@ -7,6 +8,7 @@ import type {
   OrderWithItems,
   Product,
   ReceiptPayload,
+  ServerLoginResult,
   Settings,
   TableEntity,
   TableWithOrder,
@@ -16,6 +18,8 @@ import type {
 export const IPC = {
   ping: 'app:ping',
 
+  authLoginServer: 'auth:loginServer',
+  authSelectBranch: 'auth:selectBranch',
   authListWaiters: 'auth:listWaiters',
   authVerifyPin: 'auth:verifyPin',
   authLogout: 'auth:logout',
@@ -28,11 +32,13 @@ export const IPC = {
   tablesList: 'tables:list',
   tablesSnapshot: 'tables:snapshot',
 
+  ordersGetByRoom: 'orders:getByRoom',
   ordersGetByTable: 'orders:getByTable',
   ordersUpsert: 'orders:upsert',
   ordersAddItems: 'orders:addItems',
   ordersRemoveItem: 'orders:removeItem',
   ordersUpdateItem: 'orders:updateItem',
+  ordersSyncAll: 'orders:syncAll',
   ordersClose: 'orders:close',
   ordersCancel: 'orders:cancel',
 
@@ -57,6 +63,8 @@ export interface BridgeAPI {
   ping: () => Promise<'pong'>
 
   auth: {
+    loginServer: (identifier: string, password: string) => Promise<ServerLoginResult>
+    selectBranch: (branchId: string, branchName: string) => Promise<{ ok: boolean }>
     listWaiters: () => Promise<Waiter[]>
     verifyPin: (waiterId: number, pin: string) => Promise<{
       ok: boolean
@@ -85,12 +93,18 @@ export interface BridgeAPI {
   }
 
   orders: {
+    getByRoom: (roomServerId: string) => Promise<OrderWithItems | null>
     upsert: (input: {
       tableId: number
       waiterId: number
       serviceFeePercent: number
       notes?: string | null
     }) => Promise<Order>
+    syncAll: (input: {
+      roomServerId: string
+      waiterServerId: string
+      items: Array<{ productServerId: string; count: number }>
+    }) => Promise<{ serverId: string }>
     addItems: (
       orderId: number,
       items: Array<{
@@ -104,8 +118,8 @@ export interface BridgeAPI {
     ) => Promise<OrderItem[]>
     updateItem: (itemId: number, patch: { quantity?: number; notes?: string | null }) => Promise<OrderItem>
     removeItem: (itemId: number) => Promise<void>
-    close: (orderId: number) => Promise<Order>
-    cancel: (orderId: number) => Promise<Order>
+    close: (orderId: number, serverOrderId?: string) => Promise<Order>
+    cancel: (orderId: number, serverOrderId?: string) => Promise<Order>
   }
 
   printer: {

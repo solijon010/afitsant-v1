@@ -114,12 +114,14 @@ export interface Settings {
   serverUrl: string
   serverWsUrl: string
   apiToken: string | null
+  branchId: string | null
   language: Lang
-  printerType: 'usb' | 'network' | 'windows' | null
+  printerType: 'usb' | 'network' | 'windows' | 'raw' | null
   printerVid: string | null
   printerPid: string | null
   printerIp: string | null
   printerName: string | null
+  printerDevicePath: string | null
   organizationName: string
   serviceFeePercent: number
   receiptHeader: string | null
@@ -153,4 +155,27 @@ export interface SyncEvent {
     | 'order.closed'
   payload: unknown
   at: number
+}
+
+export interface ServerUser {
+  id: string
+  firstName: string
+  lastName: string
+  role: string
+  phoneNumer: string
+}
+
+export interface BranchInfo {
+  id: string
+  name: string
+  addres: string
+  companyId: string
+}
+
+export interface ServerLoginResult {
+  ok: boolean
+  token?: string
+  user?: ServerUser
+  branches?: BranchInfo[]
+  message?: string
 }

@@ -1,5 +1,7 @@
 import { getDb } from '../db/connection'
 import { mapArea, mapOrder, mapOrderItem, mapTable } from '../db/mappers'
+import { getApi } from './apiClient'
+import { getSettings } from './settings'
 import type { Area, OrderWithItems, TableEntity, TableWithOrder } from '@shared/types'
 
 export function listAreas(): Area[] {
@@ -26,7 +28,82 @@ export function getOpenOrderByTable(tableId: number): OrderWithItems | null {
   return { ...mapOrder(order), items: items.map(mapOrderItem) }
 }
 
-export function snapshot(): TableWithOrder[] {
+export async function snapshot(): Promise<TableWithOrder[]> {
+  const s = getSettings()
+  const db = getDb()
   const tables = listTables()
-  return tables.map((t) => ({ table: t, order: getOpenOrderByTable(t.id) }))
+
+  if (!s.apiToken || !s.branchId) {
+    return tables.map((t) => ({ table: t, order: getOpenOrderByTable(t.id) }))
+  }
+
+  const api = getApi()
+  let activeOrders: any[] = []
+  try {
+    const res = await api.get(`/api/order/branch/${s.branchId}?limit=200`)
+    const data = res.data as any
+    const all: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+    activeOrders = all.filter((o: any) => o.status === 'PENDING' || o.status === 'READY')
+  } catch (e: any) {
+    console.error('snapshot orders fetch error:', e?.message)
+  }
+
+  const now = Date.now()
+
+  return tables.map((table) => {
+    const backendOrder = activeOrders.find((o: any) => o.room?.id === table.serverId)
+    if (!backendOrder) {
+      return { table, order: null }
+    }
+
+    const waiter = backendOrder.user
+      ? (db.prepare(`SELECT * FROM waiters WHERE server_id = ?`).get(backendOrder.user.id) as any)
+      : null
+
+    const items = (backendOrder.orderItem ?? [])
+      .filter((it: any) => it.status !== 'CANCELED')
+      .map((it: any, idx: number) => {
+        const product = it.product?.id
+          ? (db.prepare(`SELECT * FROM products WHERE server_id = ?`).get(it.product.id) as any)
+          : null
+        return {
+          id: idx + 1,
+          serverId: it.id,
+          localUuid: it.id,
+          orderId: 0,
+          productId: product?.id ?? 0,
+          productName: it.product?.name ?? '',
+          unitPrice: Math.round(Number(it.product?.price ?? 0)),
+          quantity: Number(it.count ?? 1),
+          notes: null,
+          syncStatus: 'synced' as const,
+          createdAt: now,
+          updatedAt: now
+        }
+      })
+
+    const subtotal = items.reduce((s: number, it: any) => s + it.unitPrice * it.quantity, 0)
+
+    const order: OrderWithItems = {
+      id: 0,
+      serverId: backendOrder.id,
+      localUuid: backendOrder.id,
+      tableId: table.id,
+      waiterId: waiter?.id ?? 0,
+      status: 'open',
+      subtotal,
+      serviceFee: 0,
+      total: subtotal,
+      openedAt: new Date(backendOrder.createdAt).getTime(),
+      closedAt: null,
+      printedAt: null,
+      notes: null,
+      syncStatus: 'synced',
+      createdAt: new Date(backendOrder.createdAt).getTime(),
+      updatedAt: now,
+      items
+    }
+
+    return { table, order }
+  })
 }

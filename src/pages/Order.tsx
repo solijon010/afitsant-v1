@@ -23,17 +23,16 @@ import { useCart, type CartLine } from '@/stores/cart'
 import { useMenu } from '@/stores/menu'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
-import { useCartFlush } from '@/hooks/useCartFlush'
 import { fmtMoney, fmtQty } from '@/lib/format'
 import { cn } from '@/lib/cn'
 
 const CAT_ICON: Record<string, JSX.Element> = {
-  package: <Package size={16} />,
-  leaf: <Leaf size={16} />,
-  plus: <Plus size={16} />,
-  'cup-soda': <CupSoda size={16} />,
-  flame: <Flame size={16} />,
-  'chef-hat': <ChefHat size={16} />
+  package: <Package size={18} />,
+  leaf: <Leaf size={18} />,
+  plus: <Plus size={18} />,
+  'cup-soda': <CupSoda size={18} />,
+  flame: <Flame size={18} />,
+  'chef-hat': <ChefHat size={18} />
 }
 
 export default function OrderPage(): JSX.Element {
@@ -46,12 +45,12 @@ export default function OrderPage(): JSX.Element {
   const refreshTable = useTables((s) => s.refreshTable)
 
   const cart = useCart()
-  const { flushNow } = useCartFlush()
 
   const [activeCatId, setActiveCatId] = useState<number | null>(null)
   const [table, setTable] = useState<TableEntity | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
   const [printing, setPrinting] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!activeCatId && categories[0]) setActiveCatId(categories[0].id)
@@ -62,40 +61,59 @@ export default function OrderPage(): JSX.Element {
   }, [tId])
 
   useEffect(() => {
-    if (!waiter || !tId) return
+    if (!table || !waiter) return
     let cancelled = false
     void (async () => {
-      const fee = settings?.serviceFeePercent ?? 1
+      const fee = settings?.serviceFeePercent ?? 0
       useCart.setState({ serviceFeePercent: fee })
-      const order = await window.afisant.orders.upsert({
-        tableId: tId,
-        waiterId: waiter.id,
-        serviceFeePercent: fee
-      })
-      if (cancelled) return
-      const existing = await window.afisant.tables.getByTable(tId)
-      cart.setOrder(order.id, tId)
-      if (existing) {
-        cart.hydrateFromOrder(
-          existing.items.map<CartLine>((it) => ({
-            localUuid: it.localUuid,
-            productId: it.productId,
-            productName: it.productName,
-            unitPrice: it.unitPrice,
-            quantity: it.quantity,
-            notes: it.notes,
-            flushed: true,
-            itemId: it.id,
-            addedAt: it.createdAt
-          }))
-        )
+
+      const roomServerId = table.serverId
+
+      if (roomServerId) {
+        cart.setOrder(0, tId, null, roomServerId)
+        const existingOrder = await window.afisant.orders.getByRoom(roomServerId)
+        if (cancelled) return
+
+        if (existingOrder) {
+          useCart.setState({
+            serverOrderId: existingOrder.serverId ?? null,
+            roomServerId
+          })
+          cart.hydrateFromOrder(
+            existingOrder.items.map<CartLine>((it) => {
+              const product = products.find((p) => p.id === it.productId || p.serverId === it.serverId)
+              return {
+                localUuid: it.localUuid,
+                productId: it.productId,
+                productServerId: product?.serverId ?? null,
+                productName: it.productName,
+                unitPrice: it.unitPrice,
+                quantity: it.quantity,
+                notes: it.notes,
+                flushed: true,
+                itemId: it.id,
+                addedAt: it.createdAt
+              }
+            })
+          )
+        }
+      } else {
+        const fee2 = settings?.serviceFeePercent ?? 0
+        useCart.setState({ serviceFeePercent: fee2 })
+        const order = await window.afisant.orders.upsert({
+          tableId: tId,
+          waiterId: waiter.id,
+          serviceFeePercent: fee2
+        })
+        if (cancelled) return
+        cart.setOrder(order.id, tId)
       }
     })()
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tId, waiter?.id, settings?.serviceFeePercent])
+  }, [tId, table, waiter?.id, settings?.serviceFeePercent])
 
   const shownProducts = useMemo<Product[]>(
     () => products.filter((p) => p.categoryId === activeCatId),
@@ -103,26 +121,77 @@ export default function OrderPage(): JSX.Element {
   )
 
   const handleSave = async (): Promise<void> => {
-    await flushNow()
-    await refreshTable(tId)
-    toast.success('Buyurtma saqlandi')
-    navigate('/tables')
+    if (cart.lines.length === 0) {
+      navigate('/tables')
+      return
+    }
+    setSaving(true)
+    try {
+      const roomServerId = useCart.getState().roomServerId
+      const waiterServerId = waiter.serverId
+
+      if (roomServerId && waiterServerId) {
+        const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
+        if (itemsWithServerId.length > 0) {
+          const res = await window.afisant.orders.syncAll({
+            roomServerId,
+            waiterServerId,
+            items: itemsWithServerId.map((l) => ({
+              productServerId: l.productServerId!,
+              count: Math.round(l.quantity)
+            }))
+          })
+          useCart.setState({ serverOrderId: res.serverId })
+          useCart.setState({
+            lines: cart.lines.map((l) => ({ ...l, flushed: true }))
+          })
+        }
+      }
+
+      await refreshTable(tId)
+      toast.success('Buyurtma saqlandi')
+      cart.clear()
+      cart.setOrder(null, null)
+      navigate('/tables')
+    } catch (e: any) {
+      toast.error('Saqlashda xatolik', { description: e?.message })
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleCloseAndPrint = async (): Promise<void> => {
-    if (!cart.orderId || !table || !waiter) return
-    if (cart.lines.length === 0) {
+    if (!table || !waiter) return
+    if (cart.lines.length === 0 && !cart.serverOrderId) {
       toast.error("Savat bo'sh")
       return
     }
     setPrinting(true)
     try {
-      await flushNow()
+      const roomServerId = useCart.getState().roomServerId
+      const waiterServerId = waiter.serverId
+      let serverOrderId = useCart.getState().serverOrderId
+
+      if (roomServerId && waiterServerId && cart.lines.length > 0) {
+        const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
+        if (itemsWithServerId.length > 0) {
+          const res = await window.afisant.orders.syncAll({
+            roomServerId,
+            waiterServerId,
+            items: itemsWithServerId.map((l) => ({
+              productServerId: l.productServerId!,
+              count: Math.round(l.quantity)
+            }))
+          })
+          serverOrderId = res.serverId
+        }
+      }
+
       const payload: ReceiptPayload = {
-        organizationName: settings?.organizationName ?? 'Choyxona',
+        organizationName: settings?.organizationName ?? 'Restoran',
         tableName: table.name,
         waiterName: `${waiter.firstName} ${waiter.lastName}`,
-        orderLocalUuid: String(cart.orderId),
+        orderLocalUuid: serverOrderId ?? String(cart.orderId ?? 'unkwn'),
         items: cart.lines.map((l) => ({
           name: l.productName,
           quantity: l.quantity,
@@ -137,20 +206,30 @@ export default function OrderPage(): JSX.Element {
         receiptHeader: settings?.receiptHeader ?? null,
         receiptFooter: settings?.receiptFooter ?? null
       }
+
       const res = await window.afisant.printer.receipt(payload)
-      if (!res.ok && settings?.printerType) {
-        toast.error('Chek chiqarib bo\'lmadi', { description: (res as any).error })
-      } else if (!res.ok) {
-        toast.message('Printer ulanmagan — chek o\'tkazib yuborildi')
+      if (!res.ok) {
+        if (settings?.printerType) {
+          toast.error("Chek chiqarib bo'lmadi", { description: (res as any).error })
+        } else {
+          toast.message("Printer ulanmagan — chek o'tkazib yuborildi")
+        }
       } else {
         toast.success('Chek chiqdi')
       }
 
-      await window.afisant.orders.close(cart.orderId)
+      if (serverOrderId) {
+        await window.afisant.orders.close(cart.orderId ?? 0, serverOrderId)
+      } else if (cart.orderId) {
+        await window.afisant.orders.close(cart.orderId)
+      }
+
       cart.clear()
       cart.setOrder(null, null)
       await refreshTable(tId)
       navigate('/tables')
+    } catch (e: any) {
+      toast.error('Xatolik', { description: e?.message })
     } finally {
       setPrinting(false)
       setConfirmClose(false)
@@ -166,20 +245,20 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full grid-cols-[1fr_380px]">
+    <div className="grid h-full grid-cols-[1fr_400px]">
       <section className="flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between px-6 py-4">
+        <header className="flex items-center justify-between border-b border-line px-6 py-4">
           <button onClick={() => navigate('/tables')} className="btn-ghost">
             <ArrowLeft size={16} /> Orqaga
           </button>
           <div className="text-center">
-            <p className="text-xs uppercase tracking-wider text-ink-soft">STOL</p>
-            <p className="text-lg font-semibold">{table.name}</p>
+            <p className="text-xs uppercase tracking-wider text-ink-soft">XONA / STOL</p>
+            <p className="text-xl font-bold">{table.name}</p>
           </div>
           <div className="w-[100px]" />
         </header>
 
-        <nav className="flex gap-2 overflow-x-auto px-6 pb-3">
+        <nav className="flex gap-3 overflow-x-auto border-b border-line px-6 py-4">
           {categories.map((c) => (
             <CategoryPill
               key={c.id}
@@ -190,12 +269,18 @@ export default function OrderPage(): JSX.Element {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {shownProducts.map((p, idx) => (
-              <ProductCard key={p.id} product={p} idx={idx} />
-            ))}
-          </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {shownProducts.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-ink-dim">
+              Bu kategoriyada mahsulot yo'q
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {shownProducts.map((p, idx) => (
+                <ProductCard key={p.id} product={p} idx={idx} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -204,6 +289,7 @@ export default function OrderPage(): JSX.Element {
         onSave={handleSave}
         onClosePrint={() => setConfirmClose(true)}
         printing={printing}
+        saving={saving}
       />
 
       <AnimatePresence>
@@ -233,14 +319,20 @@ function CategoryPill({
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium transition-all',
+        'inline-flex shrink-0 items-center gap-2.5 rounded-2xl border px-5 py-3 text-base font-semibold transition-all',
         active
           ? 'border-brand-primary bg-brand-primary text-black shadow-glow-amber'
           : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
       )}
-      style={active && cat.color ? { borderColor: cat.color, background: cat.color, boxShadow: `0 0 24px ${cat.color}33` } : undefined}
+      style={
+        active && cat.color
+          ? { borderColor: cat.color, background: cat.color, boxShadow: `0 0 24px ${cat.color}55` }
+          : undefined
+      }
     >
-      <span className={active ? 'text-black' : ''}>{CAT_ICON[cat.icon ?? ''] ?? <Package size={16} />}</span>
+      <span className={active ? 'text-black' : 'text-ink-soft'}>
+        {CAT_ICON[cat.icon ?? ''] ?? <Package size={18} />}
+      </span>
       {cat.nameUzLatn}
     </button>
   )
@@ -249,35 +341,70 @@ function CategoryPill({
 function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
+  const inc = useCart((s) => s.increment)
+  const dec = useCart((s) => s.decrement)
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
+  const line = lines.find((l) => l.productId === product.id)
 
   return (
-    <motion.button
-      onClick={() => add(product)}
+    <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.015 }}
-      whileTap={{ scale: 0.97 }}
       className={cn(
-        'group relative flex h-32 flex-col justify-between rounded-2xl border p-4 text-left transition-all',
+        'relative flex flex-col justify-between rounded-2xl border p-4 transition-all',
         qty > 0
-          ? 'border-brand-success/50 bg-brand-success/10 shadow-glow'
+          ? 'border-brand-success/50 bg-brand-success/8 shadow-glow'
           : 'border-line bg-bg-card hover:border-line-strong hover:bg-bg-elevated'
       )}
     >
-      <div className="flex items-start justify-between">
-        <span className="text-2xl">{product.emoji ?? '📦'}</span>
-        {qty > 0 && (
-          <span className="grid h-6 min-w-6 place-items-center rounded-full bg-brand-success px-1.5 text-xs font-bold text-black">
-            {fmtQty(qty)}
-          </span>
+      {product.imageUrl ? (
+        <img
+          src={product.imageUrl}
+          alt={product.nameUzLatn}
+          className="mb-2 h-20 w-full rounded-xl object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none'
+          }}
+        />
+      ) : (
+        <div className="mb-2 flex h-16 items-center justify-start text-3xl">
+          {product.emoji ?? '📦'}
+        </div>
+      )}
+      <div className="flex-1">
+        <p className="line-clamp-2 text-sm font-semibold leading-tight">{product.nameUzLatn}</p>
+        <p className="mt-1 text-sm font-bold text-brand-success">{fmtMoney(product.price)} so'm</p>
+      </div>
+      <div className="mt-3">
+        {qty === 0 ? (
+          <button
+            onClick={() => add(product)}
+            className="w-full rounded-xl border border-brand-success/40 bg-brand-success/10 py-2 text-sm font-semibold text-brand-success transition-all hover:bg-brand-success/20"
+          >
+            + Qo'shish
+          </button>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={() => line && dec(line.localUuid)}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
+            >
+              <Minus size={14} />
+            </button>
+            <span className="min-w-[2rem] text-center text-base font-bold text-brand-success">
+              {fmtQty(qty)}
+            </span>
+            <button
+              onClick={() => add(product)}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-brand-success/40 bg-brand-success/10 text-brand-success hover:bg-brand-success/20"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         )}
       </div>
-      <div>
-        <p className="line-clamp-2 text-sm font-semibold leading-tight">{product.nameUzLatn}</p>
-        <p className="mt-1 text-sm text-brand-success">{fmtMoney(product.price)} so'm</p>
-      </div>
-    </motion.button>
+    </motion.div>
   )
 }
 
@@ -285,12 +412,14 @@ function CartPanel({
   table,
   onSave,
   onClosePrint,
-  printing
+  printing,
+  saving
 }: {
   table: TableEntity
   onSave: () => Promise<void> | void
   onClosePrint: () => void
   printing: boolean
+  saving: boolean
 }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const inc = useCart((s) => s.increment)
@@ -300,7 +429,6 @@ function CartPanel({
   const fee = useCart((s) => s.serviceFee())
   const total = useCart((s) => s.total())
   const feePct = useCart((s) => s.serviceFeePercent)
-  const pending = lines.filter((l) => !l.flushed).length
 
   return (
     <aside className="flex h-full flex-col border-l border-line bg-bg-soft/40">
@@ -323,7 +451,7 @@ function CartPanel({
         {lines.length === 0 ? (
           <div className="grid h-full place-items-center px-6 text-center text-sm text-ink-dim">
             <div>
-              <ShoppingCart className="mx-auto mb-2 opacity-30" size={28} />
+              <ShoppingCart className="mx-auto mb-2 opacity-30" size={32} />
               Mahsulotlarni tanlang
             </div>
           </div>
@@ -337,15 +465,12 @@ function CartPanel({
                   initial={{ opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 8 }}
-                  className={cn(
-                    'rounded-xl border bg-bg-card px-3 py-2.5',
-                    l.flushed ? 'border-line' : 'border-brand-warn/30 bg-brand-warn/5'
-                  )}
+                  className="rounded-xl border border-line bg-bg-card px-3 py-2.5"
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{l.productName}</p>
-                      <p className="text-xs text-ink-soft">{fmtMoney(l.unitPrice)} so'm /dona</p>
+                      <p className="text-xs text-ink-soft">{fmtMoney(l.unitPrice)} so'm</p>
                     </div>
                     <button
                       onClick={() => rem(l.localUuid)}
@@ -381,18 +506,19 @@ function CartPanel({
           {fee > 0 && <Row label={`Xizmat (${feePct}%)`} value={`${fmtMoney(fee)} so'm`} muted />}
           <div className="my-2 h-px bg-line" />
           <Row label="Jami" value={`${fmtMoney(total)} so'm`} large />
-          {pending > 0 && (
-            <p className="text-right text-[11px] text-brand-warn">{pending} ta mahsulot sinx kutmoqda</p>
-          )}
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => onSave()} className="btn-ghost" disabled={lines.length === 0}>
-            <Save size={14} /> Saqlash
+          <button
+            onClick={() => void onSave()}
+            className="btn-ghost"
+            disabled={saving || printing}
+          >
+            <Save size={14} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </button>
           <button
             onClick={onClosePrint}
             className="btn-success"
-            disabled={lines.length === 0 || printing}
+            disabled={lines.length === 0 || printing || saving}
           >
             <Printer size={14} /> Chek & Yopish
           </button>
@@ -464,10 +590,12 @@ function ConfirmCloseModal({
           <Printer size={22} />
         </div>
         <h3 className="text-lg font-semibold">Buyurtmani yopish</h3>
-        <p className="mt-1 text-sm text-ink-soft">Chek chiqariladi va buyurtma yopiladi. Davom etamizmi?</p>
+        <p className="mt-1 text-sm text-ink-soft">
+          Chek chiqariladi va buyurtma yopiladi. Davom etamizmi?
+        </p>
         <div className="my-4 rounded-2xl border border-line bg-bg-card p-3 text-center">
           <p className="text-xs uppercase tracking-wider text-ink-soft">Jami</p>
-          <p className="text-2xl font-bold text-brand-success">{fmtMoney(total)} so'm</p>
+          <p className="text-3xl font-bold text-brand-success">{fmtMoney(total)} so'm</p>
         </div>
         <div className="flex gap-2">
           <button onClick={onCancel} className="btn-ghost flex-1" disabled={busy}>
