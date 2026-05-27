@@ -22,6 +22,7 @@ export const IPC = {
   authSelectBranch: 'auth:selectBranch',
   authListWaiters: 'auth:listWaiters',
   authVerifyPin: 'auth:verifyPin',
+  authSetPin: 'auth:setPin',
   authLogout: 'auth:logout',
 
   menuGetCategories: 'menu:getCategories',
@@ -73,6 +74,7 @@ export interface BridgeAPI {
       attemptsLeft?: number
       message?: string
     }>
+    setPin: (waiterId: number, pin: string) => Promise<{ ok: boolean; message?: string }>
     logout: () => Promise<void>
   }
 

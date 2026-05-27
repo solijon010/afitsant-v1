@@ -9,6 +9,7 @@ const api: BridgeAPI = {
     selectBranch: (branchId, branchName) => ipcRenderer.invoke(IPC.authSelectBranch, branchId, branchName),
     listWaiters: () => ipcRenderer.invoke(IPC.authListWaiters),
     verifyPin: (waiterId, pin) => ipcRenderer.invoke(IPC.authVerifyPin, waiterId, pin),
+    setPin: (waiterId, pin) => ipcRenderer.invoke(IPC.authSetPin, waiterId, pin),
     logout: () => ipcRenderer.invoke(IPC.authLogout)
   },
 
