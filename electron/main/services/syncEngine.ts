@@ -187,7 +187,8 @@ export async function fullPull(): Promise<{
            price = excluded.price,
            unit = excluded.unit,
            image_url = excluded.image_url,
-           category_id = (SELECT id FROM categories WHERE server_id = excluded.server_id)`
+           sort_order = excluded.sort_order,
+           category_id = excluded.category_id`
       )
       db.transaction(() => {
         for (let i = 0; i < prods.length; i++) {
@@ -218,7 +219,8 @@ export async function fullPull(): Promise<{
          FROM areas WHERE areas.server_id = ?
          ON CONFLICT(server_id) DO UPDATE SET
            name = excluded.name,
-           area_id = (SELECT id FROM areas WHERE server_id = excluded.server_id)`
+           sort_order = excluded.sort_order,
+           area_id = excluded.area_id`
       )
       db.transaction(() => {
         for (let i = 0; i < rooms.length; i++) {

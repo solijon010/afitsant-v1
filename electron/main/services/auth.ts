@@ -79,6 +79,17 @@ export async function syncWaitersForBranch(branchId?: string | null): Promise<vo
     )
     const db = getDb()
     const now = Date.now()
+
+    // bcrypt.hash async — main thread ni bloklamaslik uchun transaction dan oldin bajaramiz
+    const rows: Array<{ u: any; phone: string; pinHash: string }> = []
+    for (const u of afitsants) {
+      const existing = db.prepare(`SELECT pin_hash FROM waiters WHERE server_id = ?`).get(u.id) as any
+      const phone = u.phoneNumer ?? u.phone ?? ''
+      const pinHash: string = existing?.pin_hash
+        ?? await bcrypt.hash(phone.length >= 4 ? phone.slice(-4) : '1234', 8)
+      rows.push({ u, phone, pinHash })
+    }
+
     const stmt = db.prepare(
       `INSERT INTO waiters (server_id, first_name, last_name, phone, pin_hash, role, is_active, failed_attempts, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
@@ -90,19 +101,28 @@ export async function syncWaitersForBranch(branchId?: string | null): Promise<vo
          is_active = 1,
          updated_at = excluded.updated_at`
     )
-    const tx = db.transaction(() => {
-      for (const u of afitsants) {
-        const existing = db.prepare(`SELECT pin_hash FROM waiters WHERE server_id = ?`).get(u.id) as any
-        const phone = u.phoneNumer ?? u.phone ?? ''
-        const defaultPin = phone.length >= 4 ? phone.slice(-4) : '1234'
-        const pinHash = existing?.pin_hash ?? bcrypt.hashSync(defaultPin, 8)
+    db.transaction(() => {
+      for (const { u, phone, pinHash } of rows) {
         stmt.run(u.id, u.firstName, u.lastName, phone, pinHash, mapRole(u.role), now, now)
       }
-    })
-    tx()
+    })()
   } catch (e: any) {
     console.error('Sync waiters error:', e?.message)
   }
+}
+
+export async function setWaiterPin(waiterId: number, pin: string): Promise<{ ok: boolean; message?: string }> {
+  if (!/^\d{4}$/.test(pin)) return { ok: false, message: "PIN 4 ta raqam bo'lishi kerak" }
+  const db = getDb()
+  const row = db.prepare(`SELECT id FROM waiters WHERE id = ?`).get(waiterId) as any
+  if (!row) return { ok: false, message: 'Afitsant topilmadi' }
+  // bcrypt.hash async — main thread ni bloklamaslik uchun
+  const hash = await bcrypt.hash(pin, 8)
+  // Faqat pin_hash yangilanadi — failed_attempts va locked_until teglinmaydi.
+  // Blokni olib tashlash alohida admin amaliyot bo'lishi kerak.
+  db.prepare(`UPDATE waiters SET pin_hash = ?, updated_at = ? WHERE id = ?`)
+    .run(hash, Date.now(), waiterId)
+  return { ok: true }
 }
 
 export function listWaiters(): Waiter[] {
@@ -128,6 +148,9 @@ export function verifyPin(waiterId: number, pin: string): {
     return { ok: false, lockedUntil: row.locked_until, message: 'Bloklangan' }
   }
 
+  if (!row.pin_hash) {
+    return { ok: false, message: "PIN o'rnatilmagan. Sozlamalarda yangi PIN kiriting." }
+  }
   const matches = bcrypt.compareSync(pin, row.pin_hash)
   if (!matches) {
     const attempts = (row.failed_attempts ?? 0) + 1

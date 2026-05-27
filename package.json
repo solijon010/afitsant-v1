@@ -10,7 +10,7 @@
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "node scripts/dev.cjs",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
@@ -52,6 +52,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
     "electron": "^32.1.2",
     "electron-builder": "^25.1.7",
     "electron-vite": "^2.3.0",
