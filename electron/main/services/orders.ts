@@ -112,9 +112,17 @@ export async function syncAllItems(input: {
   )
 
   if (existing) {
+    if (items.length === 0) {
+      // Bo'sh savat — orderni bekor qilish, yangi order yaratmaslik
+      await api.patch(`/api/order/status/${existing.id}`, null, { params: { status: 'CANCELED' } })
+      return { serverId: existing.id }
+    }
     await api.patch(`/api/order/sync-items/${existing.id}`, { items })
     return { serverId: existing.id }
   }
+
+  // Yangi order yaratish faqat kamida bitta mahsulot bo'lganda
+  if (items.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
 
   const createRes = await api.post('/api/order', {
     roomId: roomServerId,
@@ -208,9 +216,14 @@ export function updateItem(itemId: number, patch: { quantity?: number; notes?: s
   const existing = db.prepare(`SELECT * FROM order_items WHERE id = ?`).get(itemId) as any
   if (!existing) throw new Error('Item topilmadi')
 
+  // COALESCE ishlatilmaydi — notes = null bo'lganda eski qiymat o'rnini egallaydi.
+  // Buning o'rniga faqat berilgan maydonlarni yangilash uchun shart ishlatiladi.
+  const newQuantity = patch.quantity !== undefined ? patch.quantity : existing.quantity
+  const newNotes    = 'notes' in patch ? patch.notes : existing.notes
+
   db.prepare(
-    `UPDATE order_items SET quantity = COALESCE(?, quantity), notes = COALESCE(?, notes), sync_status = 'pending', updated_at = ? WHERE id = ?`
-  ).run(patch.quantity ?? null, patch.notes ?? null, ts, itemId)
+    `UPDATE order_items SET quantity = ?, notes = ?, sync_status = 'pending', updated_at = ? WHERE id = ?`
+  ).run(newQuantity, newNotes, ts, itemId)
 
   recalculateOrder(existing.order_id)
   const row = db.prepare(`SELECT * FROM order_items WHERE id = ?`).get(itemId) as any

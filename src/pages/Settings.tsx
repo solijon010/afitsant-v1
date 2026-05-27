@@ -1,16 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Languages, Printer, Store, TestTube2 } from 'lucide-react'
+import { ArrowLeft, Languages, Printer, Shield, Store, TestTube2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Lang, Settings } from '@shared/types'
+import type { Lang, Settings, Waiter } from '@shared/types'
+import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
+import { initials } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import PinPad from '@/components/PinPad'
 
 export default function SettingsPage(): JSX.Element {
   const navigate = useNavigate()
   const { settings, load, patch } = useSettings()
+  const waiter = useAuth((s) => s.waiter)
   const [form, setForm] = useState<Settings | null>(null)
   const [saving, setSaving] = useState(false)
+  const [waiters, setWaiters] = useState<Waiter[]>([])
+  const [pinTarget, setPinTarget] = useState<Waiter | null>(null)
+
+  useEffect(() => {
+    void window.afisant.auth.listWaiters().then(setWaiters)
+  }, [])
 
   useEffect(() => {
     if (!settings) void load()
@@ -45,7 +55,7 @@ export default function SettingsPage(): JSX.Element {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between px-6 py-4">
-        <button onClick={() => navigate(-1)} className="btn-ghost">
+        <button onClick={() => navigate(waiter ? -1 : '/select-waiter')} className="btn-ghost">
           <ArrowLeft size={16} /> Orqaga
         </button>
         <h1 className="text-lg font-semibold">Sozlamalar</h1>
@@ -164,7 +174,51 @@ export default function SettingsPage(): JSX.Element {
             <TestTube2 size={14} /> Test chek
           </button>
         </Section>
+
+        <Section title="Afitsantlar" icon={<Users size={16} />}>
+          {waiters.length === 0 ? (
+            <p className="text-sm text-ink-soft">Afitsantlar topilmadi</p>
+          ) : (
+            <div className="space-y-2">
+              {waiters.map((w) => (
+                <div
+                  key={w.id}
+                  className="flex items-center justify-between rounded-xl border border-line bg-bg-elevated px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand-info/30 to-brand-purple/30 text-sm font-semibold">
+                      {initials(w.firstName, w.lastName)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium leading-tight">
+                        {w.firstName} {w.lastName}
+                      </p>
+                      <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-ink-soft">
+                        {w.role === 'super_waiter' && <Shield size={9} />}
+                        {w.role === 'super_waiter' ? 'Super afitsant' : w.role === 'manager' ? 'Manager' : 'Afitsant'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setPinTarget(w)}
+                    className="rounded-lg border border-line bg-bg-card px-3 py-1.5 text-xs text-ink-soft hover:border-line-strong hover:text-ink transition-all"
+                  >
+                    PIN o'zgartirish
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
       </main>
+
+      {pinTarget && (
+        <PinModal
+          waiter={pinTarget}
+          onClose={() => setPinTarget(null)}
+          onSaved={() => setPinTarget(null)}
+        />
+      )}
     </div>
   )
 }
@@ -194,6 +248,83 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <span className="label">{label}</span>
       {children}
+    </div>
+  )
+}
+
+function PinModal({
+  waiter,
+  onClose,
+  onSaved
+}: {
+  waiter: Waiter
+  onClose: () => void
+  onSaved: () => void
+}): JSX.Element {
+  const [pin, setPin] = useState('')
+  const [saving, setSaving] = useState(false)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    overlayRef.current?.focus()
+  }, [])
+
+  // Escape tugmasi — PinPad keyboard listener Escape ni tutmaydi
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const save = async (raw: string): Promise<void> => {
+    if (saving) return
+    setSaving(true)
+    try {
+      const res = await window.afisant.auth.setPin(waiter.id, raw)
+      if (res.ok) {
+        toast.success(`${waiter.firstName} uchun PIN saqlandi`)
+        onSaved()
+      } else {
+        toast.error(res.message ?? 'Xatolik')
+        setPin('')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      ref={overlayRef}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm outline-none"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="relative w-full max-w-xs rounded-3xl border border-line bg-bg-card p-7 shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full text-ink-dim hover:bg-bg-elevated hover:text-ink transition-all"
+        >
+          <X size={16} />
+        </button>
+
+        <div className="mb-1 flex flex-col items-center gap-2">
+          <div className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-brand-info/30 to-brand-purple/30 text-lg font-semibold">
+            {initials(waiter.firstName, waiter.lastName)}
+          </div>
+          <p className="text-base font-semibold">{waiter.firstName} {waiter.lastName}</p>
+          <p className="text-xs text-ink-soft">Yangi 4 xonali PIN kiriting</p>
+        </div>
+
+        <PinPad
+          pin={pin}
+          onChange={setPin}
+          disabled={saving}
+          onSubmit={(raw) => void save(raw)}
+        />
+      </div>
     </div>
   )
 }

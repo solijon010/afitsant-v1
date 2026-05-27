@@ -7,9 +7,8 @@ import { startSync, stopSync } from './services/syncEngine'
 
 let mainWindow: BrowserWindow | null = null
 
-const isDev = !app.isPackaged
-
 function createWindow(): void {
+  const isDev = !app.isPackaged
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
