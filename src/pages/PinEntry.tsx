@@ -8,6 +8,7 @@ import { useAuth } from '@/stores/auth'
 import { useCart } from '@/stores/cart'
 import { initials } from '@/lib/format'
 import PinPad, { PIN_LENGTH } from '@/components/PinPad'
+import loginBg from '@/assets/manzara-foto.png'
 
 export default function PinEntry(): JSX.Element {
   const { waiterId } = useParams<{ waiterId: string }>()
@@ -41,11 +42,8 @@ export default function PinEntry(): JSX.Element {
     return () => clearInterval(t)
   }, [lockedUntil])
 
-  useEffect(() => {
-    containerRef.current?.focus()
-  }, [])
+  useEffect(() => { containerRef.current?.focus() }, [])
 
-  // Escape tugmasi
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') navigate('/select-waiter')
@@ -90,8 +88,12 @@ export default function PinEntry(): JSX.Element {
 
   if (!waiter) {
     return (
-      <div className="grid h-full place-items-center">
-        <div className="card h-24 w-72 animate-pulse" />
+      <div
+        className="relative grid h-full place-items-center"
+        style={{ backgroundImage: `url(${loginBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+      >
+        <div className="absolute inset-0" style={{ background: 'rgba(8,5,1,0.55)' }} />
+        <div className="relative z-10 h-24 w-72 rounded-2xl animate-pulse" style={{ background: 'rgba(201,169,110,0.1)', border: '1px solid rgba(201,169,110,0.2)' }} />
       </div>
     )
   }
@@ -100,49 +102,126 @@ export default function PinEntry(): JSX.Element {
     <div
       ref={containerRef}
       tabIndex={-1}
-      className="flex h-full flex-col items-center justify-center bg-bg px-6 outline-none"
+      className="relative flex h-full flex-col items-center justify-center px-6 outline-none overflow-hidden"
+      style={{
+        backgroundImage: `url(${loginBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
     >
+      {/* Overlay */}
+      <div className="absolute inset-0" style={{ background: 'rgba(8,5,1,0.48)' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%)' }} />
+
+      {/* Orqaga tugmasi */}
       <button
         onClick={() => navigate('/select-waiter')}
-        className="btn-ghost absolute left-6 top-6"
+        className="absolute left-6 top-6 z-20 flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all"
+        style={{
+          background: 'rgba(201,169,110,0.1)',
+          border: '1px solid rgba(201,169,110,0.3)',
+          color: '#e8d5a3',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(201,169,110,0.18)' }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(201,169,110,0.1)' }}
       >
-        <ArrowLeft size={16} /> Orqaga
+        <ArrowLeft size={14} /> Orqaga
       </button>
 
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex w-full max-w-sm flex-col items-center"
-      >
-        <div className="mb-4 grid h-20 w-20 place-items-center rounded-full bg-brand-primary/10 text-brand-primary text-2xl font-bold ring-4 ring-brand-primary/10">
-          {initials(waiter.firstName, waiter.lastName)}
-        </div>
-        <h2 className="text-xl font-bold text-ink">
-          {waiter.firstName} {waiter.lastName}
-        </h2>
-        <p className="mt-1 text-sm text-ink-soft">
-          {lockedUntil ? (
-            <span className="inline-flex items-center gap-1.5 text-brand-warn">
-              <Lock size={12} /> Bloklangan · {lockSecondsLeft}s
-            </span>
-          ) : (
-            'PIN-kodni kiriting'
-          )}
-        </p>
-        {!lockedUntil && (
-          <p className="mt-1 text-[11px] text-ink-dim">
-            PIN unutilsa — Sozlamalar → Afitsantlar
-          </p>
-        )}
+      {/* Karta */}
+      <div className="relative z-10 w-full max-w-[360px]">
+        <div
+          className="relative rounded-3xl p-[1px]"
+          style={{
+            background: 'linear-gradient(145deg, #c9a96e, #6b4c1e, #e8d09a, #6b4c1e, #c9a96e)',
+            boxShadow: '0 0 60px rgba(201,169,110,0.2), 0 32px 80px rgba(0,0,0,0.65)',
+          }}
+        >
+          <div
+            className="rounded-3xl overflow-hidden"
+            style={{ background: 'linear-gradient(175deg, #1c1004 0%, #110a02 40%, #0d0701 100%)' }}
+          >
+            {/* Yuqori chiziq */}
+            <div className="h-[3px] w-full" style={{ background: 'linear-gradient(90deg, transparent, #c9a96e 30%, #f0dc9a 50%, #c9a96e 70%, transparent)' }} />
 
-        <PinPad
-          pin={pin}
-          onChange={setPin}
-          disabled={!!lockedUntil || busy}
-          shake={shake}
-          onSubmit={(raw) => void submit(raw)}
-        />
-      </motion.div>
+            <div className="flex flex-col items-center px-8 pt-7 pb-8">
+              {/* Avatar */}
+              <div className="relative mb-1">
+                <div className="absolute -inset-2.5 rounded-full" style={{ border: '1px dashed rgba(201,169,110,0.22)' }} />
+                <div className="absolute -inset-1 rounded-full" style={{ border: '1px solid rgba(201,169,110,0.15)' }} />
+                <div
+                  className="relative grid h-[80px] w-[80px] place-items-center rounded-full text-2xl font-bold"
+                  style={{
+                    background: 'linear-gradient(145deg, #2a1a06, #1a0f02)',
+                    border: '2px solid rgba(201,169,110,0.55)',
+                    color: '#e8d5a3',
+                    boxShadow: '0 0 20px rgba(201,169,110,0.2)',
+                    fontFamily: 'Georgia, serif',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  {initials(waiter.firstName, waiter.lastName)}
+                </div>
+              </div>
+
+              {/* Ism */}
+              <h2
+                className="mt-4 text-[20px] font-bold tracking-[0.08em] uppercase"
+                style={{
+                  color: '#e8d5a3',
+                  fontFamily: 'Georgia, serif',
+                  textShadow: '0 0 30px rgba(201,169,110,0.4)',
+                }}
+              >
+                {waiter.firstName} {waiter.lastName}
+              </h2>
+
+              {/* Status */}
+              <div className="mt-2 flex items-center gap-2">
+                {lockedUntil ? (
+                  <span className="flex items-center gap-1.5 text-xs tracking-widest uppercase" style={{ color: '#e87070' }}>
+                    <Lock size={11} /> Bloklangan · {lockSecondsLeft}s
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="h-px w-6" style={{ background: '#c9a96e44' }} />
+                    <span className="text-[10px] tracking-[0.25em] uppercase" style={{ color: '#c9a96e88' }}>
+                      PIN-kodni kiriting
+                    </span>
+                    <div className="h-px w-6" style={{ background: '#c9a96e44' }} />
+                  </div>
+                )}
+              </div>
+
+              {!lockedUntil && (
+                <p className="mt-1 text-[10px] tracking-wider" style={{ color: 'rgba(201,169,110,0.4)' }}>
+                  PIN unutilsa — Sozlamalar → Afitsantlar
+                </p>
+              )}
+
+              {/* Separator */}
+              <div className="flex items-center gap-2 w-full mt-5 mb-1">
+                <div className="flex-1 h-px" style={{ background: 'rgba(201,169,110,0.15)' }} />
+                <span style={{ color: 'rgba(201,169,110,0.3)', fontSize: 10 }}>◆ ◆ ◆</span>
+                <div className="flex-1 h-px" style={{ background: 'rgba(201,169,110,0.15)' }} />
+              </div>
+
+              {/* PIN pad */}
+              <PinPad
+                pin={pin}
+                onChange={setPin}
+                disabled={!!lockedUntil || busy}
+                shake={shake}
+                onSubmit={(raw) => void submit(raw)}
+                retro
+              />
+            </div>
+
+            {/* Pastki chiziq */}
+            <div className="h-[2px] w-full" style={{ background: 'linear-gradient(90deg, transparent, #c9a96e 30%, #f0dc9a 50%, #c9a96e 70%, transparent)' }} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
