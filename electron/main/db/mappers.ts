@@ -44,6 +44,7 @@ export const mapProduct = (r: Row): Product => ({
   nameUzCyrl: r.name_uz_cyrl,
   price: r.price,
   unit: r.unit,
+  photo: r.image_url,
   imageUrl: r.image_url,
   emoji: r.emoji,
   isAvailable: !!r.is_available,

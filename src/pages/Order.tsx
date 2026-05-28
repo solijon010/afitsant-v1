@@ -404,9 +404,9 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         </div>
       )}
 
-      {product.imageUrl ? (
+      {product.photo ? (
         <img
-          src={product.imageUrl}
+          src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
           alt={product.nameUzLatn}
           className="mb-3 h-24 w-full rounded-xl object-cover"
           onError={(e) => {

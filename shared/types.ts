@@ -41,6 +41,7 @@ export interface Product {
   nameUzCyrl: string | null
   price: number
   unit: ProductUnit
+  photo: string | null
   imageUrl: string | null
   emoji: string | null
   isAvailable: boolean
