@@ -198,9 +198,9 @@ export async function fullPull(): Promise<{
           const safeUnit = ['dona', 'kg', 'porsiya', 'litr'].includes(unit) ? unit : 'dona'
           const catServerId = p.productCategoryId ?? p.categoryId ?? null
           if (!catServerId) continue
-          const photoUrl = p.photo ? `${getSettings().serverUrl}/api/image/${p.photo}` : null
+          const photoFilename: string | null = p.photo ?? null
           try {
-            upsertProd.run(p.id, p.name, Math.round(Number(p.price)), safeUnit, photoUrl, i, catServerId)
+            upsertProd.run(p.id, p.name, Math.round(Number(p.price)), safeUnit, photoFilename, i, catServerId)
             productCount++
           } catch (err: any) {
             console.warn(`[SYNC] product skip: ${p.name} — ${err?.message}`)
