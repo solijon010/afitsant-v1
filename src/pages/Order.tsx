@@ -401,16 +401,19 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
 
       {/* Rasm qismi */}
       {product.photo ? (
-        <div className="relative h-36 w-full overflow-hidden bg-slate-50">
+        <div className="relative aspect-square w-full overflow-hidden bg-white">
           <img
             src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
             alt={product.nameUzLatn}
-            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+            className="h-full w-full object-contain p-2"
             onError={(e) => {
               const el = e.target as HTMLImageElement
               el.style.display = 'none'
-              el.parentElement!.innerHTML +=
-                '<div class="flex h-full items-center justify-center text-4xl">📦</div>'
+              const wrap = el.parentElement!
+              const fb = document.createElement('div')
+              fb.className = 'flex h-full items-center justify-center text-4xl'
+              fb.textContent = '📦'
+              wrap.appendChild(fb)
             }}
           />
           {qty > 0 && (
@@ -419,7 +422,7 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         </div>
       ) : (
         <div className={cn(
-          'flex h-28 items-center justify-center text-5xl',
+          'flex aspect-square items-center justify-center text-5xl',
           qty > 0 ? 'bg-brand-success/5' : 'bg-slate-50'
         )}>
           {product.emoji ?? '📦'}
@@ -427,11 +430,11 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
       )}
 
       {/* Matn qismi */}
-      <div className="flex flex-col gap-1 p-3">
-        <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
+      <div className="flex flex-col gap-1 border-t border-line/50 p-3">
+        <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-ink">
           {product.nameUzLatn}
         </p>
-        <p className="text-sm font-bold text-brand-success">
+        <p className="mt-0.5 text-[13px] font-bold text-brand-success">
           {fmtMoney(product.price)} so'm
         </p>
       </div>
