@@ -70,11 +70,7 @@ export default function WaiterSelect(): JSX.Element {
           >
             <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
           </button>
-          <button
-            onClick={() => navigate('/settings')}
-            className="btn-ghost h-10 w-10 p-0"
-            title="Sozlamalar"
-          >
+          <button onClick={() => navigate('/settings')} className="btn-ghost h-10 w-10 p-0" title="Sozlamalar">
             <Settings size={16} />
           </button>
           <button onClick={handleLogout} className="btn-ghost h-10 w-10 p-0" title="Chiqish">

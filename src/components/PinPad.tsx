@@ -96,8 +96,8 @@ export function PinKey({ children, variant = 'default', className, ...rest }: Pi
       className={cn(
         'grid h-16 w-16 place-items-center rounded-2xl text-xl font-semibold transition-all',
         variant === 'default'
-          ? 'border border-line bg-white text-ink shadow-sm hover:bg-bg-soft hover:border-line-strong active:scale-95'
-          : 'text-ink-soft hover:bg-bg-soft hover:text-ink',
+          ? 'border border-line bg-bg-card text-ink hover:bg-bg-elevated hover:border-line-strong active:scale-95'
+          : 'text-ink-soft hover:bg-bg-card hover:text-ink',
         rest.disabled && 'opacity-40 pointer-events-none',
         className
       )}
