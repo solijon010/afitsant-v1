@@ -100,7 +100,7 @@ export default function PinEntry(): JSX.Element {
     <div
       ref={containerRef}
       tabIndex={-1}
-      className="flex h-full flex-col items-center justify-center px-6 outline-none"
+      className="flex h-full flex-col items-center justify-center bg-bg px-6 outline-none"
     >
       <button
         onClick={() => navigate('/select-waiter')}
@@ -114,10 +114,10 @@ export default function PinEntry(): JSX.Element {
         animate={{ opacity: 1, scale: 1 }}
         className="flex w-full max-w-sm flex-col items-center"
       >
-        <div className="mb-4 grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-brand-info/30 to-brand-purple/30 text-2xl font-semibold">
+        <div className="mb-4 grid h-20 w-20 place-items-center rounded-full bg-brand-primary/10 text-brand-primary text-2xl font-bold ring-4 ring-brand-primary/10">
           {initials(waiter.firstName, waiter.lastName)}
         </div>
-        <h2 className="text-xl font-semibold">
+        <h2 className="text-xl font-bold text-ink">
           {waiter.firstName} {waiter.lastName}
         </h2>
         <p className="mt-1 text-sm text-ink-soft">

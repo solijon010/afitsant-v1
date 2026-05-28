@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: light;
   }
   html,
   body,
@@ -12,12 +12,8 @@
     height: 100%;
   }
   body {
-    background:
-      radial-gradient(1200px 600px at 0% -10%, rgba(34, 197, 94, 0.07), transparent 60%),
-      radial-gradient(900px 500px at 100% 0%, rgba(168, 85, 247, 0.06), transparent 60%),
-      radial-gradient(800px 600px at 50% 110%, rgba(245, 158, 11, 0.05), transparent 60%),
-      #06101f;
-    color: #e6edf7;
+    background: #f1f5f9;
+    color: #0f172a;
     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     user-select: none;
@@ -29,18 +25,18 @@
     user-select: text;
   }
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: #cbd5e1;
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background: #94a3b8;
   }
   button {
     cursor: pointer;
@@ -53,10 +49,10 @@
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-line bg-bg-card backdrop-blur-sm;
+    @apply rounded-2xl border border-line bg-bg-card shadow-card;
   }
   .card-elevated {
-    @apply rounded-2xl border border-line bg-bg-elevated shadow-card;
+    @apply rounded-2xl border border-line bg-bg-card shadow-card;
   }
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-ink-soft;
@@ -65,19 +61,19 @@
     @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.98];
   }
   .btn-primary {
-    @apply btn bg-brand-primary text-black hover:brightness-110;
+    @apply btn bg-brand-primary text-white hover:brightness-110 shadow-sm;
   }
   .btn-success {
-    @apply btn bg-brand-success text-black hover:brightness-110;
+    @apply btn bg-brand-success text-white hover:brightness-110 shadow-sm;
   }
   .btn-ghost {
-    @apply btn bg-bg-card text-ink hover:bg-bg-elevated;
+    @apply btn border border-line bg-bg-card text-ink hover:bg-bg-soft hover:border-line-strong;
   }
   .btn-danger {
-    @apply btn bg-brand-danger/15 text-brand-danger hover:bg-brand-danger/25;
+    @apply btn bg-brand-danger/10 text-brand-danger hover:bg-brand-danger/20 border border-brand-danger/20;
   }
   .input {
-    @apply w-full rounded-xl border border-line bg-bg-soft px-4 py-3 text-sm text-ink placeholder:text-ink-dim outline-none transition-colors focus:border-line-strong;
+    @apply w-full rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-dim outline-none transition-colors focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10;
   }
   .label {
     @apply mb-1.5 block text-xs font-medium text-ink-soft;

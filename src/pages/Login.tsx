@@ -91,7 +91,7 @@ export default function LoginPage(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center bg-bg-base px-6">
+    <div className="flex h-full flex-col items-center justify-center bg-bg px-6">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -99,11 +99,11 @@ export default function LoginPage(): JSX.Element {
         className="w-full max-w-sm"
       >
         <div className="mb-10 flex flex-col items-center gap-3">
-          <div className="grid h-16 w-16 place-items-center rounded-3xl bg-brand-primary/15 text-brand-primary shadow-glow-amber">
+          <div className="grid h-16 w-16 place-items-center rounded-3xl bg-brand-primary/10 text-brand-primary shadow-glow-blue">
             <Coffee size={30} />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight">POS Tizimi</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-ink">POS Tizimi</h1>
             <p className="mt-1 text-sm text-ink-soft">Tizimga kirish</p>
           </div>
         </div>
