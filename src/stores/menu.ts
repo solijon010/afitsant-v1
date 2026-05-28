@@ -15,11 +15,11 @@ export const useMenu = create<MenuState>((set, get) => ({
   loadedAt: null,
   load: async () => {
     const snap = await window.afisant.menu.getSnapshot()
-    // server_id bo'yicha dublikatlarni olib tashlash
+    // nom bo'yicha dublikatlarni olib tashlash (server_id null bo'lsa ham ishlaydi)
     const seen = new Set<string>()
     const uniqueCategories = snap.categories.filter((c) => {
-      const key = c.serverId ?? String(c.id)
-      if (seen.has(key)) return false
+      const key = (c.nameUzLatn ?? '').toLowerCase().trim()
+      if (!key || seen.has(key)) return false
       seen.add(key)
       return true
     })

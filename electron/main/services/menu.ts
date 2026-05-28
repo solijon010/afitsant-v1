@@ -3,12 +3,16 @@ import { mapCategory, mapProduct } from '../db/mappers'
 import type { Category, Product } from '@shared/types'
 
 export function getCategories(): Category[] {
-  // GROUP BY server_id — server_id bir xil bo'lsa birinchisi olinadi (dublikat yo'q)
+  // MIN(id) GROUP BY nom — bir xil nomli kategoriya bir marta chiqadi
   const rows = getDb()
     .prepare(
       `SELECT * FROM categories
        WHERE is_active = 1
-       GROUP BY COALESCE(server_id, CAST(id AS TEXT))
+         AND id IN (
+           SELECT MIN(id) FROM categories
+           WHERE is_active = 1
+           GROUP BY LOWER(TRIM(name_uz_latn))
+         )
        ORDER BY sort_order, name_uz_latn`
     )
     .all() as any[]
