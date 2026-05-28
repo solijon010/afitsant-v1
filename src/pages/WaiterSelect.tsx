@@ -52,10 +52,10 @@ export default function WaiterSelect(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between px-8 py-6">
+    <div className="flex h-full flex-col bg-bg">
+      <header className="flex items-center justify-between border-b border-line bg-bg-card px-8 py-5 shadow-sm">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">
+          <h1 className="text-lg font-bold text-ink tracking-tight">
             {settings?.organizationName ?? 'POS Tizimi'}
           </h1>
           <p className="text-xs text-ink-soft">Afitsantni tanlang</p>
@@ -70,7 +70,11 @@ export default function WaiterSelect(): JSX.Element {
           >
             <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
           </button>
-          <button onClick={() => navigate('/settings')} className="btn-ghost h-10 w-10 p-0" title="Sozlamalar">
+          <button
+            onClick={() => navigate('/settings')}
+            className="btn-ghost h-10 w-10 p-0"
+            title="Sozlamalar"
+          >
             <Settings size={16} />
           </button>
           <button onClick={handleLogout} className="btn-ghost h-10 w-10 p-0" title="Chiqish">
@@ -83,7 +87,7 @@ export default function WaiterSelect(): JSX.Element {
         {loading ? (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="card h-44 animate-pulse" />
+              <div key={i} className="h-48 rounded-2xl bg-bg-card animate-pulse border border-line" />
             ))}
           </div>
         ) : waiters.length === 0 ? (
@@ -110,35 +114,37 @@ export default function WaiterSelect(): JSX.Element {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                whileHover={{ y: -3 }}
+                whileHover={{ y: -3, boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}
                 whileTap={{ scale: 0.97 }}
                 className={cn(
-                  'group relative flex h-48 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border p-5 transition-all',
-                  'border-line bg-bg-card hover:border-brand-success/40 hover:bg-bg-elevated hover:shadow-glow'
+                  'group flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border p-5 transition-colors',
+                  'border-line bg-white shadow-card hover:border-brand-primary/30 hover:shadow-card-hover'
                 )}
               >
-                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-success/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
                 <div
                   className={cn(
-                    'grid h-20 w-20 place-items-center rounded-full text-2xl font-bold shadow-inner',
-                    w.role === 'super_waiter'
-                      ? 'bg-gradient-to-br from-amber-500 to-amber-700 text-black'
-                      : 'bg-gradient-to-br from-brand-info/30 to-brand-purple/30 text-ink'
+                    'grid h-20 w-20 place-items-center rounded-full text-2xl font-bold',
+                    w.role === 'super_waiter' || w.role === 'manager'
+                      ? 'bg-brand-primary/10 text-brand-primary ring-2 ring-brand-primary/20'
+                      : 'bg-bg-soft text-ink ring-2 ring-line'
                   )}
                 >
                   {initials(w.firstName, w.lastName)}
                 </div>
                 <div className="text-center">
-                  <p className="font-semibold leading-tight">
+                  <p className="font-semibold leading-tight text-ink">
                     {w.firstName} {w.lastName}
                   </p>
                   <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-ink-soft">
-                    {w.role === 'super_waiter' && <Shield size={10} />}
-                    {w.role === 'super_waiter' ? 'Super afitsant' : w.role === 'manager' ? 'Manager' : 'Afitsant'}
+                    {(w.role === 'super_waiter' || w.role === 'manager') && (
+                      <Shield size={10} className="text-brand-primary" />
+                    )}
+                    {w.role === 'super_waiter'
+                      ? 'Super afitsant'
+                      : w.role === 'manager'
+                        ? 'Manager'
+                        : 'Afitsant'}
                   </p>
-                  {w.phone && (
-                    <p className="mt-0.5 text-[10px] text-ink-dim">{w.phone.slice(-4).padStart(w.phone.length, '•')}</p>
-                  )}
                 </div>
               </motion.button>
             ))}

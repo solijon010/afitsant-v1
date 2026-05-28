@@ -246,19 +246,19 @@ export default function OrderPage(): JSX.Element {
 
   return (
     <div className="grid h-full grid-cols-[1fr_400px]">
-      <section className="flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-line px-6 py-4">
+      <section className="flex flex-col overflow-hidden bg-bg">
+        <header className="flex items-center justify-between border-b border-line bg-bg-card px-6 py-4 shadow-sm">
           <button onClick={() => navigate('/tables')} className="btn-ghost">
             <ArrowLeft size={16} /> Orqaga
           </button>
           <div className="text-center">
-            <p className="text-xs uppercase tracking-wider text-ink-soft">XONA / STOL</p>
-            <p className="text-xl font-bold">{table.name}</p>
+            <p className="text-[11px] font-medium uppercase tracking-widest text-ink-dim">STOL</p>
+            <p className="text-xl font-bold text-ink">{table.name}</p>
           </div>
           <div className="w-[100px]" />
         </header>
 
-        <nav className="flex gap-3 overflow-x-auto border-b border-line px-6 py-4">
+        <nav className="flex gap-2 overflow-x-auto border-b border-line bg-bg-card px-6 py-3">
           {categories.map((c) => (
             <CategoryPill
               key={c.id}
@@ -269,7 +269,7 @@ export default function OrderPage(): JSX.Element {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto bg-bg px-6 py-5">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
               Bu kategoriyada mahsulot yo'q
@@ -319,19 +319,19 @@ function CategoryPill({
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex shrink-0 items-center gap-2.5 rounded-2xl border px-5 py-3 text-base font-semibold transition-all',
+        'inline-flex shrink-0 items-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold transition-all',
         active
-          ? 'border-brand-primary bg-brand-primary text-black shadow-glow-amber'
-          : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
+          ? 'border-brand-primary bg-brand-primary text-white shadow-sm shadow-brand-primary/20'
+          : 'border-line bg-white text-ink-soft hover:border-line-strong hover:text-ink'
       )}
       style={
         active && cat.color
-          ? { borderColor: cat.color, background: cat.color, boxShadow: `0 0 24px ${cat.color}55` }
+          ? { borderColor: cat.color, background: cat.color }
           : undefined
       }
     >
-      <span className={active ? 'text-black' : 'text-ink-soft'}>
-        {CAT_ICON[cat.icon ?? ''] ?? <Package size={18} />}
+      <span className={active ? 'text-white/80' : 'text-ink-dim'}>
+        {CAT_ICON[cat.icon ?? ''] ?? <Package size={16} />}
       </span>
       {cat.nameUzLatn}
     </button>
@@ -354,10 +354,13 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
       className={cn(
         'relative flex flex-col justify-between rounded-2xl border p-4 transition-all',
         qty > 0
-          ? 'border-brand-success/50 bg-brand-success/8 shadow-glow'
-          : 'border-line bg-bg-card hover:border-line-strong hover:bg-bg-elevated'
+          ? 'border-brand-success/40 bg-white shadow-glow'
+          : 'border-line bg-white shadow-card hover:border-line-strong hover:shadow-card-hover'
       )}
     >
+      {qty > 0 && (
+        <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-brand-success" />
+      )}
       {product.imageUrl ? (
         <img
           src={product.imageUrl}
@@ -368,19 +371,19 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
           }}
         />
       ) : (
-        <div className="mb-2 flex h-16 items-center justify-start text-3xl">
+        <div className="mb-2 flex h-14 items-center justify-start text-3xl">
           {product.emoji ?? '📦'}
         </div>
       )}
       <div className="flex-1">
-        <p className="line-clamp-2 text-sm font-semibold leading-tight">{product.nameUzLatn}</p>
+        <p className="line-clamp-2 text-sm font-semibold leading-tight text-ink">{product.nameUzLatn}</p>
         <p className="mt-1 text-sm font-bold text-brand-success">{fmtMoney(product.price)} so'm</p>
       </div>
       <div className="mt-3">
         {qty === 0 ? (
           <button
             onClick={() => add(product)}
-            className="w-full rounded-xl border border-brand-success/40 bg-brand-success/10 py-2 text-sm font-semibold text-brand-success transition-all hover:bg-brand-success/20"
+            className="w-full rounded-xl border border-brand-primary/30 bg-brand-primary/8 py-2 text-sm font-semibold text-brand-primary transition-all hover:bg-brand-primary/15"
           >
             + Qo'shish
           </button>
@@ -388,7 +391,7 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={() => line && dec(line.localUuid)}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-bg text-ink hover:border-line-strong"
             >
               <Minus size={14} />
             </button>
@@ -431,18 +434,18 @@ function CartPanel({
   const feePct = useCart((s) => s.serviceFeePercent)
 
   return (
-    <aside className="flex h-full flex-col border-l border-line bg-bg-soft/40">
-      <header className="flex items-center justify-between border-b border-line px-5 py-4">
+    <aside className="flex h-full flex-col border-l border-line bg-bg-soft">
+      <header className="flex items-center justify-between border-b border-line bg-bg-card px-5 py-4">
         <div className="flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-success/15 text-brand-success">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-primary/10 text-brand-primary">
             <ShoppingCart size={16} />
           </div>
           <div>
-            <p className="text-sm font-semibold">Savat</p>
+            <p className="text-sm font-semibold text-ink">Savat</p>
             <p className="text-xs text-ink-soft">{table.name}</p>
           </div>
         </div>
-        <span className="grid h-7 min-w-7 place-items-center rounded-full bg-brand-success px-2 text-xs font-bold text-black">
+        <span className="grid h-7 min-w-7 place-items-center rounded-full bg-brand-primary px-2 text-xs font-bold text-white">
           {lines.length}
         </span>
       </header>
@@ -451,7 +454,7 @@ function CartPanel({
         {lines.length === 0 ? (
           <div className="grid h-full place-items-center px-6 text-center text-sm text-ink-dim">
             <div>
-              <ShoppingCart className="mx-auto mb-2 opacity-30" size={32} />
+              <ShoppingCart className="mx-auto mb-2 opacity-25" size={32} />
               Mahsulotlarni tanlang
             </div>
           </div>
@@ -465,7 +468,7 @@ function CartPanel({
                   initial={{ opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 8 }}
-                  className="rounded-xl border border-line bg-bg-card px-3 py-2.5"
+                  className="rounded-xl border border-line bg-white px-3 py-2.5 shadow-sm"
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -500,7 +503,7 @@ function CartPanel({
         )}
       </div>
 
-      <footer className="border-t border-line bg-bg-soft/60 p-4">
+      <footer className="border-t border-line bg-bg-card p-4">
         <div className="mb-3 space-y-1.5 text-sm">
           <Row label="Mahsulotlar" value={`${fmtMoney(subtotal)} so'm`} muted />
           {fee > 0 && <Row label={`Xizmat (${feePct}%)`} value={`${fmtMoney(fee)} so'm`} muted />}
@@ -553,7 +556,7 @@ function Row({
   return (
     <div className="flex items-baseline justify-between">
       <span className={cn(muted && 'text-ink-soft', large && 'text-base font-semibold')}>{label}</span>
-      <span className={cn(large ? 'text-xl font-bold text-brand-success' : 'font-medium', muted && !large && 'text-ink-soft')}>
+      <span className={cn(large ? 'text-xl font-bold text-ink' : 'font-medium', muted && !large && 'text-ink-soft')}>
         {value}
       </span>
     </div>
@@ -586,16 +589,16 @@ function ConfirmCloseModal({
         onClick={(e) => e.stopPropagation()}
         className="card-elevated w-full max-w-sm p-6"
       >
-        <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-brand-success/15 text-brand-success">
+        <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-brand-primary/10 text-brand-primary">
           <Printer size={22} />
         </div>
-        <h3 className="text-lg font-semibold">Buyurtmani yopish</h3>
+        <h3 className="text-lg font-semibold text-ink">Buyurtmani yopish</h3>
         <p className="mt-1 text-sm text-ink-soft">
           Chek chiqariladi va buyurtma yopiladi. Davom etamizmi?
         </p>
-        <div className="my-4 rounded-2xl border border-line bg-bg-card p-3 text-center">
-          <p className="text-xs uppercase tracking-wider text-ink-soft">Jami</p>
-          <p className="text-3xl font-bold text-brand-success">{fmtMoney(total)} so'm</p>
+        <div className="my-4 rounded-2xl border border-line bg-bg p-4 text-center">
+          <p className="text-xs font-medium uppercase tracking-wider text-ink-dim">Jami to'lov</p>
+          <p className="mt-1 text-3xl font-bold text-ink">{fmtMoney(total)} so'm</p>
         </div>
         <div className="flex gap-2">
           <button onClick={onCancel} className="btn-ghost flex-1" disabled={busy}>
