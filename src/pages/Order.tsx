@@ -14,7 +14,8 @@ import {
   Save,
   ShoppingCart,
   Trash2,
-  X
+  X,
+  Ban
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Category, Product, ReceiptPayload, TableEntity } from '@shared/types'
@@ -49,6 +50,7 @@ export default function OrderPage(): JSX.Element {
   const [activeCatId, setActiveCatId] = useState<number | null>(null)
   const [table, setTable] = useState<TableEntity | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -160,6 +162,27 @@ export default function OrderPage(): JSX.Element {
     }
   }
 
+  const handleCancel = async (): Promise<void> => {
+    setSaving(true)
+    try {
+      const serverOrderId = useCart.getState().serverOrderId
+      const orderId = cart.orderId
+      if (orderId || serverOrderId) {
+        await window.afisant.orders.cancel(orderId ?? 0, serverOrderId ?? undefined)
+      }
+      cart.clear()
+      cart.setOrder(null, null)
+      await refreshTable(tId)
+      toast.success("Buyurtma bekor qilindi")
+      navigate('/tables')
+    } catch (e: any) {
+      toast.error('Bekor qilishda xatolik', { description: e?.message })
+    } finally {
+      setSaving(false)
+      setConfirmCancel(false)
+    }
+  }
+
   const handleCloseAndPrint = async (): Promise<void> => {
     if (!table || !waiter) return
     if (cart.lines.length === 0 && !cart.serverOrderId) {
@@ -248,7 +271,11 @@ export default function OrderPage(): JSX.Element {
     <div className="grid h-full grid-cols-[1fr_400px]">
       <section className="flex flex-col overflow-hidden bg-bg">
         <header className="flex items-center justify-between border-b border-line bg-bg-card px-6 py-4 shadow-sm">
-          <button onClick={() => navigate('/tables')} className="btn-ghost">
+          <button
+            onClick={() => void handleSave()}
+            className="btn-ghost"
+            disabled={saving || printing}
+          >
             <ArrowLeft size={16} /> Orqaga
           </button>
           <div className="text-center">
@@ -288,6 +315,7 @@ export default function OrderPage(): JSX.Element {
         table={table}
         onSave={handleSave}
         onClosePrint={() => setConfirmClose(true)}
+        onCancel={() => setConfirmCancel(true)}
         printing={printing}
         saving={saving}
       />
@@ -299,6 +327,13 @@ export default function OrderPage(): JSX.Element {
             onConfirm={handleCloseAndPrint}
             total={cart.total()}
             busy={printing}
+          />
+        )}
+        {confirmCancel && (
+          <ConfirmCancelModal
+            onCancel={() => setConfirmCancel(false)}
+            onConfirm={handleCancel}
+            busy={saving}
           />
         )}
       </AnimatePresence>
@@ -341,72 +376,55 @@ function CategoryPill({
 function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
-  const inc = useCart((s) => s.increment)
-  const dec = useCart((s) => s.decrement)
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
-  const line = lines.find((l) => l.productId === product.id)
 
   return (
     <motion.div
+      onClick={() => add(product)}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.015 }}
+      whileTap={{ scale: 0.96 }}
       className={cn(
-        'relative flex flex-col justify-between rounded-2xl border p-4 transition-all',
+        'relative flex cursor-pointer flex-col rounded-2xl border p-4 transition-all select-none',
         qty > 0
           ? 'border-brand-success/40 bg-white shadow-glow'
-          : 'border-line bg-white shadow-card hover:border-line-strong hover:shadow-card-hover'
+          : 'border-line bg-white shadow-card hover:border-brand-primary/30 hover:shadow-card-hover'
       )}
     >
+      {/* Yuqori yashil chiziq — savatda bor bo'lganda */}
       {qty > 0 && (
-        <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-brand-success" />
+        <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-brand-success" />
       )}
+
+      {/* Miqdor badge */}
+      {qty > 0 && (
+        <div className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-brand-success text-xs font-bold text-white shadow-md ring-2 ring-white">
+          {qty}
+        </div>
+      )}
+
       {product.imageUrl ? (
         <img
           src={product.imageUrl}
           alt={product.nameUzLatn}
-          className="mb-2 h-20 w-full rounded-xl object-cover"
+          className="mb-3 h-24 w-full rounded-xl object-cover"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = 'none'
           }}
         />
       ) : (
-        <div className="mb-2 flex h-14 items-center justify-start text-3xl">
+        <div className="mb-3 flex h-16 items-center justify-start text-4xl">
           {product.emoji ?? '📦'}
         </div>
       )}
-      <div className="flex-1">
-        <p className="line-clamp-2 text-sm font-semibold leading-tight text-ink">{product.nameUzLatn}</p>
-        <p className="mt-1 text-sm font-bold text-brand-success">{fmtMoney(product.price)} so'm</p>
-      </div>
-      <div className="mt-3">
-        {qty === 0 ? (
-          <button
-            onClick={() => add(product)}
-            className="w-full rounded-xl border border-brand-primary/30 bg-brand-primary/8 py-2 text-sm font-semibold text-brand-primary transition-all hover:bg-brand-primary/15"
-          >
-            + Qo'shish
-          </button>
-        ) : (
-          <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={() => line && dec(line.localUuid)}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-bg text-ink hover:border-line-strong"
-            >
-              <Minus size={14} />
-            </button>
-            <span className="min-w-[2rem] text-center text-base font-bold text-brand-success">
-              {fmtQty(qty)}
-            </span>
-            <button
-              onClick={() => add(product)}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-brand-success/40 bg-brand-success/10 text-brand-success hover:bg-brand-success/20"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-        )}
-      </div>
+
+      <p className="line-clamp-2 flex-1 text-sm font-semibold leading-tight text-ink">
+        {product.nameUzLatn}
+      </p>
+      <p className="mt-2 text-sm font-bold text-brand-success">
+        {fmtMoney(product.price)} so'm
+      </p>
     </motion.div>
   )
 }
@@ -415,12 +433,14 @@ function CartPanel({
   table,
   onSave,
   onClosePrint,
+  onCancel,
   printing,
   saving
 }: {
   table: TableEntity
   onSave: () => Promise<void> | void
   onClosePrint: () => void
+  onCancel: () => void
   printing: boolean
   saving: boolean
 }): JSX.Element {
@@ -504,26 +524,33 @@ function CartPanel({
       </div>
 
       <footer className="border-t border-line bg-bg-card p-4">
-        <div className="mb-3 space-y-1.5 text-sm">
+        <div className="mb-4 space-y-1.5 text-sm">
           <Row label="Mahsulotlar" value={`${fmtMoney(subtotal)} so'm`} muted />
           {fee > 0 && <Row label={`Xizmat (${feePct}%)`} value={`${fmtMoney(fee)} so'm`} muted />}
           <div className="my-2 h-px bg-line" />
           <Row label="Jami" value={`${fmtMoney(total)} so'm`} large />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={onCancel}
+            className="btn-danger w-full"
+            disabled={saving || printing || lines.length === 0}
+          >
+            <Ban size={14} /> Zakazni bekor qilish
+          </button>
           <button
             onClick={() => void onSave()}
-            className="btn-ghost"
+            className="btn-primary w-full"
             disabled={saving || printing}
           >
             <Save size={14} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </button>
           <button
             onClick={onClosePrint}
-            className="btn-success"
+            className="btn-success w-full"
             disabled={lines.length === 0 || printing || saving}
           >
-            <Printer size={14} /> Chek & Yopish
+            <Printer size={14} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
           </button>
         </div>
       </footer>
@@ -560,6 +587,54 @@ function Row({
         {value}
       </span>
     </div>
+  )
+}
+
+function ConfirmCancelModal({
+  onCancel,
+  onConfirm,
+  busy
+}: {
+  onCancel: () => void
+  onConfirm: () => void | Promise<void>
+  busy: boolean
+}): JSX.Element {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="card w-full max-w-sm p-6"
+      >
+        <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-brand-danger/10 text-brand-danger">
+          <Ban size={22} />
+        </div>
+        <h3 className="text-lg font-semibold text-ink">Zakazni bekor qilish</h3>
+        <p className="mt-1 text-sm text-ink-soft">
+          Barcha mahsulotlar o'chirilib, buyurtma bekor qilinadi. Davom etasizmi?
+        </p>
+        <div className="mt-5 flex gap-2">
+          <button onClick={onCancel} className="btn-ghost flex-1" disabled={busy}>
+            <X size={14} /> Orqaga
+          </button>
+          <button
+            onClick={() => void onConfirm()}
+            className="btn-danger flex-1"
+            disabled={busy}
+          >
+            <Ban size={14} /> {busy ? 'Bekor qilinmoqda…' : 'Ha, bekor qilish'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
