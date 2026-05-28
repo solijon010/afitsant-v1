@@ -302,7 +302,7 @@ export default function OrderPage(): JSX.Element {
               Bu kategoriyada mahsulot yo'q
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
               {shownProducts.map((p, idx) => (
                 <ProductCard key={p.id} product={p} idx={idx} />
               ))}
@@ -384,47 +384,57 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.015 }}
-      whileTap={{ scale: 0.96 }}
+      whileTap={{ scale: 0.97 }}
       className={cn(
-        'relative flex cursor-pointer flex-col rounded-2xl border p-4 transition-all select-none',
+        'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all select-none',
         qty > 0
-          ? 'border-brand-success/40 bg-white shadow-glow'
-          : 'border-line bg-white shadow-card hover:border-brand-primary/30 hover:shadow-card-hover'
+          ? 'border-brand-success/50 bg-white shadow-glow'
+          : 'border-line bg-white shadow-card hover:shadow-card-hover hover:border-line-strong'
       )}
     >
-      {/* Yuqori yashil chiziq — savatda bor bo'lganda */}
-      {qty > 0 && (
-        <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-brand-success" />
-      )}
-
       {/* Miqdor badge */}
       {qty > 0 && (
-        <div className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-brand-success text-xs font-bold text-white shadow-md ring-2 ring-white">
+        <div className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-brand-success text-xs font-bold text-white shadow-md ring-2 ring-white">
           {qty}
         </div>
       )}
 
+      {/* Rasm qismi */}
       {product.photo ? (
-        <img
-          src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
-          alt={product.nameUzLatn}
-          className="mb-3 h-24 w-full rounded-xl object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none'
-          }}
-        />
+        <div className="relative h-36 w-full overflow-hidden bg-slate-50">
+          <img
+            src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
+            alt={product.nameUzLatn}
+            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+            onError={(e) => {
+              const el = e.target as HTMLImageElement
+              el.style.display = 'none'
+              el.parentElement!.innerHTML +=
+                '<div class="flex h-full items-center justify-center text-4xl">📦</div>'
+            }}
+          />
+          {qty > 0 && (
+            <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-success" />
+          )}
+        </div>
       ) : (
-        <div className="mb-3 flex h-16 items-center justify-start text-4xl">
+        <div className={cn(
+          'flex h-28 items-center justify-center text-5xl',
+          qty > 0 ? 'bg-brand-success/5' : 'bg-slate-50'
+        )}>
           {product.emoji ?? '📦'}
         </div>
       )}
 
-      <p className="line-clamp-2 flex-1 text-sm font-semibold leading-tight text-ink">
-        {product.nameUzLatn}
-      </p>
-      <p className="mt-2 text-sm font-bold text-brand-success">
-        {fmtMoney(product.price)} so'm
-      </p>
+      {/* Matn qismi */}
+      <div className="flex flex-col gap-1 p-3">
+        <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
+          {product.nameUzLatn}
+        </p>
+        <p className="text-sm font-bold text-brand-success">
+          {fmtMoney(product.price)} so'm
+        </p>
+      </div>
     </motion.div>
   )
 }
