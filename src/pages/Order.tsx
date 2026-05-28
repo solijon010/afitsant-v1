@@ -405,14 +405,17 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
       )}
 
       {product.photo ? (
-        <img
-          src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
-          alt={product.nameUzLatn}
-          className="mb-3 h-24 w-full rounded-xl object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none'
-          }}
-        />
+        <div className="mb-3 flex h-28 w-full items-center justify-center overflow-hidden rounded-xl bg-bg-soft">
+          <img
+            src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
+            alt={product.nameUzLatn}
+            className="h-full w-full object-contain p-1"
+            onError={(e) => {
+              const el = e.target as HTMLImageElement
+              el.parentElement!.innerHTML = '<span style="font-size:2.5rem">📦</span>'
+            }}
+          />
+        </div>
       ) : (
         <div className="mb-3 flex h-16 items-center justify-start text-4xl">
           {product.emoji ?? '📦'}

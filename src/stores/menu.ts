@@ -15,7 +15,15 @@ export const useMenu = create<MenuState>((set, get) => ({
   loadedAt: null,
   load: async () => {
     const snap = await window.afisant.menu.getSnapshot()
-    set({ categories: snap.categories, products: snap.products, loadedAt: Date.now() })
+    // server_id bo'yicha dublikatlarni olib tashlash
+    const seen = new Set<string>()
+    const uniqueCategories = snap.categories.filter((c) => {
+      const key = c.serverId ?? String(c.id)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    set({ categories: uniqueCategories, products: snap.products, loadedAt: Date.now() })
   },
   productsByCategory: (categoryId) => get().products.filter((p) => p.categoryId === categoryId)
 }))
