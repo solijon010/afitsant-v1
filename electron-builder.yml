@@ -23,7 +23,7 @@ win:
       arch: [x64]
     - target: portable
       arch: [x64]
-  icon: build/icon.ico
+  icon: src/assets/logo.png
   artifactName: Afisant-${version}-${arch}.${ext}
 
 nsis:
@@ -32,9 +32,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Afisant
-  installerIcon: build/icon.ico
-  uninstallerIcon: build/icon.ico
+  shortcutName: Afisant POS
 
 portable:
   artifactName: Afisant-${version}-portable.exe
