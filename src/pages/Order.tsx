@@ -418,9 +418,9 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 440px' }}>
-      <section className="flex flex-col overflow-hidden bg-bg">
-        <header className="flex items-center justify-between border-b border-line bg-bg-card px-4 py-3 shadow-sm">
+    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 380px' }}>
+      <section className="flex flex-col overflow-hidden bg-[#F5F5F4]">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
           <button
             onClick={() => void handleSave()}
             className="btn-ghost"
@@ -429,12 +429,12 @@ export default function OrderPage(): JSX.Element {
             <ArrowLeft size={15} /> Orqaga
           </button>
           <div className="text-center">
-            <p className="text-lg font-bold text-ink">{table.name}</p>
+            <p className="text-base font-bold text-stone-800">{table.name}</p>
           </div>
           <div className="w-[80px]" />
         </header>
 
-        <nav className="flex gap-1.5 overflow-x-auto border-b border-line bg-bg-card px-4 py-2">
+        <nav className="flex gap-1.5 overflow-x-auto border-b border-stone-100 bg-white px-4 py-2.5 shrink-0">
           {categories.map((c) => (
             <CategoryPill
               key={c.id}
@@ -445,7 +445,7 @@ export default function OrderPage(): JSX.Element {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto bg-bg px-4 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
               Bu kategoriyada mahsulot yo'q
@@ -506,8 +506,8 @@ function CategoryPill({
       className={cn(
         'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all',
         active
-          ? 'border-brand-primary bg-brand-primary text-white shadow-sm shadow-brand-primary/20'
-          : 'border-line bg-white text-ink-soft hover:border-line-strong hover:text-ink'
+          ? 'border-[#C2410C] bg-[#C2410C] text-white shadow-sm'
+          : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-700'
       )}
       style={
         active && cat.color
@@ -544,14 +544,14 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         transition={{ delay: idx * 0.015 }}
         whileTap={{ scale: 0.97 }}
         className={cn(
-          'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all select-none',
+          'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border-2 transition-all select-none',
           qty > 0
-            ? 'border-brand-success/50 bg-white shadow-glow'
-            : 'border-line bg-white shadow-card hover:shadow-card-hover hover:border-line-strong'
+            ? 'border-[#C2410C]/50 bg-white shadow-glow-primary'
+            : 'border-stone-100 bg-white shadow-card hover:shadow-card-hover hover:border-stone-300'
         )}
       >
         {qty > 0 && (
-          <div className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-brand-success text-xs font-bold text-white shadow-md ring-2 ring-white">
+          <div className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#C2410C] text-xs font-bold text-white shadow-md ring-2 ring-white">
             {qty}
           </div>
         )}
@@ -563,16 +563,16 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
               className="h-full w-full object-contain p-2"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
             />
-            {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-success" />}
+            {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-[#C2410C]" />}
           </div>
         ) : (
-          <div className={cn('flex aspect-square items-center justify-center text-5xl', qty > 0 ? 'bg-brand-success/5' : 'bg-slate-50')}>
+          <div className={cn('flex aspect-square items-center justify-center text-5xl', qty > 0 ? 'bg-[#C2410C]/5' : 'bg-stone-50')}>
             {product.emoji ?? '📦'}
           </div>
         )}
         <div className="flex flex-col gap-0.5 p-2.5">
           <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{product.nameUzLatn}</p>
-          <p className="text-xs font-bold text-brand-success">
+          <p className="font-mono text-xs font-bold text-[#C2410C]">
             {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
           </p>
         </div>
@@ -711,12 +711,12 @@ function CartPanel({
     .slice(0, 30)
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', borderLeft: '1px solid #e2e8f0', background: '#f8fafc' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', borderLeft: '1px solid #E7E5E4', background: '#FAFAF9' }}>
 
       {/* Header */}
-      <div style={{ padding: '14px 16px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '14px 16px', background: 'white', borderBottom: '1px solid #E7E5E4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', display: 'grid', placeItems: 'center', boxShadow: '0 4px 12px rgba(59,130,246,0.35)' }}>
+          <div style={{ width: 38, height: 38, borderRadius: 12, background: '#C2410C', display: 'grid', placeItems: 'center', boxShadow: '0 4px 12px rgba(194,65,12,0.25)' }}>
             <ShoppingCart size={16} color="white" />
           </div>
           <div>
@@ -740,8 +740,8 @@ function CartPanel({
               Tarix ({historyEntries.length})
             </button>
           )}
-          <div style={{ minWidth: 28, height: 28, borderRadius: 99, background: lines.length > 0 ? '#3b82f6' : '#e2e8f0', display: 'grid', placeItems: 'center', padding: '0 8px' }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: lines.length > 0 ? 'white' : '#94a3b8' }}>{lines.length}</span>
+          <div style={{ minWidth: 28, height: 28, borderRadius: 99, background: lines.length > 0 ? '#C2410C' : '#E7E5E4', display: 'grid', placeItems: 'center', padding: '0 8px' }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: lines.length > 0 ? 'white' : '#A8A29E' }}>{lines.length}</span>
           </div>
         </div>
       </div>
@@ -749,33 +749,33 @@ function CartPanel({
       {/* Mahsulotlar ro'yxati */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
         {lines.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', gap: 8 }}>
-            <ShoppingCart size={32} style={{ opacity: 0.2 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A8A29E', gap: 8 }}>
+            <ShoppingCart size={32} style={{ opacity: 0.25 }} />
             <span style={{ fontSize: 13 }}>Mahsulotlarni tanlang</span>
           </div>
         ) : (
           <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {lines.map((l, idx) => (
                 <li key={l.localUuid}
-                  style={{ background: 'white', borderRadius: 10, padding: '8px 10px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}
+                  style={{ background: 'white', borderRadius: 10, padding: '8px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #E7E5E4' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#1e293b', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#1C1917', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {idx + 1}. {l.productName}
                     </p>
-                    <button onClick={() => rem(l.localUuid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: '2px 4px', borderRadius: 6, display: 'grid', placeItems: 'center', flexShrink: 0 }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#fff1f2')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                    <button onClick={() => rem(l.localUuid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', padding: '2px 4px', borderRadius: 6, display: 'grid', placeItems: 'center', flexShrink: 0 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#FEF2F2'; (e.currentTarget as HTMLButtonElement).style.color = '#DC2626' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#FCA5A5' }}>
                       <Trash2 size={12} />
                     </button>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', borderRadius: 8, padding: '2px 4px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F5F5F4', borderRadius: 8, padding: '2px 4px', border: '1px solid #E7E5E4' }}>
                       <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={10} /></QtyBtn>
-                      <span style={{ minWidth: 22, textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#1e293b' }}>{fmtQty(l.quantity)}</span>
+                      <span style={{ minWidth: 22, textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#1C1917' }}>{fmtQty(l.quantity)}</span>
                       <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={10} /></QtyBtn>
                     </div>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#16a34a' }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>
                       {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
                     </p>
                   </div>
@@ -809,23 +809,23 @@ function CartPanel({
       </div>
 
       {/* Footer */}
-      <div style={{ background: 'white', borderTop: '1px solid #e2e8f0', padding: '12px 14px' }}>
+      <div style={{ background: 'white', borderTop: '1px solid #E7E5E4', padding: '12px 14px' }}>
         {/* Jami */}
-        <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '10px 14px', marginBottom: 10, border: '1px solid #bbf7d0' }}>
+        <div style={{ background: '#F5F5F4', borderRadius: 12, padding: '10px 14px', marginBottom: 10, border: '1px solid #E7E5E4' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 11, color: '#64748b' }}>Mahsulotlar</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{fmtMoney(subtotal)} so'm</span>
+            <span style={{ fontSize: 11, color: '#78716C' }}>Mahsulotlar</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#57534E' }}>{fmtMoney(subtotal)} so'm</span>
           </div>
           {fee > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: '#64748b' }}>Xizmat ({feePct}%)</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{fmtMoney(fee)} so'm</span>
+              <span style={{ fontSize: 11, color: '#78716C' }}>Xizmat ({feePct}%)</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#57534E' }}>{fmtMoney(fee)} so'm</span>
             </div>
           )}
-          <div style={{ height: 1, background: '#d1fae5', margin: '6px 0' }} />
+          <div style={{ height: 1, background: '#E7E5E4', margin: '6px 0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#15803d' }}>Jami</span>
-            <span style={{ fontSize: 18, fontWeight: 900, color: '#15803d' }}>{fmtMoney(total)} so'm</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1917' }}>Jami</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>{fmtMoney(total)} so'm</span>
           </div>
         </div>
 
@@ -837,7 +837,7 @@ function CartPanel({
           </button>
           <div style={{ display: 'flex', gap: 7 }}>
             <button onClick={() => void onSave()} disabled={saving || printing}
-              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 12px rgba(59,130,246,0.35)', opacity: saving || printing ? 0.6 : 1 }}>
+              style={{ flex: 1, height: 42, borderRadius: 10, border: '1.5px solid #D6D3D1', background: 'white', color: '#1C1917', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving || printing ? 0.6 : 1 }}>
               <Save size={13} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
             </button>
             <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
