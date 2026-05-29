@@ -101,7 +101,7 @@ export default function TablesPage(): JSX.Element {
 
       {/* ── Area tabs ── */}
       {areas.length > 0 && (
-        <nav className="flex items-center gap-2 overflow-x-auto border-b border-line bg-white px-6 py-3" style={{ justifyContent: 'flex-end' }}>
+        <nav className="flex items-center gap-3 overflow-x-auto border-b border-line bg-white px-6 py-3">
           {/* Barchasi tab */}
           <button
             onClick={() => setActiveAreaId(null)}
@@ -177,7 +177,7 @@ export default function TablesPage(): JSX.Element {
                 </div>
 
                 {/* Karta grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: 24 }}>
                   {tables.map((tw, i) => (
                     <TableCard key={tw.table.id} tw={tw} idx={i} onClick={() => navigate(`/order/${tw.table.id}`)} />
                   ))}
@@ -207,11 +207,13 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
         justifyContent: 'space-between', height: 132,
         borderRadius: 14, padding: '14px 16px',
         textAlign: 'left', cursor: 'pointer',
-        background: isOpen ? '#f0fdf4' : hov ? '#e8edf5' : '#eef2f7',
-        border: `2px solid ${isOpen ? '#22c55e' : hov ? '#94a3b8' : '#c8d3e0'}`,
+        background: isOpen
+          ? 'linear-gradient(145deg,#f0fdf4,#dcfce7)'
+          : hov ? '#dbeafe' : '#eff6ff',
+        border: `2px solid ${isOpen ? '#22c55e' : hov ? '#3b82f6' : '#bfdbfe'}`,
         boxShadow: isOpen
-          ? '0 4px 16px rgba(34,197,94,0.18)'
-          : hov ? '0 6px 16px rgba(0,0,0,0.1)' : '0 1px 4px rgba(0,0,0,0.06)',
+          ? '0 4px 16px rgba(34,197,94,0.2)'
+          : hov ? '0 6px 18px rgba(59,130,246,0.18)' : '0 2px 8px rgba(59,130,246,0.08)',
         transform: hov && !isOpen ? 'translateY(-2px)' : 'none',
         transition: 'all .16s ease',
       }}
@@ -220,7 +222,7 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
       <div style={{
         position: 'absolute', top: 0, left: 12, right: 12, height: 3,
         borderRadius: 99,
-        background: isOpen ? 'linear-gradient(90deg,#16a34a,#4ade80)' : '#e2e8f0',
+        background: isOpen ? 'linear-gradient(90deg,#16a34a,#4ade80)' : 'linear-gradient(90deg,#93c5fd,#3b82f6)',
       }} />
 
       {/* Nomi + nuqta */}
@@ -230,14 +232,14 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
         </p>
         <div style={{
           width: 10, height: 10, borderRadius: '50%',
-          background: isOpen ? '#22c55e' : '#e2e8f0',
-          boxShadow: isOpen ? '0 0 0 3px rgba(34,197,94,0.2)' : 'none',
+          background: isOpen ? '#22c55e' : '#3b82f6',
+          boxShadow: isOpen ? '0 0 0 3px rgba(34,197,94,0.2)' : '0 0 0 3px rgba(59,130,246,0.15)',
           flexShrink: 0,
         }} />
       </div>
 
       {/* Holat */}
-      <p style={{ margin: '4px 0 0', fontSize: 12, color: isOpen ? '#16a34a' : '#94a3b8', fontWeight: 500 }}>
+      <p style={{ margin: '4px 0 0', fontSize: 12, color: isOpen ? '#16a34a' : '#2563eb', fontWeight: 600 }}>
         {isOpen ? `${itemCount} ta mahsulot` : "Bo'sh"}
       </p>
 
