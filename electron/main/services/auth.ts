@@ -23,7 +23,7 @@ export async function loginWithServer(identifier: string, password: string): Pro
   console.log(`[AUTH] loginWithServer called — serverUrl: ${s.serverUrl}, identifier: ${identifier}`)
   const api = getApi()
   try {
-    const res = await api.post('/api/auth/login', { phoneNumer: identifier, password })
+    const res = await api.post('/api/auth/login', { identifier, password })
     const { accessToken, user } = res.data as any
 
     setSettings({ apiToken: accessToken })
