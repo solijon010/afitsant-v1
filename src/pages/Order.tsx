@@ -440,75 +440,113 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
 }
 
 function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () => void; onAdd: (weight: number) => void }): JSX.Element {
-  const [weight, setWeight] = useState('1')
-  const parsed = parseFloat(weight) || 0
-  const total = Math.round(product.price * parsed)
+  const [kg, setKg] = useState('1')
+  const [summa, setSumma] = useState(String(product.price))
+
+  const handleKgChange = (v: string): void => {
+    setKg(v)
+    const n = parseFloat(v)
+    if (!isNaN(n) && n > 0) setSumma(String(Math.round(product.price * n)))
+    else setSumma('')
+  }
+
+  const handleSummaChange = (v: string): void => {
+    setSumma(v)
+    const n = parseFloat(v)
+    if (!isNaN(n) && n > 0 && product.price > 0)
+      setKg((n / product.price).toFixed(3).replace(/\.?0+$/, ''))
+    else setKg('')
+  }
+
+  const parsedKg = parseFloat(kg) || 0
+  const canAdd = parsedKg > 0
+
+  const fieldStyle: React.CSSProperties = {
+    width: '100%', height: 52, borderRadius: 12,
+    border: '1.5px solid #e2e8f0', background: '#f8fafc',
+    color: '#1e293b', fontSize: 20, fontWeight: 700,
+    textAlign: 'center', outline: 'none', caretColor: '#16a34a',
+    boxSizing: 'border-box', transition: 'border-color .15s',
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
+        initial={{ scale: 0.96, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 320, borderRadius: 20, overflow: 'hidden', background: '#0d1a2a', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}
+        style={{ width: 320, borderRadius: 20, overflow: 'hidden', background: 'white', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: 'white' }}>{product.nameUzLatn}</p>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', display: 'grid', placeItems: 'center' }}>
-            <X size={18} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 14px', borderBottom: '1px solid #f1f5f9' }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{product.nameUzLatn}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#22c55e', fontWeight: 600 }}>{fmtMoney(product.price)} so'm / kg</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: 30, height: 30, borderRadius: 8, display: 'grid', placeItems: 'center', color: '#64748b' }}>
+            <X size={15} />
           </button>
         </div>
 
-        <div style={{ padding: '18px 20px 20px' }}>
-          {/* Narxi */}
-          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Narxi:</span>
-            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: 14 }}>{fmtMoney(product.price)} so'm / kg</span>
+        <div style={{ padding: '16px 18px 18px' }}>
+
+          {/* KG → SUMMA */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Og'irlik (kg)</label>
+              <input
+                type="number" min="0.01" step="0.1" autoFocus
+                value={kg}
+                onChange={(e) => handleKgChange(e.target.value)}
+                style={fieldStyle}
+                onFocus={(e) => { e.target.style.borderColor = '#22c55e'; e.target.style.background = '#f0fdf4' }}
+                onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc' }}
+              />
+            </div>
+
+            {/* = */}
+            <div style={{ padding: '0 2px 14px', fontSize: 20, color: '#94a3b8', fontWeight: 300 }}>=</div>
+
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Summa (so'm)</label>
+              <input
+                type="number" min="0" step="1000"
+                value={summa}
+                onChange={(e) => handleSummaChange(e.target.value)}
+                style={fieldStyle}
+                onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; e.target.style.background = '#eff6ff' }}
+                onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.background = '#f8fafc' }}
+              />
+            </div>
           </div>
 
-          {/* Og'irlik */}
-          <label style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-            Og'irlik (kg)
-          </label>
-          <input
-            type="number"
-            min="0.1"
-            step="0.1"
-            autoFocus
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            style={{
-              width: '100%', height: 52, borderRadius: 12, border: '2px solid #22c55e',
-              background: 'rgba(34,197,94,0.08)', color: 'white',
-              fontSize: 22, fontWeight: 700, textAlign: 'center',
-              outline: 'none', caretColor: '#22c55e', boxSizing: 'border-box',
-            }}
-          />
-
-          {/* Jami */}
-          <div style={{ background: 'rgba(34,197,94,0.1)', borderRadius: 12, padding: '12px 14px', marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(34,197,94,0.3)' }}>
-            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>Summa:</span>
-            <span style={{ color: '#22c55e', fontWeight: 800, fontSize: 20 }}>{fmtMoney(total)} so'm</span>
-          </div>
+          {/* Jami ko'rsatish */}
+          {canAdd && (
+            <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', border: '1px solid #bbf7d0' }}>
+              <span style={{ color: '#64748b', fontSize: 12 }}>{kg} kg × {fmtMoney(product.price)}</span>
+              <span style={{ color: '#16a34a', fontWeight: 800, fontSize: 14 }}>{fmtMoney(Math.round(product.price * parsedKg))} so'm</span>
+            </div>
+          )}
 
           {/* Tugmalar */}
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={onClose}
-              style={{ flex: 1, height: 46, borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-              × Bekor
+              style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              Bekor
             </button>
             <button
-              onClick={() => { if (parsed > 0) onAdd(parsed) }}
-              disabled={parsed <= 0}
-              style={{ flex: 1.6, height: 46, borderRadius: 12, border: 'none', background: parsed > 0 ? 'linear-gradient(145deg,#22c55e,#16a34a)' : '#334', color: 'white', fontSize: 14, fontWeight: 700, cursor: parsed > 0 ? 'pointer' : 'not-allowed', boxShadow: parsed > 0 ? '0 4px 14px rgba(34,197,94,0.4)' : 'none' }}>
+              onClick={() => { if (canAdd) onAdd(parsedKg) }}
+              disabled={!canAdd}
+              style={{ flex: 1.6, height: 44, borderRadius: 12, border: 'none', background: canAdd ? 'linear-gradient(145deg,#22c55e,#16a34a)' : '#e2e8f0', color: canAdd ? 'white' : '#94a3b8', fontSize: 13, fontWeight: 700, cursor: canAdd ? 'pointer' : 'not-allowed', boxShadow: canAdd ? '0 4px 12px rgba(34,197,94,0.35)' : 'none' }}>
               + Qo'shish
             </button>
           </div>
