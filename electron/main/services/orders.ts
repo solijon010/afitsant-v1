@@ -132,9 +132,16 @@ export async function syncAllItems(input: {
 
   if (items.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
 
+  // JWT tokendan real user ID ni olamiz — server shu IDni tekshiradi
+  let realWaiterId = waiterServerId
+  try {
+    const payload = JSON.parse(Buffer.from(s.apiToken.split('.')[1], 'base64').toString())
+    if (payload.id) realWaiterId = payload.id
+  } catch {}
+
   const createRes = await api.post('/api/order', {
     roomId: roomServerId,
-    waiterId: waiterServerId,
+    waiterId: realWaiterId,
     orderItems: items.map((it) => ({ productId: it.productServerId, count: it.count }))
   })
   return { serverId: createRes.data.id }
