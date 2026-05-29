@@ -479,7 +479,7 @@ function CartPanel({
             </div>
           </div>
         ) : (
-          <ul className="space-y-1.5">
+          <ul className="space-y-1">
             <AnimatePresence initial={false}>
               {lines.map((l) => (
                 <motion.li
@@ -488,25 +488,22 @@ function CartPanel({
                   initial={{ opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 8 }}
-                  className="rounded-lg border border-line bg-white px-2.5 py-2 shadow-sm"
+                  className="rounded-lg border border-line bg-white px-2 py-1.5 shadow-sm"
                 >
-                  {/* Nom + o'chirish */}
-                  <div className="flex items-center gap-1 mb-1.5">
-                    <p className="truncate text-xs font-semibold flex-1 text-ink">{l.productName}</p>
-                    <button onClick={() => rem(l.localUuid)} className="grid h-6 w-6 shrink-0 place-items-center rounded text-ink-dim hover:text-brand-danger">
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                  {/* Miqdor + narx bir qatorda */}
-                  <div className="flex items-center justify-between">
-                    <div className="inline-flex items-center gap-1">
-                      <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={12} /></QtyBtn>
-                      <span className="w-6 text-center text-xs font-bold">{fmtQty(l.quantity)}</span>
-                      <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={12} /></QtyBtn>
+                  {/* Hammasi bir qatorda: nom | miqdor | narx | o'chirish */}
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-xs font-semibold text-ink" style={{ flex: 1, minWidth: 0 }}>{l.productName}</p>
+                    <div className="inline-flex items-center gap-0.5 shrink-0">
+                      <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={11} /></QtyBtn>
+                      <span className="w-5 text-center text-xs font-bold">{fmtQty(l.quantity)}</span>
+                      <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={11} /></QtyBtn>
                     </div>
-                    <p className="text-xs font-bold text-brand-success">
-                      {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
+                    <p className="text-xs font-bold text-brand-success shrink-0">
+                      {fmtMoney(Math.round(l.unitPrice * l.quantity))}
                     </p>
+                    <button onClick={() => rem(l.localUuid)} className="grid h-5 w-5 shrink-0 place-items-center rounded text-ink-dim hover:text-brand-danger">
+                      <Trash2 size={11} />
+                    </button>
                   </div>
                 </motion.li>
               ))}
@@ -554,7 +551,7 @@ function QtyBtn({ children, onClick }: { children: React.ReactNode; onClick: () 
   return (
     <button
       onClick={onClick}
-      className="grid h-6 w-6 place-items-center rounded border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
+      className="grid h-5 w-5 place-items-center rounded border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
     >
       {children}
     </button>
