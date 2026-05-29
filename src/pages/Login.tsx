@@ -1,23 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Phone, Lock, Delete, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/stores/auth'
-import { useSettings } from '@/stores/settings'
 import { useMenu } from '@/stores/menu'
 import { useTables } from '@/stores/tables'
 import loginBg from '@/assets/manzara-foto.png'
 import logoImg from '@/assets/logo.png'
 
-function ServerUrlDisplay(): JSX.Element {
-  const { settings, load } = useSettings()
-  useEffect(() => { if (!settings) void load() }, [settings, load])
-  return (
-    <p style={{ marginTop: 10, textAlign: 'center', fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)' }}>
-      {settings?.serverUrl ?? '…'}
-    </p>
-  )
-}
 
 export default function LoginPage(): JSX.Element {
   const [identifier, setIdentifier] = useState('')
@@ -113,18 +103,18 @@ export default function LoginPage(): JSX.Element {
       {/* Background rasm */}
       <img src={loginBg} alt="" style={{
         position: 'absolute', inset: 0, width: '100%', height: '100%',
-        objectFit: 'cover', filter: 'brightness(0.4) saturate(1.1)',
+        objectFit: 'cover', filter: 'brightness(0.62) saturate(1.15)',
       }} />
 
       {/* Overlay */}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,rgba(0,16,0,0.7) 0%,rgba(3,18,3,0.5) 100%)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(2,12,2,0.42)' }} />
 
       {/* Chet chiziqlari */}
       <div style={{ position: 'absolute', left: 0, top: 0, width: 2, height: '100%', background: 'linear-gradient(to bottom,transparent 5%,#f5c842 50%,transparent 95%)' }} />
       <div style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', background: 'linear-gradient(to bottom,transparent 5%,#f5c842 50%,transparent 95%)' }} />
 
       {/* Kontent */}
-      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 400, padding: '0 20px' }}>
+      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 400, padding: '12px 20px', overflowY: 'auto', maxHeight: '100vh' }}>
 
         {/* Logo */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
@@ -224,7 +214,6 @@ export default function LoginPage(): JSX.Element {
           <div style={{ height: 2, background: 'linear-gradient(90deg,transparent,#f5c842 40%,#ffe680 50%,#f5c842 60%,transparent)' }} />
         </div>
 
-        <ServerUrlDisplay />
       </div>
     </div>
   )
