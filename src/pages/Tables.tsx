@@ -40,10 +40,6 @@ export default function TablesPage(): JSX.Element {
     return () => clearInterval(t)
   }, [load])
 
-  useEffect(() => {
-    if (areas.length > 0 && activeAreaId === null) setActiveAreaId(areas[0].id)
-  }, [areas, activeAreaId])
-
   const grouped = useMemo(() => {
     const m = new Map<number, TableWithOrder[]>()
     for (const s of snapshot) {
@@ -56,7 +52,9 @@ export default function TablesPage(): JSX.Element {
 
   /* Aktiv areadagi stollar — prefix bo'yicha guruhlangan */
   const groupedByPrefix = useMemo(() => {
-    const list = activeAreaId !== null ? sortTables(grouped.get(activeAreaId) ?? []) : []
+    const list = activeAreaId !== null
+      ? sortTables(grouped.get(activeAreaId) ?? [])
+      : sortTables(Array.from(grouped.values()).flat())
     const map = new Map<string, TableWithOrder[]>()
     for (const tw of list) {
       const p = getPrefix(tw.table.name)
@@ -103,15 +101,36 @@ export default function TablesPage(): JSX.Element {
 
       {/* ── Area tabs ── */}
       {areas.length > 0 && (
-        <nav className="flex items-center gap-2 overflow-x-auto border-b border-line bg-white px-6 py-3">
+        <nav className="flex items-center justify-end gap-2 overflow-x-auto border-b border-line bg-white px-6 py-3">
+          {/* Barchasi tab */}
+          <button
+            onClick={() => setActiveAreaId(null)}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all',
+              activeAreaId === null
+                ? 'bg-slate-800 text-white shadow-md'
+                : 'border-2 border-slate-200 bg-white text-slate-500 hover:border-slate-400 hover:text-slate-700'
+            )}
+          >
+            Barchasi
+            {totalOccupied > 0 && (
+              <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold',
+                activeAreaId === null ? 'bg-white/25 text-white' : 'bg-green-100 text-green-700')}>
+                {totalOccupied}
+              </span>
+            )}
+          </button>
+
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
             return (
               <button key={area.id} onClick={() => setActiveAreaId(area.id)}
                 className={cn(
-                  'inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold transition-all',
-                  active ? 'bg-brand-primary text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                  'inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all',
+                  active
+                    ? 'bg-brand-primary text-white shadow-md shadow-brand-primary/20'
+                    : 'border-2 border-slate-200 bg-white text-slate-500 hover:border-slate-400 hover:text-slate-700'
                 )}
               >
                 {area.name}
