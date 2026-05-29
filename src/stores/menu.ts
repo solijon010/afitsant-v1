@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Category, Product } from '@shared/types'
+import { preloadImages } from '@/lib/imageCache'
 
 interface MenuState {
   categories: Category[]
@@ -24,6 +25,8 @@ export const useMenu = create<MenuState>((set, get) => ({
       return true
     })
     set({ categories: uniqueCategories, products: snap.products, loadedAt: Date.now() })
+    // Barcha mahsulot rasmlarini background da oldindan yuklab cache ga saqlaymiz
+    preloadImages(snap.products.map((p) => p.photo))
   },
   productsByCategory: (categoryId) => get().products.filter((p) => p.categoryId === categoryId)
 }))
