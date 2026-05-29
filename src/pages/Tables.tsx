@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { LogOut, Settings as SettingsIcon, UtensilsCrossed } from 'lucide-react'
@@ -10,6 +10,24 @@ import { useTables } from '@/stores/tables'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
+
+/* ─── Soat hook ─── */
+const UZ_DAYS = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba']
+const UZ_MONTHS = ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentyabr','Oktyabr','Noyabr','Dekabr']
+
+function useClock() {
+  const [tick, setTick] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setTick(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    time: `${pad(tick.getHours())}:${pad(tick.getMinutes())}`,
+    secs: pad(tick.getSeconds()),
+    date: `${UZ_DAYS[tick.getDay()]}, ${tick.getDate()}-${UZ_MONTHS[tick.getMonth()]}`,
+  }
+}
 
 /* ─── Animatsiya ─── */
 const cardVariants = {
@@ -87,14 +105,19 @@ export default function TablesPage(): JSX.Element {
   const roleLabel = waiter?.role === 'super_waiter' ? 'Super afitsant'
     : waiter?.role === 'manager' ? 'Manager' : 'Afitsant'
 
+  const clock = useClock()
+
   return (
     <div className="flex h-full flex-col bg-[#F5F5F4]">
 
       {/* ── Header ── */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-6 shadow-sm">
+      <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-stone-100 bg-white px-6 shadow-sm">
+
         {/* Chap: Logo + foydalanuvchi */}
         <div className="flex items-center gap-3">
-          <img src={hisobchimLogo} alt="Hisobchim" className="h-9 w-9 rounded-xl object-contain" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm border border-stone-100">
+            <img src={hisobchimLogo} alt="Hisobchim" className="h-7 w-7 object-contain" />
+          </div>
           <div>
             <p className="text-sm font-semibold text-stone-900 leading-tight">
               {settings?.organizationName ?? 'Hisobchim POS'}
@@ -105,10 +128,25 @@ export default function TablesPage(): JSX.Element {
           </div>
         </div>
 
+        {/* Markaz: Soat */}
+        <div className="flex flex-col items-center justify-center">
+          <div className="flex items-baseline gap-0.5">
+            <span className="font-mono text-[22px] font-bold tabular-nums text-stone-800 leading-none">
+              {clock.time}
+            </span>
+            <span className="font-mono text-[13px] font-semibold tabular-nums text-stone-300 leading-none">
+              :{clock.secs}
+            </span>
+          </div>
+          <span className="mt-0.5 text-[10px] font-medium text-stone-400 leading-none tracking-wide">
+            {clock.date}
+          </span>
+        </div>
+
         {/* O'ng: Statistika + tugmalar */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-end gap-3">
           {totalOccupied > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-1.5 text-right">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-right">
               <p className="text-[10px] font-medium text-amber-600 leading-tight">{totalOccupied} ta band</p>
               <p className="font-mono text-sm font-bold text-amber-700 leading-tight">{fmtMoney(totalSum)} so'm</p>
             </div>
