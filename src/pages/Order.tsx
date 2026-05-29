@@ -268,7 +268,7 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 320px' }}>
+    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 370px' }}>
       <section className="flex flex-col overflow-hidden bg-bg">
         <header className="flex items-center justify-between border-b border-line bg-bg-card px-4 py-3 shadow-sm">
           <button
