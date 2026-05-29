@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/stores/auth'
@@ -12,6 +12,17 @@ import PinEntry from '@/pages/PinEntry'
 import TablesPage from '@/pages/Tables'
 import OrderPage from '@/pages/Order'
 import SettingsPage from '@/pages/Settings'
+
+/** JWT tokenning muddati tugamaganligini tekshiradi */
+function isTokenValid(token: string): boolean {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(base64)) as { exp?: number }
+    return !payload.exp || payload.exp * 1000 > Date.now()
+  } catch {
+    return false
+  }
+}
 
 function RequireAuth({ children }: { children: React.ReactNode }): JSX.Element {
   const waiter = useAuth((s) => s.waiter)
@@ -36,6 +47,7 @@ export default function App(): JSX.Element {
   const waiter = useAuth((s) => s.waiter)
   const settings = useSettings((s) => s.settings)
   const restoreSession = useAuth((s) => s.restoreSession)
+  const initialAutoLoginDone = useRef(false)
 
   useEffect(() => {
     void loadSettings().then(() => {
@@ -45,12 +57,19 @@ export default function App(): JSX.Element {
   }, [loadSettings, loadMenu, loadTables])
 
   useEffect(() => {
-    // Ilovani qayta ochganda token saqlangan bo'lsa — sessionni tiklash
-    // serverUser null qoladi (to'liq login ma'lumotlari yo'q), token bor bo'lsa yetarli
-    if (settings?.apiToken && !useAuth.getState().serverToken) {
+    // Settings hali yuklanmagan bo'lsa yoki allaqachon ishlov berilgan bo'lsa — o'tkazib yubor
+    if (!settings || initialAutoLoginDone.current) return
+    initialAutoLoginDone.current = true
+
+    if (settings.apiToken && isTokenValid(settings.apiToken)) {
+      // Token hali amal qiladi — server loginni o'tkazib, PIN ekraniga o'tish
       restoreSession(settings.apiToken, settings.branchId ?? null)
+      navigate('/select-waiter', { replace: true })
+    } else if (settings.apiToken) {
+      // Token muddati o'tgan — tozalab, server loginni ko'rsatish
+      void window.afisant.settings.set({ apiToken: null, branchId: null })
     }
-  }, [settings, restoreSession])
+  }, [settings, navigate, restoreSession])
 
   useEffect(() => {
     const off = window.afisant.on.sync(({ channel }) => {

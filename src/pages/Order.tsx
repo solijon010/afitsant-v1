@@ -22,6 +22,7 @@ import { toast } from 'sonner'
 import type { Category, Product, ReceiptPayload, TableEntity } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useCart, type CartLine } from '@/stores/cart'
+import { useCachedImage } from '@/hooks/useCachedImage'
 import { useMenu } from '@/stores/menu'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
@@ -527,6 +528,7 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
   const add = useCart((s) => s.add)
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
   const [showKgModal, setShowKgModal] = useState(false)
+  const imgSrc = useCachedImage(product.photo)
 
   const handleClick = (): void => {
     if (product.unit === 'kg') setShowKgModal(true)
@@ -553,10 +555,10 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             {qty}
           </div>
         )}
-        {product.photo ? (
+        {imgSrc ? (
           <div className="relative aspect-square w-full overflow-hidden bg-white">
             <img
-              src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
+              src={imgSrc}
               alt={product.nameUzLatn}
               className="h-full w-full object-contain p-2"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
