@@ -37,6 +37,7 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.ordersUpsert, (_e, input) => orders.upsertOpenOrder(input))
   ipcMain.handle(IPC.ordersAddItems, (_e, orderId: number, items: any[]) => orders.addItems(orderId, items))
+  ipcMain.handle(IPC.ordersReplaceItems, (_e, orderId: number, items: any[]) => orders.replaceOrderItems(orderId, items))
   ipcMain.handle(IPC.ordersUpdateItem, (_e, itemId: number, patch: any) => orders.updateItem(itemId, patch))
   ipcMain.handle(IPC.ordersRemoveItem, (_e, itemId: number) => orders.removeItem(itemId))
   ipcMain.handle(IPC.ordersSyncAll, (_e, input: any) => orders.syncAllItems(input))
@@ -56,6 +57,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.printReceipt, (_e, payload) => printer.printReceipt(payload))
   ipcMain.handle(IPC.printerTest, () => printer.testPrint())
   ipcMain.handle(IPC.printerListUsb, () => printer.listUsbPrinters())
+  ipcMain.handle(IPC.printerFixPerms, () => printer.fixPrinterPerms())
 
   ipcMain.handle(IPC.syncFullPull, () => sync.fullPull())
   ipcMain.handle(IPC.syncFlush, () => sync.flush())

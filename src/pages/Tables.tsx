@@ -1,12 +1,21 @@
 import { useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Coffee, Crown, LogOut, Settings as SettingsIcon, Sofa, Users } from 'lucide-react'
+import {
+  Clock,
+  Coffee,
+  Crown,
+  LogOut,
+  Printer,
+  Settings as SettingsIcon,
+  Sofa,
+  Users
+} from 'lucide-react'
 import type { Area, TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
-import { fmtMoney } from '@/lib/format'
+import { fmtMoney, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
 
@@ -28,7 +37,6 @@ export default function TablesPage(): JSX.Element {
   const logout = useAuth((s) => s.logout)
   const settings = useSettings((s) => s.settings)
   const { areas, snapshot, load } = useTables()
-
   useEffect(() => {
     void load()
     const t = setInterval(() => void load(), 30_000)
@@ -63,7 +71,8 @@ export default function TablesPage(): JSX.Element {
           <div>
             <h1 className="text-base font-semibold">{settings?.organizationName ?? 'Afisant'}</h1>
             <p className="text-xs text-ink-soft">
-              {waiter ? `${waiter.firstName} ${waiter.lastName}` : ''} · {waiter?.role === 'super_waiter' ? 'Super afitsant' : 'Afitsant'}
+              {waiter ? `${waiter.firstName} ${waiter.lastName}` : ''} ·{' '}
+              {waiter?.role === 'super_waiter' ? 'Super afitsant' : 'Afitsant'}
             </p>
           </div>
         </div>
@@ -87,7 +96,12 @@ export default function TablesPage(): JSX.Element {
 
       <main className="flex-1 overflow-y-auto px-8 pb-8">
         {areas.map((area) => (
-          <AreaBlock key={area.id} area={area} tables={grouped.get(area.id) ?? []} onPick={(id) => navigate(`/order/${id}`)} />
+          <AreaBlock
+            key={area.id}
+            area={area}
+            tables={grouped.get(area.id) ?? []}
+            onPick={(id) => navigate(`/order/${id}`)}
+          />
         ))}
       </main>
     </div>
@@ -119,7 +133,13 @@ function AreaBlock({
           {AREA_ICON[area.type] ?? <Sofa size={16} />} {area.name}
         </span>
         {occupied > 0 && (
-          <span className={cn('rounded-full px-3 py-0.5 text-xs font-semibold', tone, 'bg-current/10 border border-current/20')}>
+          <span
+            className={cn(
+              'rounded-full px-3 py-0.5 text-xs font-semibold',
+              tone,
+              'bg-current/10 border border-current/20'
+            )}
+          >
             {occupied} band
           </span>
         )}
@@ -127,17 +147,23 @@ function AreaBlock({
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
         {tables.map((tw, i) => (
-          <TableCard key={tw.table.id} tw={tw} idx={i} tone={tone} onClick={() => onPick(tw.table.id)} />
+          <TableCard
+            key={tw.table.id}
+            tw={tw}
+            idx={i}
+            tone={tone}
+            onClick={() => onPick(tw.table.id)}
+          />
         ))}
       </div>
     </section>
   )
 }
 
+
 function TableCard({
   tw,
   idx,
-  tone,
   onClick
 }: {
   tw: TableWithOrder
@@ -146,44 +172,58 @@ function TableCard({
   onClick: () => void
 }): JSX.Element {
   const isOpen = !!tw.order
+
   return (
-    <motion.button
-      onClick={onClick}
+    <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.015 }}
+      className="relative"
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.97 }}
-      className={cn(
-        'relative flex h-36 flex-col justify-between rounded-2xl border p-4 text-left transition-all',
-        isOpen
-          ? 'border-brand-success/50 bg-brand-success/8 shadow-glow'
-          : 'border-line bg-bg-card hover:border-line-strong hover:bg-bg-elevated'
-      )}
     >
-      {isOpen && (
-        <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-gradient-to-r from-transparent via-brand-success/60 to-transparent" />
-      )}
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-base font-bold leading-tight">{tw.table.name}</p>
-          <p className="mt-1 text-xs text-ink-soft">
-            {isOpen ? `${tw.order!.items.length} mahsulot` : "Bo'sh"}
-          </p>
+      <button
+        onClick={onClick}
+        className={cn(
+          'relative flex h-40 w-full flex-col justify-between rounded-2xl border-2 p-4 text-left transition-all duration-200',
+          isOpen
+            ? 'border-brand-danger bg-brand-danger shadow-[0_0_28px_rgba(239,68,68,0.5)]'
+            : 'border-line bg-bg-card hover:border-line-strong hover:bg-bg-elevated'
+        )}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <p className={cn('text-base font-bold leading-tight', isOpen && 'text-white')}>
+              {tw.table.name}
+            </p>
+            <p className={cn('mt-0.5 text-xs', isOpen ? 'text-red-200' : 'text-ink-soft')}>
+              {isOpen ? `${tw.order!.items.length} ta mahsulot` : "Bo'sh"}
+            </p>
+          </div>
+          {isOpen && (
+            <span className="mt-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+          )}
         </div>
-        {isOpen && <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-brand-success shadow-glow" />}
-      </div>
-      {isOpen ? (
-        <div className="text-right">
-          <p className={cn('text-lg font-bold', tone)}>{fmtMoney(tw.order!.total)}</p>
-          <p className="text-xs text-ink-dim">so'm</p>
-        </div>
-      ) : (
-        <div className="flex items-center gap-1.5 text-xs text-ink-dim">
-          <span className="h-1.5 w-1.5 rounded-full bg-ink-dim/40" />
-          Bo&apos;sh
-        </div>
-      )}
-    </motion.button>
+
+        {isOpen ? (
+          <div>
+            <div className="mb-1 flex items-center gap-1 text-xs text-red-200">
+              <Clock size={10} />
+              <span>{fmtTime(tw.order!.openedAt)} dan beri</span>
+            </div>
+            <p className="text-2xl font-extrabold leading-tight text-white">
+              {fmtMoney(tw.order!.total)}
+            </p>
+            <p className="text-xs font-semibold text-red-200">so'm</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-ink-dim">
+            <span className="h-1.5 w-1.5 rounded-full bg-ink-dim/40" />
+            Bo&apos;sh
+          </div>
+        )}
+      </button>
+    </motion.div>
   )
 }
+

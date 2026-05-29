@@ -1,10 +1,10 @@
-import { writeSync, openSync, closeSync, existsSync } from 'node:fs'
+import { writeSync, openSync, closeSync, existsSync, fsyncSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import type { ReceiptPayload } from '@shared/types'
 import { getSettings } from './settings'
 
 const ESC = 0x1b
 const GS = 0x1d
-const LF = 0x0a
 
 function bytes(...args: number[]): Uint8Array {
   return new Uint8Array(args)
@@ -23,63 +23,69 @@ function pad(left: string, right: string, width = 42): string {
   return left.slice(0, total).padEnd(total, ' ') + right
 }
 
+function center(text: string, width = 42): string {
+  if (text.length >= width) return text.slice(0, width)
+  const spaces = Math.floor((width - text.length) / 2)
+  return ' '.repeat(spaces) + text
+}
+
 function fmt(n: number): string {
-  return new Intl.NumberFormat('uz-UZ').format(n)
+  return new Intl.NumberFormat('uz-UZ').format(Math.round(n))
+}
+
+function fmtDateTime(ts: number): { date: string; time: string } {
+  const d = new Date(ts)
+  const date = d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const time = d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+  return { date, time }
 }
 
 function buildEscPos(payload: ReceiptPayload): Buffer {
-  const W = 42
-  const divider = '-'.repeat(W)
+  const W = 30
+  const line = '-'.repeat(W)
+  const { date, time } = fmtDateTime(payload.printedAt)
 
   const parts: Uint8Array[] = [
-    bytes(ESC, 0x40),
-    bytes(ESC, 0x61, 0x01),
-    bytes(ESC, 0x45, 0x01),
-    bytes(GS, 0x21, 0x11),
-    textBytes(payload.organizationName + '\n'),
-    bytes(GS, 0x21, 0x00),
-    bytes(ESC, 0x45, 0x00),
+    bytes(ESC, 0x40),                    // reset
+    bytes(ESC, 0x61, 0x01),              // center
+    bytes(ESC, 0x45, 0x01),              // bold on
+    textBytes(payload.organizationName.slice(0, W) + '\n'),
+    bytes(ESC, 0x45, 0x00),              // bold off
+    bytes(ESC, 0x61, 0x00),              // left
+    textBytes(line + '\n'),
+    textBytes(`Stol : ${payload.tableName}\n`),
+    textBytes(`Vaqt : ${date} ${time}\n`),
+    textBytes(line + '\n'),
   ]
-
-  if (payload.receiptHeader) {
-    parts.push(textBytes(payload.receiptHeader + '\n'))
-  }
-  parts.push(textBytes(divider + '\n'))
-
-  parts.push(bytes(ESC, 0x61, 0x00))
-  parts.push(textBytes(`Stol: ${payload.tableName}\n`))
-  parts.push(textBytes(`Afitsant: ${payload.waiterName}\n`))
-  parts.push(textBytes(`Vaqt: ${new Date(payload.printedAt).toLocaleString('uz-UZ')}\n`))
-  parts.push(textBytes(`Chek: ${payload.orderLocalUuid.slice(0, 8).toUpperCase()}\n`))
-  parts.push(textBytes(divider + '\n'))
 
   for (const item of payload.items) {
     parts.push(textBytes(item.name.slice(0, W) + '\n'))
-    const detail = pad(`  ${fmt(item.quantity)} x ${fmt(item.unitPrice)} so'm`, `${fmt(item.total)} so'm`, W)
-    parts.push(textBytes(detail + '\n'))
+    parts.push(textBytes(
+      pad(`  ${fmt(item.quantity)}x${fmt(item.unitPrice)}`, fmt(item.total), W) + '\n'
+    ))
   }
 
-  parts.push(textBytes(divider + '\n'))
-  parts.push(textBytes(pad("Jami mahsulotlar:", `${fmt(payload.subtotal)} so'm`, W) + '\n'))
+  parts.push(textBytes(line + '\n'))
+
   if (payload.serviceFee > 0) {
-    parts.push(textBytes(pad(`Xizmat (${payload.serviceFeePercent}%):`, `${fmt(payload.serviceFee)} so'm`, W) + '\n'))
-  }
-  parts.push(textBytes(divider + '\n'))
-
-  parts.push(bytes(ESC, 0x45, 0x01))
-  parts.push(bytes(GS, 0x21, 0x11))
-  parts.push(textBytes(pad("JAMI:", `${fmt(payload.total)} so'm`, W) + '\n'))
-  parts.push(bytes(GS, 0x21, 0x00))
-  parts.push(bytes(ESC, 0x45, 0x00))
-  parts.push(textBytes(divider + '\n'))
-
-  if (payload.receiptFooter) {
-    parts.push(bytes(ESC, 0x61, 0x01))
-    parts.push(textBytes(payload.receiptFooter + '\n'))
+    parts.push(textBytes(
+      pad(`Xizmat ${payload.serviceFeePercent}%:`, fmt(payload.serviceFee), W) + '\n'
+    ))
   }
 
-  parts.push(bytes(ESC, 0x64, 4))
-  parts.push(bytes(GS, 0x56, 0x01))
+  parts.push(
+    bytes(ESC, 0x61, 0x01),              // center
+    bytes(ESC, 0x45, 0x01),              // bold on
+    textBytes(`JAMI: ${fmt(payload.total)} som\n`),
+    bytes(ESC, 0x45, 0x00),              // bold off
+    bytes(ESC, 0x61, 0x00),              // left
+    textBytes(line + '\n'),
+    textBytes('Rahmat! Yana keling!\n'),
+  )
+
+  // Qog'oz surish (auto-cutter bo'lmasa ham yirtish uchun qulay)
+  parts.push(bytes(ESC, 0x64, 3))        // 3 qator surish
+  parts.push(bytes(GS, 0x56, 0x00))      // kesish (cutter bo'lsa ishlaydi)
 
   return concat(...parts)
 }
@@ -89,16 +95,46 @@ async function printRaw(data: Buffer): Promise<{ ok: true } | { ok: false; error
   const devicePath = s.printerDevicePath ?? '/dev/usb/lp0'
 
   if (!existsSync(devicePath)) {
-    return { ok: false, error: `Printer qurilmasi topilmadi: ${devicePath}` }
+    return {
+      ok: false,
+      error: `USB printer topilmadi: ${devicePath}\nPrinterni ulang va Sozlamalar > Aniqlash tugmasini bosing`
+    }
   }
 
   try {
     const fd = openSync(devicePath, 'w')
     writeSync(fd, data)
+    try { fsyncSync(fd) } catch { /* ba'zi USB drayverlar fsync qo'llab-quvvatlamaydi */ }
     closeSync(fd)
     return { ok: true }
   } catch (e: any) {
-    return { ok: false, error: e?.message ?? 'Chop etishda xatolik' }
+    const msg = e?.message ?? 'Chop etishda xatolik'
+    if (msg.includes('EACCES') || msg.includes('permission')) {
+      try {
+        execSync(`pkexec chmod a+w ${devicePath}`, { timeout: 30000 })
+        const fd = openSync(devicePath, 'w')
+        writeSync(fd, data)
+        try { fsyncSync(fd) } catch { /* ignore */ }
+        closeSync(fd)
+        return { ok: true }
+      } catch {
+        return {
+          ok: false,
+          error: `Ruxsat yo'q: ${devicePath}\nTerminalda: sudo chmod a+w ${devicePath}`
+        }
+      }
+    }
+    return { ok: false, error: msg }
+  }
+}
+
+export async function fixPrinterPerms(): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const rule = `KERNEL=="lp[0-9]*", SUBSYSTEM=="usb", MODE="0666"`
+    execSync(`pkexec bash -c "echo '${rule}' > /etc/udev/rules.d/99-afisant-printer.rules && udevadm control --reload-rules && udevadm trigger"`, { timeout: 30000 })
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Ruxsat berishda xatolik' }
   }
 }
 
@@ -120,7 +156,8 @@ async function printViaThermalLib(payload: ReceiptPayload): Promise<{ ok: true }
   const { ThermalPrinter, PrinterTypes } = mod as any
   let iface = ''
   if (s.printerType === 'network' && s.printerIp) iface = `tcp://${s.printerIp}:9100`
-  else if ((s.printerType === 'windows' || s.printerType === 'usb') && s.printerName) iface = `printer:${s.printerName}`
+  else if ((s.printerType === 'windows' || s.printerType === 'usb') && s.printerName)
+    iface = `printer:${s.printerName}`
   else return { ok: false, error: 'Printer nomi kiritilmagan (Sozlamalar > Printer nomi)' }
 
   const printer = new ThermalPrinter({
@@ -131,43 +168,72 @@ async function printViaThermalLib(payload: ReceiptPayload): Promise<{ ok: true }
     removeSpecialCharacters: false
   })
 
+  const { date, time } = fmtDateTime(payload.printedAt)
+
   try {
     const connected = await printer.isPrinterConnected()
     if (!connected) return { ok: false, error: 'Printer ulanmagan' }
 
+    // Organization name
     printer.alignCenter()
     printer.bold(true)
     printer.setTextSize(1, 1)
     printer.println(payload.organizationName)
     printer.bold(false)
     printer.setTextNormal()
-    if (payload.receiptHeader) printer.println(payload.receiptHeader)
-    printer.drawLine()
-    printer.alignLeft()
-    printer.println(`Stol: ${payload.tableName}`)
-    printer.println(`Afitsant: ${payload.waiterName}`)
-    printer.println(`Vaqt: ${new Date(payload.printedAt).toLocaleString('uz-UZ')}`)
-    printer.println(`Chek: ${payload.orderLocalUuid.slice(0, 8).toUpperCase()}`)
     printer.drawLine()
 
+    // Header
+    if (payload.receiptHeader) {
+      printer.println(payload.receiptHeader)
+      printer.drawLine()
+    }
+
+    // Order info
+    printer.alignLeft()
+    printer.println(`Stol    : ${payload.tableName}`)
+    printer.println(`Afitsant: ${payload.waiterName}`)
+    printer.println(`Sana    : ${date}`)
+    printer.println(`Vaqt    : ${time}`)
+    printer.println(`Chek #  : ${payload.orderLocalUuid.slice(0, 8).toUpperCase()}`)
+    printer.drawLine()
+
+    // Column header
+    printer.leftRight('Mahsulot', 'Jami')
+    printer.drawLine()
+
+    // Items
     for (const item of payload.items) {
       printer.println(item.name)
-      printer.leftRight(`  ${fmt(item.quantity)} x ${fmt(item.unitPrice)}`, `${fmt(item.total)} so'm`)
+      printer.leftRight(
+        `  ${fmt(item.quantity)} x ${fmt(item.unitPrice)} so'm`,
+        `${fmt(item.total)} so'm`
+      )
     }
     printer.drawLine()
-    printer.leftRight('Mahsulotlar:', `${fmt(payload.subtotal)} so'm`)
-    if (payload.serviceFee > 0)
+
+    // Totals
+    printer.leftRight('Mahsulotlar jami:', `${fmt(payload.subtotal)} so'm`)
+    if (payload.serviceFee > 0) {
       printer.leftRight(`Xizmat (${payload.serviceFeePercent}%):`, `${fmt(payload.serviceFee)} so'm`)
+    }
+    printer.drawLine()
+
+    // Grand total
+    printer.alignCenter()
     printer.bold(true)
     printer.setTextSize(1, 1)
-    printer.leftRight('JAMI:', `${fmt(payload.total)} so'm`)
+    printer.println(`JAMI: ${fmt(payload.total)} so'm`)
     printer.bold(false)
     printer.setTextNormal()
     printer.drawLine()
-    if (payload.receiptFooter) {
-      printer.alignCenter()
-      printer.println(payload.receiptFooter)
-    }
+
+    // Footer
+    printer.alignCenter()
+    printer.println('Rahmat! Yana keling!')
+    if (payload.receiptFooter) printer.println(payload.receiptFooter)
+    printer.println('* * *')
+
     printer.cut()
     await printer.execute()
     return { ok: true }
@@ -180,7 +246,7 @@ export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true 
   const s = getSettings()
   if (!s.printerType) return { ok: false, error: 'Printer sozlanmagan' }
 
-  // Linux da USB: to'g'ridan device pathga yozish
+  // Linux USB: to'g'ridan device pathga yozish (ESC/POS raw)
   if (s.printerType === 'usb' && process.platform !== 'win32') {
     return printRaw(buildEscPos(payload))
   }
@@ -191,18 +257,21 @@ export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true 
 
 export async function testPrint(): Promise<{ ok: true } | { ok: false; error: string }> {
   return printReceipt({
-    organizationName: 'TEST CHEK',
-    tableName: '1-stol',
-    waiterName: 'Test afitsant',
-    orderLocalUuid: 'test1234',
-    items: [{ name: 'Test mahsulot', quantity: 2, unitPrice: 10000, total: 20000 }],
-    subtotal: 20000,
-    serviceFeePercent: 0,
-    serviceFee: 0,
-    total: 20000,
+    organizationName: 'AFISANT TEST',
+    tableName: 'Sori 1',
+    waiterName: 'Test Afitsant',
+    orderLocalUuid: 'test1234abcd',
+    items: [
+      { name: 'Choy', quantity: 2, unitPrice: 12000, total: 24000 },
+      { name: 'Osh', quantity: 1, unitPrice: 45000, total: 45000 }
+    ],
+    subtotal: 69000,
+    serviceFeePercent: 10,
+    serviceFee: 6900,
+    total: 75900,
     printedAt: Date.now(),
     receiptHeader: 'Xush kelibsiz!',
-    receiptFooter: 'Test muvaffaqiyatli'
+    receiptFooter: 'Bizga yana tashrif buyuring!'
   })
 }
 

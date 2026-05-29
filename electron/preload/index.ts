@@ -33,6 +33,7 @@ const api: BridgeAPI = {
     upsert: (input) => ipcRenderer.invoke(IPC.ordersUpsert, input),
     syncAll: (input) => ipcRenderer.invoke(IPC.ordersSyncAll, input),
     addItems: (orderId, items) => ipcRenderer.invoke(IPC.ordersAddItems, orderId, items),
+    replaceItems: (orderId, items) => ipcRenderer.invoke(IPC.ordersReplaceItems, orderId, items),
     updateItem: (itemId, patch) => ipcRenderer.invoke(IPC.ordersUpdateItem, itemId, patch),
     removeItem: (itemId) => ipcRenderer.invoke(IPC.ordersRemoveItem, itemId),
     close: (orderId, serverOrderId) => ipcRenderer.invoke(IPC.ordersClose, orderId, serverOrderId),
@@ -42,7 +43,8 @@ const api: BridgeAPI = {
   printer: {
     receipt: (payload) => ipcRenderer.invoke(IPC.printReceipt, payload),
     test: () => ipcRenderer.invoke(IPC.printerTest),
-    listUsb: () => ipcRenderer.invoke(IPC.printerListUsb)
+    listUsb: () => ipcRenderer.invoke(IPC.printerListUsb),
+    fixPerms: () => ipcRenderer.invoke(IPC.printerFixPerms)
   },
 
   sync: {

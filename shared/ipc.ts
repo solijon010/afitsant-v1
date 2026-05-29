@@ -36,6 +36,7 @@ export const IPC = {
   ordersGetByTable: 'orders:getByTable',
   ordersUpsert: 'orders:upsert',
   ordersAddItems: 'orders:addItems',
+  ordersReplaceItems: 'orders:replaceItems',
   ordersRemoveItem: 'orders:removeItem',
   ordersUpdateItem: 'orders:updateItem',
   ordersSyncAll: 'orders:syncAll',
@@ -45,6 +46,7 @@ export const IPC = {
   printReceipt: 'printer:receipt',
   printerTest: 'printer:test',
   printerListUsb: 'printer:listUsb',
+  printerFixPerms: 'printer:fixPerms',
 
   syncFullPull: 'sync:fullPull',
   syncFlush: 'sync:flush',
@@ -116,6 +118,17 @@ export interface BridgeAPI {
         localUuid: string
       }>
     ) => Promise<OrderItem[]>
+    replaceItems: (
+      orderId: number,
+      items: Array<{
+        productId: number
+        productName: string
+        unitPrice: number
+        quantity: number
+        notes?: string | null
+        localUuid: string
+      }>
+    ) => Promise<OrderItem[]>
     updateItem: (itemId: number, patch: { quantity?: number; notes?: string | null }) => Promise<OrderItem>
     removeItem: (itemId: number) => Promise<void>
     close: (orderId: number, serverOrderId?: string) => Promise<Order>
@@ -126,6 +139,7 @@ export interface BridgeAPI {
     receipt: (payload: ReceiptPayload) => Promise<{ ok: true } | { ok: false; error: string }>
     test: () => Promise<{ ok: true } | { ok: false; error: string }>
     listUsb: () => Promise<Array<{ vendorId: string; productId: string; manufacturer?: string; product?: string }>>
+    fixPerms: () => Promise<{ ok: true } | { ok: false; error: string }>
   }
 
   sync: {

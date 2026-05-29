@@ -160,6 +160,38 @@ export function upsertOpenOrder(input: {
   return mapOrder(order)
 }
 
+export function replaceOrderItems(
+  orderId: number,
+  items: Array<{
+    productId: number
+    productName: string
+    unitPrice: number
+    quantity: number
+    notes?: string | null
+    localUuid: string
+  }>
+): OrderItem[] {
+  const db = getDb()
+  const ts = now()
+
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM order_items WHERE order_id = ?`).run(orderId)
+
+    const insert = db.prepare(
+      `INSERT INTO order_items (local_uuid, order_id, product_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+    )
+    for (const it of items) {
+      insert.run(it.localUuid, orderId, it.productId, it.productName, it.unitPrice, it.quantity, it.notes ?? null, ts, ts)
+    }
+    recalculateOrder(orderId)
+  })
+  tx()
+
+  const rows = db.prepare(`SELECT * FROM order_items WHERE order_id = ? ORDER BY id`).all(orderId) as any[]
+  return rows.map(mapOrderItem)
+}
+
 export function addItems(
   orderId: number,
   items: Array<{

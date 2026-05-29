@@ -23,7 +23,8 @@ import { useCart, type CartLine } from '@/stores/cart'
 import { useMenu } from '@/stores/menu'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
-import { fmtMoney, fmtQty } from '@/lib/format'
+import { useOrderHistory, type HistoryEntry } from '@/stores/orderHistory'
+import { fmtMoney, fmtQty, fmtDate } from '@/lib/format'
 import { cn } from '@/lib/cn'
 
 const CAT_ICON: Record<string, JSX.Element> = {
@@ -66,19 +67,23 @@ export default function OrderPage(): JSX.Element {
     void (async () => {
       const fee = settings?.serviceFeePercent ?? 0
       useCart.setState({ serviceFeePercent: fee })
-
       const roomServerId = table.serverId
 
+      // Always create/get a local SQLite order so items can be persisted offline
+      const baseOrder = await window.afisant.orders.upsert({
+        tableId: tId,
+        waiterId: waiter.id,
+        serviceFeePercent: fee
+      })
+      if (cancelled) return
+      cart.setOrder(baseOrder.id, tId, null, roomServerId ?? null)
+
       if (roomServerId) {
-        cart.setOrder(0, tId, null, roomServerId)
+        // Try to load active order from server
         const existingOrder = await window.afisant.orders.getByRoom(roomServerId)
         if (cancelled) return
-
         if (existingOrder) {
-          useCart.setState({
-            serverOrderId: existingOrder.serverId ?? null,
-            roomServerId
-          })
+          useCart.setState({ serverOrderId: existingOrder.serverId ?? null, roomServerId })
           cart.hydrateFromOrder(
             existingOrder.items.map<CartLine>((it) => {
               const product = products.find((p) => p.id === it.productId || p.serverId === it.serverId)
@@ -96,17 +101,28 @@ export default function OrderPage(): JSX.Element {
               }
             })
           )
+          return
         }
-      } else {
-        const fee2 = settings?.serviceFeePercent ?? 0
-        useCart.setState({ serviceFeePercent: fee2 })
-        const order = await window.afisant.orders.upsert({
-          tableId: tId,
-          waiterId: waiter.id,
-          serviceFeePercent: fee2
-        })
-        if (cancelled) return
-        cart.setOrder(order.id, tId)
+      }
+
+      // Local SQLite fallback — for local-only tables or when server has no active order
+      const localOrder = await window.afisant.tables.getByTable(tId)
+      if (cancelled) return
+      if (localOrder && localOrder.items.length > 0) {
+        cart.hydrateFromOrder(
+          localOrder.items.map<CartLine>((it) => ({
+            localUuid: it.localUuid,
+            productId: it.productId,
+            productServerId: null,
+            productName: it.productName,
+            unitPrice: it.unitPrice,
+            quantity: it.quantity,
+            notes: it.notes,
+            flushed: true,
+            itemId: it.id,
+            addedAt: it.createdAt
+          }))
+        )
       }
     })()
     return () => {
@@ -130,22 +146,61 @@ export default function OrderPage(): JSX.Element {
       const roomServerId = useCart.getState().roomServerId
       const waiterServerId = waiter.serverId
 
+      // Har doim local SQLite ga saqlash (offline persistence uchun)
+      if (cart.orderId && cart.lines.length > 0) {
+        await window.afisant.orders.replaceItems(
+          cart.orderId,
+          cart.lines.map((l) => ({
+            productId: l.productId,
+            productName: l.productName,
+            unitPrice: l.unitPrice,
+            quantity: l.quantity,
+            notes: l.notes ?? null,
+            localUuid: l.localUuid
+          }))
+        )
+      }
+
+      // Server sync — ulanish yo'q bo'lsa ogohlantirib o'tkazib yuboriladi
       if (roomServerId && waiterServerId) {
         const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
         if (itemsWithServerId.length > 0) {
-          const res = await window.afisant.orders.syncAll({
-            roomServerId,
-            waiterServerId,
-            items: itemsWithServerId.map((l) => ({
-              productServerId: l.productServerId!,
-              count: Math.round(l.quantity)
-            }))
-          })
-          useCart.setState({ serverOrderId: res.serverId })
-          useCart.setState({
-            lines: cart.lines.map((l) => ({ ...l, flushed: true }))
-          })
+          try {
+            const res = await window.afisant.orders.syncAll({
+              roomServerId,
+              waiterServerId,
+              items: itemsWithServerId.map((l) => ({
+                productServerId: l.productServerId!,
+                count: Math.round(l.quantity)
+              }))
+            })
+            useCart.setState({ serverOrderId: res.serverId })
+            useCart.setState({
+              lines: cart.lines.map((l) => ({ ...l, flushed: true }))
+            })
+          } catch {
+            toast.warning("Server bilan ulanish yo'q — mahalliy saqlandi")
+          }
         }
+      }
+
+      // Localda saqlash (vaqt bilan)
+      if (table) {
+        useOrderHistory.getState().push({
+          tableId: tId,
+          tableName: table.name,
+          waiterName: `${waiter.firstName} ${waiter.lastName}`,
+          savedAt: Date.now(),
+          items: cart.lines.map((l) => ({
+            name: l.productName,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            total: Math.round(l.unitPrice * l.quantity)
+          })),
+          subtotal: cart.subtotal(),
+          serviceFee: cart.serviceFee(),
+          total: cart.total()
+        })
       }
 
       await refreshTable(tId)
@@ -175,15 +230,19 @@ export default function OrderPage(): JSX.Element {
       if (roomServerId && waiterServerId && cart.lines.length > 0) {
         const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
         if (itemsWithServerId.length > 0) {
-          const res = await window.afisant.orders.syncAll({
-            roomServerId,
-            waiterServerId,
-            items: itemsWithServerId.map((l) => ({
-              productServerId: l.productServerId!,
-              count: Math.round(l.quantity)
-            }))
-          })
-          serverOrderId = res.serverId
+          try {
+            const res = await window.afisant.orders.syncAll({
+              roomServerId,
+              waiterServerId,
+              items: itemsWithServerId.map((l) => ({
+                productServerId: l.productServerId!,
+                count: Math.round(l.quantity)
+              }))
+            })
+            serverOrderId = res.serverId
+          } catch {
+            toast.warning("Server bilan ulanish yo'q — faqat chek chiqariladi")
+          }
         }
       }
 
@@ -206,6 +265,19 @@ export default function OrderPage(): JSX.Element {
         receiptHeader: settings?.receiptHeader ?? null,
         receiptFooter: settings?.receiptFooter ?? null
       }
+
+      // Localda saqlash va chop etilgan deb belgilash
+      const histId = useOrderHistory.getState().push({
+        tableId: tId,
+        tableName: table.name,
+        waiterName: `${waiter.firstName} ${waiter.lastName}`,
+        savedAt: Date.now(),
+        items: payload.items,
+        subtotal: payload.subtotal,
+        serviceFee: payload.serviceFee,
+        total: payload.total
+      })
+      useOrderHistory.getState().markPrinted(histId)
 
       const res = await window.afisant.printer.receipt(payload)
       if (!res.ok) {
@@ -286,6 +358,7 @@ export default function OrderPage(): JSX.Element {
 
       <CartPanel
         table={table}
+        tableId={tId}
         onSave={handleSave}
         onClosePrint={() => setConfirmClose(true)}
         printing={printing}
@@ -341,81 +414,84 @@ function CategoryPill({
 function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
-  const inc = useCart((s) => s.increment)
   const dec = useCart((s) => s.decrement)
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
-  const line = lines.find((l) => l.productId === product.id)
+  const activeLine =
+    lines.find((l) => l.productId === product.id && !l.flushed) ??
+    lines.find((l) => l.productId === product.id)
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.015 }}
-      className={cn(
-        'relative flex flex-col justify-between rounded-2xl border p-4 transition-all',
-        qty > 0
-          ? 'border-brand-success/50 bg-brand-success/8 shadow-glow'
-          : 'border-line bg-bg-card hover:border-line-strong hover:bg-bg-elevated'
-      )}
+      className="relative"
     >
-      {product.imageUrl ? (
-        <img
-          src={product.imageUrl}
-          alt={product.nameUzLatn}
-          className="mb-2 h-20 w-full rounded-xl object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none'
-          }}
-        />
-      ) : (
-        <div className="mb-2 flex h-16 items-center justify-start text-3xl">
-          {product.emoji ?? '📦'}
-        </div>
-      )}
-      <div className="flex-1">
-        <p className="line-clamp-2 text-sm font-semibold leading-tight">{product.nameUzLatn}</p>
-        <p className="mt-1 text-sm font-bold text-brand-success">{fmtMoney(product.price)} so'm</p>
-      </div>
-      <div className="mt-3">
-        {qty === 0 ? (
-          <button
-            onClick={() => add(product)}
-            className="w-full rounded-xl border border-brand-success/40 bg-brand-success/10 py-2 text-sm font-semibold text-brand-success transition-all hover:bg-brand-success/20"
-          >
-            + Qo'shish
-          </button>
+      <motion.div
+        whileTap={{ scale: 0.95 }}
+        onClick={() => add(product)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && add(product)}
+        className={cn(
+          'flex select-none cursor-pointer flex-col rounded-2xl border p-4 transition-all',
+          qty > 0
+            ? 'border-brand-success/50 bg-brand-success/8 shadow-glow'
+            : 'border-line bg-bg-card hover:border-line-strong hover:bg-bg-elevated'
+        )}
+      >
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.nameUzLatn}
+            className="mb-2 h-20 w-full rounded-xl object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none'
+            }}
+          />
         ) : (
-          <div className="flex items-center justify-between gap-2">
+          <div className="mb-2 flex h-16 items-center justify-start text-3xl">
+            {product.emoji ?? '📦'}
+          </div>
+        )}
+        <p className="line-clamp-2 flex-1 text-sm font-semibold leading-tight">{product.nameUzLatn}</p>
+        <p className="mt-1 text-sm font-bold text-brand-success">{fmtMoney(product.price)} so'm</p>
+
+        {qty > 0 && activeLine ? (
+          <div className="mt-3 flex items-center justify-between">
             <button
-              onClick={() => line && dec(line.localUuid)}
+              onClick={(e) => {
+                e.stopPropagation()
+                dec(activeLine.localUuid)
+              }}
               className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
             >
               <Minus size={14} />
             </button>
-            <span className="min-w-[2rem] text-center text-base font-bold text-brand-success">
+            <span className="grid h-8 min-w-[2rem] place-items-center rounded-full bg-brand-success px-2 text-sm font-bold text-black">
               {fmtQty(qty)}
             </span>
-            <button
-              onClick={() => add(product)}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-brand-success/40 bg-brand-success/10 text-brand-success hover:bg-brand-success/20"
-            >
-              <Plus size={14} />
-            </button>
+          </div>
+        ) : (
+          <div className="mt-3 h-8 flex items-center justify-center rounded-xl border border-dashed border-line text-xs text-ink-dim">
+            Bosing → +1
           </div>
         )}
-      </div>
+      </motion.div>
     </motion.div>
   )
 }
 
 function CartPanel({
   table,
+  tableId,
   onSave,
   onClosePrint,
   printing,
   saving
 }: {
   table: TableEntity
+  tableId: number
   onSave: () => Promise<void> | void
   onClosePrint: () => void
   printing: boolean
@@ -429,6 +505,13 @@ function CartPanel({
   const fee = useCart((s) => s.serviceFee())
   const total = useCart((s) => s.total())
   const feePct = useCart((s) => s.serviceFeePercent)
+  const [showHistory, setShowHistory] = useState(false)
+
+  const allEntries = useOrderHistory((s) => s.entries)
+  const historyEntries = allEntries
+    .filter((e) => e.tableId === tableId)
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, 30)
 
   return (
     <aside className="flex h-full flex-col border-l border-line bg-bg-soft/40">
@@ -442,62 +525,104 @@ function CartPanel({
             <p className="text-xs text-ink-soft">{table.name}</p>
           </div>
         </div>
-        <span className="grid h-7 min-w-7 place-items-center rounded-full bg-brand-success px-2 text-xs font-bold text-black">
-          {lines.length}
-        </span>
+        <div className="flex items-center gap-2">
+          {historyEntries.length > 0 && (
+            <button
+              onClick={() => setShowHistory((v) => !v)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all',
+                showHistory
+                  ? 'border-brand-danger/50 bg-brand-danger/15 text-brand-danger'
+                  : 'border-line text-ink-soft hover:border-line-strong hover:text-ink'
+              )}
+            >
+              <Printer size={11} />
+              Tarix ({historyEntries.length})
+            </button>
+          )}
+          <span className="grid h-7 min-w-7 place-items-center rounded-full bg-brand-success px-2 text-xs font-bold text-black">
+            {lines.length}
+          </span>
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3">
-        {lines.length === 0 ? (
-          <div className="grid h-full place-items-center px-6 text-center text-sm text-ink-dim">
-            <div>
-              <ShoppingCart className="mx-auto mb-2 opacity-30" size={32} />
-              Mahsulotlarni tanlang
+      <div className="flex-1 overflow-y-auto">
+        {/* Joriy savat */}
+        <div className="px-3 py-3">
+          {lines.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-center text-sm text-ink-dim">
+              <div>
+                <ShoppingCart className="mx-auto mb-2 opacity-30" size={28} />
+                Mahsulotlarni tanlang
+              </div>
             </div>
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            <AnimatePresence initial={false}>
-              {lines.map((l) => (
-                <motion.li
-                  key={l.localUuid}
-                  layout
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  className="rounded-xl border border-line bg-bg-card px-3 py-2.5"
-                >
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{l.productName}</p>
-                      <p className="text-xs text-ink-soft">{fmtMoney(l.unitPrice)} so'm</p>
+          ) : (
+            <ul className="space-y-2">
+              <AnimatePresence initial={false}>
+                {lines.map((l) => (
+                  <motion.li
+                    key={l.localUuid}
+                    layout
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 8 }}
+                    className="rounded-xl border border-line bg-bg-card px-3 py-2.5"
+                  >
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{l.productName}</p>
+                        <p className="text-xs text-ink-soft">{fmtMoney(l.unitPrice)} so'm</p>
+                      </div>
+                      <button
+                        onClick={() => rem(l.localUuid)}
+                        className="grid h-7 w-7 place-items-center rounded-lg text-ink-dim hover:bg-brand-danger/10 hover:text-brand-danger"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => rem(l.localUuid)}
-                      className="grid h-7 w-7 place-items-center rounded-lg text-ink-dim hover:bg-brand-danger/10 hover:text-brand-danger"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="inline-flex items-center gap-1">
-                      <QtyBtn onClick={() => dec(l.localUuid)}>
-                        <Minus size={14} />
-                      </QtyBtn>
-                      <span className="w-8 text-center text-sm font-semibold">{fmtQty(l.quantity)}</span>
-                      <QtyBtn onClick={() => inc(l.localUuid)}>
-                        <Plus size={14} />
-                      </QtyBtn>
+                    <div className="flex items-center justify-between">
+                      <div className="inline-flex items-center gap-1">
+                        <QtyBtn onClick={() => dec(l.localUuid)}>
+                          <Minus size={14} />
+                        </QtyBtn>
+                        <span className="w-8 text-center text-sm font-semibold">{fmtQty(l.quantity)}</span>
+                        <QtyBtn onClick={() => inc(l.localUuid)}>
+                          <Plus size={14} />
+                        </QtyBtn>
+                      </div>
+                      <p className="text-sm font-semibold text-brand-success">
+                        {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
+                      </p>
                     </div>
-                    <p className="text-sm font-semibold text-brand-success">
-                      {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
-                    </p>
-                  </div>
-                </motion.li>
-              ))}
-            </AnimatePresence>
-          </ul>
-        )}
+                  </motion.li>
+                ))}
+              </AnimatePresence>
+            </ul>
+          )}
+        </div>
+
+        {/* Tarix paneli */}
+        <AnimatePresence>
+          {showHistory && historyEntries.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden border-t border-line"
+            >
+              <div className="px-3 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-soft">
+                  {table.name} — Zakazlar tarixi
+                </p>
+                <ul className="space-y-2">
+                  {historyEntries.map((entry) => (
+                    <HistoryEntryRow key={entry.id} entry={entry} />
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <footer className="border-t border-line bg-bg-soft/60 p-4">
@@ -525,6 +650,50 @@ function CartPanel({
         </div>
       </footer>
     </aside>
+  )
+}
+
+function HistoryEntryRow({ entry }: { entry: HistoryEntry }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <li className="overflow-hidden rounded-xl border border-line bg-bg-card">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold">{fmtDate(entry.savedAt)}</p>
+          <p className="text-xs text-ink-soft">
+            {entry.waiterName} · {entry.items.length} ta mahsulot
+            {entry.printCount > 0 && (
+              <span className="ml-1 text-brand-success">· {entry.printCount} chek</span>
+            )}
+          </p>
+        </div>
+        <p className="shrink-0 text-sm font-bold text-brand-success">{fmtMoney(entry.total)} so'm</p>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            className="overflow-hidden border-t border-line"
+          >
+            <ul className="space-y-1 px-3 py-2">
+              {entry.items.map((item, i) => (
+                <li key={i} className="flex items-baseline justify-between text-xs">
+                  <span className="flex-1 truncate text-ink-soft">{item.name}</span>
+                  <span className="ml-2 shrink-0 font-medium">
+                    {item.quantity} × {fmtMoney(item.unitPrice)} = {fmtMoney(item.total)} so'm
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </li>
   )
 }
 
