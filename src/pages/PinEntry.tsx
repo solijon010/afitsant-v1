@@ -10,6 +10,10 @@ import { initials } from '@/lib/format'
 import { PIN_LENGTH } from '@/components/PinPad'
 import loginBg from '@/assets/manzara-foto.png'
 
+const G = '#22c55e'
+const G2 = '#16a34a'
+const G3 = '#15803d'
+
 export default function PinEntry(): JSX.Element {
   const { waiterId } = useParams<{ waiterId: string }>()
   const navigate = useNavigate()
@@ -82,87 +86,67 @@ export default function PinEntry(): JSX.Element {
     setPin(next)
     if (next.length === PIN_LENGTH) void submit(next)
   }
-
   const del = (): void => { if (!busy) setPin(v => v.slice(0, -1)) }
-
-  const numBtn = (variant: 'default' | 'red' = 'default'): React.CSSProperties => ({
-    height: 64, borderRadius: 16,
-    fontSize: 22, fontWeight: 700,
-    background: variant === 'red'
-      ? 'linear-gradient(145deg,#ff5f57,#e53935,#c62828)'
-      : 'rgba(255,255,255,0.08)',
-    border: `1px solid ${variant === 'red' ? 'rgba(229,57,53,0.4)' : 'rgba(255,255,255,0.1)'}`,
-    color: 'white', cursor: 'pointer',
-    display: 'grid', placeItems: 'center',
-    boxShadow: variant === 'red'
-      ? '0 4px 14px rgba(229,57,53,0.5), inset 0 1px 0 rgba(255,255,255,0.25)'
-      : 'inset 0 1px 0 rgba(255,255,255,0.08)',
-    opacity: (busy || !!lockedUntil) ? 0.4 : 1,
-    transition: 'opacity .1s',
-    fontFamily: 'Georgia, serif',
-  })
+  const disabled = busy || !!lockedUntil
 
   if (!waiter) return (
     <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: '#050e05' }}>
       <img src={loginBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.7)' }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
-      <div style={{ position: 'relative', zIndex: 10, width: 280, height: 80, borderRadius: 16, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,200,66,0.2)', animation: 'pulse 1.5s infinite' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
     </div>
   )
 
   return (
-    <div
-      ref={containerRef}
-      tabIndex={-1}
-      style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050e05', outline: 'none' }}
-    >
+    <div ref={containerRef} tabIndex={-1} style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050e05', outline: 'none' }}>
       {/* Fon */}
-      <img src={loginBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.72)' }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.38)' }} />
+      <img src={loginBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.65)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.52)' }} />
 
-      {/* Orqaga */}
+      {/* ← Orqaga — yashil iOS tugma */}
       <button
         onClick={() => navigate('/select-waiter')}
         style={{
           position: 'absolute', left: 20, top: 20, zIndex: 20,
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '8px 16px', borderRadius: 12,
-          background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(245,200,66,0.25)',
-          color: 'rgba(245,200,66,0.8)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 20px', borderRadius: 14, border: 'none',
+          background: `linear-gradient(145deg, #34d058, ${G}, ${G3})`,
+          boxShadow: `0 6px 18px rgba(34,197,94,0.5), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,0,0,0.15)`,
+          color: 'white', fontSize: 14, fontWeight: 700,
+          cursor: 'pointer', letterSpacing: '0.04em',
         }}
       >
-        <ArrowLeft size={14} /> Orqaga
+        <ArrowLeft size={15} strokeWidth={2.5} />
+        Orqaga
       </button>
 
       {/* Karta */}
-      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 360, padding: '0 20px' }}>
+      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 340, padding: '0 16px' }}>
         <div style={{
-          background: 'rgba(0,0,0,0.72)',
-          border: '1px solid rgba(245,200,66,0.3)',
+          background: 'rgba(0,0,0,0.78)',
+          border: `1px solid rgba(34,197,94,0.35)`,
           borderRadius: 24, overflow: 'hidden',
-          boxShadow: '0 24px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(245,200,66,0.07)',
+          boxShadow: `0 24px 60px rgba(0,0,0,0.75), 0 0 0 1px rgba(34,197,94,0.08)`,
         }}>
-          {/* Yuqori sariq chiziq */}
-          <div style={{ height: 3, background: 'linear-gradient(90deg,transparent,#f5c842 40%,#ffe680 50%,#f5c842 60%,transparent)' }} />
+          {/* Yuqori yashil chiziq */}
+          <div style={{ height: 3, background: `linear-gradient(90deg,transparent,${G2} 35%,${G} 50%,${G2} 65%,transparent)` }} />
 
-          <div style={{ padding: '28px 24px 28px' }}>
+          <div style={{ padding: '26px 20px 26px' }}>
+
             {/* Avatar */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
               <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', inset: -6, borderRadius: '50%', border: '1px dashed rgba(245,200,66,0.25)' }} />
+                <div style={{ position: 'absolute', inset: -7, borderRadius: '50%', border: `1px dashed rgba(34,197,94,0.3)` }} />
                 <motion.div
                   animate={shake ? { x: [-8,8,-6,6,-3,3,0] } : { x: 0 }}
                   transition={{ duration: 0.36 }}
                   style={{
-                    width: 76, height: 76, borderRadius: '50%',
+                    width: 74, height: 74, borderRadius: '50%',
                     display: 'grid', placeItems: 'center',
-                    fontSize: 26, fontWeight: 800,
-                    fontFamily: 'Georgia, serif',
-                    color: '#f5c842',
-                    background: 'rgba(245,200,66,0.08)',
-                    border: '2px solid rgba(245,200,66,0.5)',
-                    boxShadow: '0 0 20px rgba(245,200,66,0.15)',
-                    letterSpacing: '0.05em',
+                    fontSize: 24, fontWeight: 800, fontFamily: 'Georgia,serif',
+                    color: G, letterSpacing: '0.05em',
+                    background: `rgba(34,197,94,0.1)`,
+                    border: `2px solid rgba(34,197,94,0.6)`,
+                    boxShadow: `0 0 20px rgba(34,197,94,0.2)`,
                   }}
                 >
                   {initials(waiter.firstName, waiter.lastName)}
@@ -172,39 +156,39 @@ export default function PinEntry(): JSX.Element {
 
             {/* Ism */}
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#e8d5a3', fontFamily: 'Georgia,serif', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'white', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 {waiter.firstName} {waiter.lastName}
               </h2>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 }}>
-                <div style={{ height: 1, width: 20, background: 'rgba(245,200,66,0.3)' }} />
+                <div style={{ height: 1, width: 18, background: `rgba(34,197,94,0.3)` }} />
                 {lockedUntil ? (
-                  <span style={{ fontSize: 11, color: '#ff5f57', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, color: '#ff5f57', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Lock size={10} /> Bloklangan · {lockSecondsLeft}s
                   </span>
                 ) : (
-                  <span style={{ fontSize: 10, color: 'rgba(245,200,66,0.55)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: 10, color: `rgba(34,197,94,0.65)`, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
                     PIN-kodni kiriting
                   </span>
                 )}
-                <div style={{ height: 1, width: 20, background: 'rgba(245,200,66,0.3)' }} />
+                <div style={{ height: 1, width: 18, background: `rgba(34,197,94,0.3)` }} />
               </div>
               {!lockedUntil && (
-                <p style={{ margin: '4px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.05em' }}>
+                <p style={{ margin: '4px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>
                   PIN unutilsa — Sozlamalar → Afitsantlar
                 </p>
               )}
             </div>
 
             {/* PIN nuqtalar */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 22 }}>
               {Array.from({ length: PIN_LENGTH }).map((_, i) => {
                 const filled = i < pin.length
                 return (
                   <div key={i} style={{
-                    width: 14, height: 14, borderRadius: '50%',
-                    background: filled ? '#f5c842' : 'transparent',
-                    border: `2px solid ${filled ? '#f5c842' : 'rgba(245,200,66,0.3)'}`,
-                    boxShadow: filled ? '0 0 10px rgba(245,200,66,0.6)' : 'none',
+                    width: 13, height: 13, borderRadius: '50%',
+                    background: filled ? G : 'transparent',
+                    border: `2px solid ${filled ? G : 'rgba(34,197,94,0.35)'}`,
+                    boxShadow: filled ? `0 0 10px rgba(34,197,94,0.7)` : 'none',
                     transition: 'all .15s',
                   }} />
                 )
@@ -212,20 +196,60 @@ export default function PinEntry(): JSX.Element {
             </div>
 
             {/* NumPad */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 9 }}>
               {['1','2','3','4','5','6','7','8','9'].map(n => (
-                <button key={n} type="button" disabled={busy || !!lockedUntil} onClick={() => press(n)} style={numBtn()}>{n}</button>
+                <button key={n} type="button" disabled={disabled} onClick={() => press(n)}
+                  style={{
+                    height: 60, borderRadius: 14,
+                    fontSize: 22, fontWeight: 700, fontFamily: 'Georgia,serif',
+                    background: 'rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: 'white', cursor: 'pointer',
+                    display: 'grid', placeItems: 'center',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
+                    opacity: disabled ? 0.4 : 1,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(34,197,94,0.18)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(34,197,94,0.5)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)' }}
+                >
+                  {n}
+                </button>
               ))}
               <div />
-              <button type="button" disabled={busy || !!lockedUntil} onClick={() => press('0')} style={numBtn()}>0</button>
-              <button type="button" disabled={busy || pin.length === 0} onClick={del} style={numBtn('red')}>
+              <button type="button" disabled={disabled} onClick={() => press('0')}
+                style={{
+                  height: 60, borderRadius: 14,
+                  fontSize: 22, fontWeight: 700, fontFamily: 'Georgia,serif',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'white', cursor: 'pointer',
+                  display: 'grid', placeItems: 'center',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
+                  opacity: disabled ? 0.4 : 1,
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(34,197,94,0.18)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(34,197,94,0.5)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)' }}
+              >
+                0
+              </button>
+              <button type="button" disabled={busy || pin.length === 0} onClick={del}
+                style={{
+                  height: 60, borderRadius: 14,
+                  background: 'linear-gradient(145deg,#ff5f57,#e53935,#c62828)',
+                  border: '1px solid rgba(229,57,53,0.4)',
+                  color: 'white', cursor: 'pointer',
+                  display: 'grid', placeItems: 'center',
+                  boxShadow: '0 4px 14px rgba(229,57,53,0.5), inset 0 1px 0 rgba(255,255,255,0.25)',
+                  opacity: (busy || pin.length === 0) ? 0.4 : 1,
+                }}
+              >
                 <Delete size={20} />
               </button>
             </div>
           </div>
 
-          {/* Pastki sariq chiziq */}
-          <div style={{ height: 2, background: 'linear-gradient(90deg,transparent,#f5c842 40%,#ffe680 50%,#f5c842 60%,transparent)' }} />
+          {/* Pastki yashil chiziq */}
+          <div style={{ height: 2, background: `linear-gradient(90deg,transparent,${G2} 35%,${G} 50%,${G2} 65%,transparent)` }} />
         </div>
       </div>
     </div>
