@@ -376,54 +376,144 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
+  const [showKgModal, setShowKgModal] = useState(false)
+
+  const handleClick = (): void => {
+    if (product.unit === 'kg') setShowKgModal(true)
+    else add(product)
+  }
+
+  return (
+    <>
+      <motion.div
+        onClick={handleClick}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: idx * 0.015 }}
+        whileTap={{ scale: 0.97 }}
+        className={cn(
+          'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all select-none',
+          qty > 0
+            ? 'border-brand-success/50 bg-white shadow-glow'
+            : 'border-line bg-white shadow-card hover:shadow-card-hover hover:border-line-strong'
+        )}
+      >
+        {qty > 0 && (
+          <div className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-brand-success text-xs font-bold text-white shadow-md ring-2 ring-white">
+            {qty}
+          </div>
+        )}
+        {product.photo ? (
+          <div className="relative h-28 w-full overflow-hidden bg-slate-50">
+            <img
+              src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
+              alt={product.nameUzLatn}
+              className="h-full w-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+            {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-success" />}
+          </div>
+        ) : (
+          <div className={cn('flex h-20 items-center justify-center text-4xl', qty > 0 ? 'bg-brand-success/5' : 'bg-slate-50')}>
+            {product.emoji ?? '📦'}
+          </div>
+        )}
+        <div className="flex flex-col gap-0.5 p-2.5">
+          <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{product.nameUzLatn}</p>
+          <p className="text-xs font-bold text-brand-success">
+            {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
+          </p>
+        </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {showKgModal && (
+          <KgModal
+            product={product}
+            onClose={() => setShowKgModal(false)}
+            onAdd={(weight) => { add(product, weight); setShowKgModal(false) }}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () => void; onAdd: (weight: number) => void }): JSX.Element {
+  const [weight, setWeight] = useState('1')
+  const parsed = parseFloat(weight) || 0
+  const total = Math.round(product.price * parsed)
 
   return (
     <motion.div
-      onClick={() => add(product)}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.015 }}
-      whileTap={{ scale: 0.97 }}
-      className={cn(
-        'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all select-none',
-        qty > 0
-          ? 'border-brand-success/50 bg-white shadow-glow'
-          : 'border-line bg-white shadow-card hover:shadow-card-hover hover:border-line-strong'
-      )}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onClose}
     >
-      {/* Miqdor badge */}
-      {qty > 0 && (
-        <div className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-brand-success text-xs font-bold text-white shadow-md ring-2 ring-white">
-          {qty}
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: 320, borderRadius: 20, overflow: 'hidden', background: '#0d1a2a', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: 'white' }}>{product.nameUzLatn}</p>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', display: 'grid', placeItems: 'center' }}>
+            <X size={18} />
+          </button>
         </div>
-      )}
 
-      {/* Rasm qismi */}
-      {product.photo ? (
-        <div className="relative h-28 w-full overflow-hidden bg-slate-50">
-          <img
-            src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
-            alt={product.nameUzLatn}
-            className="h-full w-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+        <div style={{ padding: '18px 20px 20px' }}>
+          {/* Narxi */}
+          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Narxi:</span>
+            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: 14 }}>{fmtMoney(product.price)} so'm / kg</span>
+          </div>
+
+          {/* Og'irlik */}
+          <label style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
+            Og'irlik (kg)
+          </label>
+          <input
+            type="number"
+            min="0.1"
+            step="0.1"
+            autoFocus
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
+            style={{
+              width: '100%', height: 52, borderRadius: 12, border: '2px solid #22c55e',
+              background: 'rgba(34,197,94,0.08)', color: 'white',
+              fontSize: 22, fontWeight: 700, textAlign: 'center',
+              outline: 'none', caretColor: '#22c55e', boxSizing: 'border-box',
+            }}
           />
-          {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-success" />}
-        </div>
-      ) : (
-        <div className={cn('flex h-20 items-center justify-center text-4xl', qty > 0 ? 'bg-brand-success/5' : 'bg-slate-50')}>
-          {product.emoji ?? '📦'}
-        </div>
-      )}
 
-      {/* Matn qismi */}
-      <div className="flex flex-col gap-0.5 p-2.5">
-        <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">
-          {product.nameUzLatn}
-        </p>
-        <p className="text-xs font-bold text-brand-success">
-          {fmtMoney(product.price)} so'm
-        </p>
-      </div>
+          {/* Jami */}
+          <div style={{ background: 'rgba(34,197,94,0.1)', borderRadius: 12, padding: '12px 14px', marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(34,197,94,0.3)' }}>
+            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>Summa:</span>
+            <span style={{ color: '#22c55e', fontWeight: 800, fontSize: 20 }}>{fmtMoney(total)} so'm</span>
+          </div>
+
+          {/* Tugmalar */}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button onClick={onClose}
+              style={{ flex: 1, height: 46, borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              × Bekor
+            </button>
+            <button
+              onClick={() => { if (parsed > 0) onAdd(parsed) }}
+              disabled={parsed <= 0}
+              style={{ flex: 1.6, height: 46, borderRadius: 12, border: 'none', background: parsed > 0 ? 'linear-gradient(145deg,#22c55e,#16a34a)' : '#334', color: 'white', fontSize: 14, fontWeight: 700, cursor: parsed > 0 ? 'pointer' : 'not-allowed', boxShadow: parsed > 0 ? '0 4px 14px rgba(34,197,94,0.4)' : 'none' }}>
+              + Qo'shish
+            </button>
+          </div>
+        </div>
+      </motion.div>
     </motion.div>
   )
 }
