@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { LogOut, Settings as SettingsIcon, UtensilsCrossed } from 'lucide-react'
+import hisobchimLogo from '@/assets/hisobchim-logo.ico'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
@@ -9,10 +11,18 @@ import { fmtMoney, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
 
-/* Stol nomidan prefix olish: "Tepa 1" → "Tepa", "Xona 7" → "Xona" */
+/* ─── Animatsiya ─── */
+const cardVariants = {
+  hidden: { opacity: 0, scale: 0.96 },
+  visible: (i: number) => ({
+    opacity: 1, scale: 1,
+    transition: { delay: i * 0.03, duration: 0.2, ease: 'easeOut' },
+  }),
+}
+
+/* Stol nomidan prefix olish: "Tepa 1" → "Tepa" */
 function getPrefix(name: string): string {
-  const m = name.match(/^([^\d]+)/)?.[1]?.trim()
-  return m ?? name
+  return name.match(/^([^\d]+)/)?.[1]?.trim() ?? name
 }
 
 function sortTables(list: TableWithOrder[]): TableWithOrder[] {
@@ -26,10 +36,16 @@ function sortTables(list: TableWithOrder[]): TableWithOrder[] {
   })
 }
 
+type TableStatus = 'empty' | 'active' | 'waiting'
+
+function getStatus(tw: TableWithOrder): TableStatus {
+  if (!tw.order) return 'empty'
+  return tw.order.status === 'open' ? 'active' : 'waiting'
+}
+
 export default function TablesPage(): JSX.Element {
   const navigate = useNavigate()
   const waiter = useAuth((s) => s.waiter)
-  const logout = useAuth((s) => s.logout)
   const settings = useSettings((s) => s.settings)
   const { areas, snapshot, load, activeAreaId, setActiveAreaId } = useTables()
 
@@ -68,28 +84,33 @@ export default function TablesPage(): JSX.Element {
   const totalSum = snapshot.reduce((acc, s) => acc + (s.order?.total ?? 0), 0)
   const occupiedInArea = (id: number) => (grouped.get(id) ?? []).filter((t) => !!t.order).length
 
+  const roleLabel = waiter?.role === 'super_waiter' ? 'Super afitsant'
+    : waiter?.role === 'manager' ? 'Manager' : 'Afitsant'
+
   return (
-    <div className="flex h-full flex-col bg-bg">
+    <div className="flex h-full flex-col bg-[#F5F5F4]">
 
       {/* ── Header ── */}
-      <header className="flex items-center justify-between border-b border-line bg-white px-6 py-4 shadow-sm">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-6 shadow-sm">
+        {/* Chap: Logo + foydalanuvchi */}
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-primary/10 text-brand-primary">
-            <UtensilsCrossed size={20} />
-          </div>
+          <img src={hisobchimLogo} alt="Hisobchim" className="h-9 w-9 rounded-xl object-contain" />
           <div>
-            <h1 className="text-base font-bold text-ink">{settings?.organizationName ?? 'Afisant'}</h1>
-            <p className="text-xs text-ink-soft">
-              {waiter?.firstName} {waiter?.lastName} ·{' '}
-              {waiter?.role === 'super_waiter' ? 'Super afitsant' : waiter?.role === 'manager' ? 'Manager' : 'Afitsant'}
+            <p className="text-sm font-semibold text-stone-900 leading-tight">
+              {settings?.organizationName ?? 'Hisobchim POS'}
+            </p>
+            <p className="text-[11px] text-stone-400 leading-tight">
+              {waiter?.firstName} {waiter?.lastName} · {roleLabel}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* O'ng: Statistika + tugmalar */}
+        <div className="flex items-center gap-3">
           {totalOccupied > 0 && (
-            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-right">
-              <p className="text-[11px] font-medium text-green-600">{totalOccupied} ta band</p>
-              <p className="text-sm font-bold text-green-700">{fmtMoney(totalSum)} so'm</p>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-1.5 text-right">
+              <p className="text-[10px] font-medium text-amber-600 leading-tight">{totalOccupied} ta band</p>
+              <p className="font-mono text-sm font-bold text-amber-700 leading-tight">{fmtMoney(totalSum)} so'm</p>
             </div>
           )}
           <StatusBar />
@@ -105,24 +126,28 @@ export default function TablesPage(): JSX.Element {
       </header>
 
       {/* ── Area tabs ── */}
-      {areas.length > 0 && (
-        <nav className="flex items-center gap-3 overflow-x-auto border-b border-line bg-white px-6 py-3">
+      {areas.length > 1 && (
+        <nav className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-stone-100 bg-white px-6 py-3">
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
             return (
-              <button key={area.id} onClick={() => setActiveAreaId(area.id)}
+              <button
+                key={area.id}
+                onClick={() => setActiveAreaId(area.id)}
                 className={cn(
-                  'inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all',
+                  'inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-all',
                   active
-                    ? 'bg-brand-primary text-white shadow-md shadow-brand-primary/20'
-                    : 'border-2 border-slate-200 bg-white text-slate-500 hover:border-slate-400 hover:text-slate-700'
+                    ? 'bg-[#C2410C] text-white shadow-sm'
+                    : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700',
                 )}
               >
                 {area.name}
                 {occ > 0 && (
-                  <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold',
-                    active ? 'bg-white/25 text-white' : 'bg-green-100 text-green-700')}>
+                  <span className={cn(
+                    'inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold',
+                    active ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-700',
+                  )}>
                     {occ}
                   </span>
                 )}
@@ -137,37 +162,51 @@ export default function TablesPage(): JSX.Element {
         {areas.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <UtensilsCrossed className="mx-auto mb-3 text-slate-300" size={40} />
-              <p className="text-sm text-slate-500">Xonalar topilmadi</p>
-              <p className="mt-1 text-xs text-slate-400">Sozlamalar → Serverdan sinxronlash</p>
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-stone-100">
+                <UtensilsCrossed size={28} className="text-stone-300" />
+              </div>
+              <p className="text-sm font-medium text-stone-500">Xonalar topilmadi</p>
+              <p className="mt-1 text-xs text-stone-400">Sozlamalar → Serverdan sinxronlash</p>
             </div>
           </div>
         ) : groupedByPrefix.size === 0 ? (
-          <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+          <div className="flex h-48 items-center justify-center text-sm text-stone-400">
             Bu xonada stollar yo'q
           </div>
         ) : (
-          <div className="space-y-8">
-            {Array.from(groupedByPrefix.entries()).map(([prefix, tables]) => (
-              <section key={prefix}>
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="h-6 w-1 rounded-full bg-brand-primary" />
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-slate-600">
-                    {prefix}
-                  </h2>
-                  <div className="flex-1 h-px bg-slate-100" />
-                  <span className="text-xs text-slate-400 font-medium">
-                    {tables.filter(t => !!t.order).length}/{tables.length} band
-                  </span>
-                </div>
+          <div className="space-y-7">
+            {Array.from(groupedByPrefix.entries()).map(([prefix, tables]) => {
+              const activeCount = tables.filter((t) => !!t.order).length
+              return (
+                <section key={prefix}>
+                  {/* Section sarlavha */}
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="h-5 w-1 rounded-full bg-[#C2410C]" />
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-stone-500">
+                      {prefix}
+                    </h2>
+                    <div className="flex-1 h-px bg-stone-100" />
+                    <span className="text-xs font-medium text-stone-400">
+                      {activeCount}/{tables.length} band
+                    </span>
+                  </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: 32 }}>
-                  {tables.map((tw, i) => (
-                    <TableCard key={tw.table.id} tw={tw} idx={i} onClick={() => navigate(`/order/${tw.table.id}`)} />
-                  ))}
-                </div>
-              </section>
-            ))}
+                  <div
+                    className="grid gap-4"
+                    style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
+                  >
+                    {tables.map((tw, i) => (
+                      <TableCard
+                        key={tw.table.id}
+                        tw={tw}
+                        idx={i}
+                        onClick={() => navigate(`/order/${tw.table.id}`)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
           </div>
         )}
       </main>
@@ -175,68 +214,95 @@ export default function TablesPage(): JSX.Element {
   )
 }
 
-function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onClick: () => void }): JSX.Element {
-  const isOpen = !!tw.order
+/* ─── Stol kartasi ─── */
+function TableCard({
+  tw, idx, onClick,
+}: { tw: TableWithOrder; idx: number; onClick: () => void }): JSX.Element {
+  const status = getStatus(tw)
   const total = tw.order?.total ?? 0
   const itemCount = tw.order?.items.length ?? 0
-  const [hov, setHov] = useState(false)
+  const openedAt = tw.order?.openedAt
+
+  /* Rang konfiguratsiyasi */
+  const cfg = {
+    empty: {
+      bg: 'bg-white',
+      border: 'border-stone-100 hover:border-stone-300',
+      bar: 'bg-stone-200',
+      dot: 'bg-stone-300',
+      label: 'Bo\'sh',
+      labelColor: 'text-stone-400',
+      badgeBg: 'bg-stone-50',
+      badgeText: 'text-stone-500',
+    },
+    active: {
+      bg: 'bg-amber-50',
+      border: 'border-amber-200 hover:border-amber-400',
+      bar: 'bg-amber-400',
+      dot: 'bg-amber-400',
+      label: 'Band',
+      labelColor: 'text-amber-700',
+      badgeBg: 'bg-amber-100',
+      badgeText: 'text-amber-700',
+    },
+    waiting: {
+      bg: 'bg-red-50',
+      border: 'border-red-200 hover:border-red-300',
+      bar: 'bg-red-400',
+      dot: 'bg-red-400',
+      label: 'Kutmoqda',
+      labelColor: 'text-red-600',
+      badgeBg: 'bg-red-100',
+      badgeText: 'text-red-700',
+    },
+  }[status]
 
   return (
-    <button
+    <motion.button
+      custom={idx}
+      variants={cardVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover={{ y: -2, transition: { duration: 0.12 } }}
+      whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        position: 'relative', display: 'flex', flexDirection: 'column',
-        justifyContent: 'space-between', height: 132,
-        borderRadius: 14, padding: '14px 16px',
-        textAlign: 'left', cursor: 'pointer',
-        background: isOpen
-          ? 'linear-gradient(145deg,#f0fdf4,#dcfce7)'
-          : hov ? '#fee2e2' : '#fef2f2',
-        border: `2px solid ${isOpen ? '#22c55e' : hov ? '#f87171' : '#fca5a5'}`,
-        boxShadow: isOpen
-          ? '0 4px 16px rgba(34,197,94,0.2)'
-          : hov ? '0 6px 18px rgba(239,68,68,0.18)' : '0 2px 8px rgba(239,68,68,0.08)',
-        transform: hov && !isOpen ? 'translateY(-2px)' : 'none',
-        transition: 'all .16s ease',
-      }}
+      className={cn(
+        'relative flex flex-col justify-between rounded-xl border-2 p-4 text-left shadow-card transition-all hover:shadow-card-hover',
+        cfg.bg,
+        cfg.border,
+      )}
+      style={{ minHeight: 128 }}
     >
-      <div style={{
-        position: 'absolute', top: 0, left: 12, right: 12, height: 3,
-        borderRadius: 99,
-        background: isOpen ? 'linear-gradient(90deg,#16a34a,#4ade80)' : 'linear-gradient(90deg,#f87171,#ef4444)',
-      }} />
+      {/* Status bar — tepada */}
+      <div className={cn('absolute left-0 right-0 top-0 h-[3px] rounded-t-xl', cfg.bar)} />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8 }}>
-        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: isOpen ? '#15803d' : '#1e293b' }}>
-          {tw.table.name}
-        </p>
-        <div style={{
-          width: 10, height: 10, borderRadius: '50%',
-          background: isOpen ? '#22c55e' : '#ef4444',
-          boxShadow: isOpen ? '0 0 0 3px rgba(34,197,94,0.2)' : '0 0 0 3px rgba(239,68,68,0.15)',
-          flexShrink: 0,
-        }} />
+      {/* Sarlavha + badge */}
+      <div className="mt-1 flex items-start justify-between gap-2">
+        <span className="text-[15px] font-bold text-stone-800">{tw.table.name}</span>
+        <span className={cn(
+          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+          cfg.badgeBg, cfg.badgeText,
+        )}>
+          <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
+          {cfg.label}
+        </span>
       </div>
 
-      <p style={{ margin: '4px 0 0', fontSize: 12, color: isOpen ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
-        {isOpen ? `${itemCount} ta mahsulot` : "Bo'sh"}
-      </p>
-
-      {isOpen ? (
-        <div>
-          <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#15803d', letterSpacing: '-0.5px' }}>
-            {fmtMoney(total)} <span style={{ fontSize: 11, fontWeight: 500, color: '#4ade80' }}>so'm</span>
+      {/* Ma'lumotlar */}
+      {status === 'empty' ? (
+        <p className="mt-2 text-xs text-stone-400">Bosing ochish uchun</p>
+      ) : (
+        <div className="mt-2 space-y-1">
+          <p className="text-xs text-stone-500">{itemCount} ta mahsulot</p>
+          {openedAt && (
+            <p className="text-xs text-stone-400">{fmtTime(openedAt)}</p>
+          )}
+          <p className="mt-1 font-mono text-base font-bold text-[#C2410C]">
+            {fmtMoney(total)}{' '}
+            <span className="text-xs font-medium text-stone-400">so'm</span>
           </p>
         </div>
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e2e8f0' }} />
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Bo'sh</span>
-        </div>
       )}
-    </button>
+    </motion.button>
   )
 }
-

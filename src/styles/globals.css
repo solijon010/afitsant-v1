@@ -2,80 +2,127 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Hisobchim Warm — dizayn tizimi CSS o'zgaruvchilari ─── */
 @layer base {
   :root {
     color-scheme: light;
+
+    /* shadcn/ui uchun CSS variables (HSL format) */
+    --background: 60 5% 96%;           /* #F5F5F4 */
+    --foreground: 20 14% 11%;          /* #1C1917 */
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 11%;
+    --primary: 16 88% 40%;             /* #C2410C — terakota */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 60 5% 96%;
+    --secondary-foreground: 20 14% 11%;
+    --muted: 30 8% 95%;
+    --muted-foreground: 25 5% 45%;     /* #78716C */
+    --accent: 38 92% 50%;              /* #F59E0B — oltin */
+    --accent-foreground: 20 14% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 20 6% 90%;               /* #E7E5E4 */
+    --input: 20 6% 90%;
+    --ring: 16 88% 40%;
+    --radius: 0.5rem;
+
+    /* Stol holat ranglari */
+    --table-empty-bg: #F9FAFB;
+    --table-empty-border: #E5E7EB;
+    --table-active-bg: #FFFBEB;
+    --table-active-border: #FCD34D;
+    --table-waiting-bg: #FEF2F2;
+    --table-waiting-border: #FCA5A5;
   }
-  html,
-  body,
-  #root {
+
+  html, body, #root {
     height: 100%;
   }
+
   body {
-    background: #f1f5f9;
-    color: #0f172a;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     user-select: none;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  input,
-  textarea,
-  [contenteditable='true'] {
+
+  input, textarea, [contenteditable='true'] {
     user-select: text;
   }
+
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #D6D3D1;
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #A8A29E;
   }
-  button {
-    cursor: pointer;
-  }
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
+
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: 0.5; }
 }
 
+/* ─── Komponent klasslar (mavjud kod bilan mos) ─── */
 @layer components {
+  /* Mavjud klasslar — o'zgartirmadik */
   .card {
-    @apply rounded-2xl border border-line bg-bg-card shadow-card;
+    @apply rounded-2xl border border-stone-200 bg-white shadow-sm;
   }
   .card-elevated {
-    @apply rounded-2xl border border-line bg-bg-card shadow-card;
+    @apply rounded-2xl border border-stone-200 bg-white shadow-md;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-ink-soft;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-2.5 py-1 text-xs text-stone-500;
   }
   .btn {
-    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.98];
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.98];
   }
   .btn-primary {
-    @apply btn bg-brand-primary text-white hover:brightness-110 shadow-sm;
+    @apply btn bg-[#C2410C] text-white hover:bg-[#9A3412] shadow-sm;
   }
   .btn-success {
-    @apply btn bg-brand-success text-white hover:brightness-110 shadow-sm;
+    @apply btn bg-[#16A34A] text-white hover:bg-[#15803D] shadow-sm;
   }
   .btn-ghost {
-    @apply btn border border-line bg-bg-card text-ink hover:bg-bg-soft hover:border-line-strong;
+    @apply btn border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-stone-300;
   }
   .btn-danger {
-    @apply btn bg-brand-danger/10 text-brand-danger hover:bg-brand-danger/20 border border-brand-danger/20;
+    @apply btn bg-red-50 text-red-600 hover:bg-red-100 border border-red-200;
   }
   .input {
-    @apply w-full rounded-xl border border-line bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-dim outline-none transition-colors focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/10;
+    @apply w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 outline-none transition-colors focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/10;
   }
   .label {
-    @apply mb-1.5 block text-xs font-medium text-ink-soft;
+    @apply mb-1.5 block text-xs font-medium text-stone-600;
+  }
+
+  /* Yangi Hisobchim utility klasslar */
+  .page-header {
+    @apply flex h-14 items-center border-b border-stone-100 bg-white px-4;
+  }
+  .section-title {
+    @apply flex items-center gap-2.5 mb-4;
+  }
+  .section-title-bar {
+    @apply h-5 w-1 rounded-full bg-[#C2410C];
+  }
+  .money {
+    @apply font-mono font-semibold text-[#C2410C];
+  }
+  .money-lg {
+    @apply font-mono font-bold text-[22px] text-[#C2410C];
   }
 }

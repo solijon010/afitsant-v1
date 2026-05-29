@@ -6,7 +6,7 @@ import { useAuth } from '@/stores/auth'
 import { useMenu } from '@/stores/menu'
 import { useTables } from '@/stores/tables'
 import loginBg from '@/assets/manzara-foto.png'
-import logoImg from '@/assets/logo.png'
+import hisobchimLogo from '@/assets/hisobchim-logo.ico'
 
 export default function LoginPage(): JSX.Element {
   const [identifier, setIdentifier] = useState('')
@@ -79,14 +79,14 @@ export default function LoginPage(): JSX.Element {
         {/* Logo */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
           <div style={{ width: 78, height: 78, borderRadius: '50%', border: '3px solid #f5c842', boxShadow: '0 0 0 5px rgba(245,200,66,0.13), 0 8px 28px rgba(0,0,0,0.7)', overflow: 'hidden' }}>
-            <img src={logoImg} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={hisobchimLogo} alt="Hisobchim" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
           </div>
         </div>
 
         {/* Sarlavha */}
         <div style={{ textAlign: 'center', marginBottom: 22 }}>
           <h1 style={{ fontSize: 34, fontWeight: 900, margin: 0, lineHeight: 1.15, color: '#f5c842', fontFamily: 'Georgia,serif', letterSpacing: '0.1em', textTransform: 'uppercase', textShadow: '0 3px 12px rgba(0,0,0,0.9)' }}>
-            Sohil<br />Choyxonasi
+            Hisobchim<br />POS
           </h1>
           <div style={{ margin: '12px auto 0', width: 50, height: 2, background: 'linear-gradient(to right,transparent,#f5c842,transparent)' }} />
         </div>

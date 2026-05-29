@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { LogOut, RefreshCw, Settings, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Waiter } from '@shared/types'
@@ -7,8 +8,30 @@ import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { initials } from '@/lib/format'
 import StatusBar from '@/components/StatusBar'
-import loginBg from '@/assets/manzara-foto.png'
-import logoImg from '@/assets/logo.png'
+import { cn } from '@/lib/cn'
+import hisobchimLogo from '@/assets/hisobchim-logo.ico'
+
+/* ─── Animatsiya variantlari ─── */
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.06 } },
+}
+const cardVariants = {
+  hidden: { opacity: 0, y: 16, scale: 0.97 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: 'easeOut' } },
+}
+
+/* Afitsantlarni yaratilish vaqti bo'yicha tartiblaymiz (birinchi yaratilgan — birinchida) */
+function sortWaiters(list: Waiter[]): Waiter[] {
+  return [...list].sort((a, b) => {
+    // Manager/super_waiter yuqorida tursin
+    const rankA = a.role === 'manager' ? 0 : a.role === 'super_waiter' ? 1 : 2
+    const rankB = b.role === 'manager' ? 0 : b.role === 'super_waiter' ? 1 : 2
+    if (rankA !== rankB) return rankA - rankB
+    // Bir xil darajada — yaratilish vaqti bo'yicha (kichik id = avval yaratilgan)
+    return a.createdAt - b.createdAt
+  })
+}
 
 export default function WaiterSelect(): JSX.Element {
   const [waiters, setWaiters] = useState<Waiter[]>([])
@@ -21,7 +44,7 @@ export default function WaiterSelect(): JSX.Element {
   const loadWaiters = (): void => {
     setLoading(true)
     void window.afisant.auth.listWaiters().then((list) => {
-      setWaiters(list)
+      setWaiters(sortWaiters(list))
       setLoading(false)
     })
   }
@@ -44,155 +67,171 @@ export default function WaiterSelect(): JSX.Element {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', background: '#050e05' }}>
-      {/* Fon */}
-      <img src={loginBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.75)' }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.38)' }} />
+    <div className="flex h-full flex-col bg-[#F5F5F4]">
 
       {/* ── HEADER ── */}
-      <header style={{
-        position: 'relative', zIndex: 10,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 28px',
-        background: 'rgba(0,0,0,0.55)',
-        borderBottom: '1px solid rgba(245,200,66,0.18)',
-      }}>
-        {/* Logo + nom */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 42, height: 42, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(245,200,66,0.6)', flexShrink: 0, boxShadow: '0 0 12px rgba(245,200,66,0.2)' }}>
-            <img src={logoImg} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-6 shadow-sm">
+
+        {/* Chap: Logo + nom */}
+        <div className="flex items-center gap-3">
+          <img
+            src={hisobchimLogo}
+            alt="Hisobchim"
+            className="h-11 w-11 rounded-xl object-contain"
+          />
           <div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#f5c842', fontFamily: 'Georgia,serif', letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1.2 }}>
-              {settings?.organizationName ?? 'Sohil Choyhona'}
+            <p className="text-sm font-semibold text-stone-900 leading-tight">
+              {settings?.organizationName ?? 'Hisobchim POS'}
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-              <div style={{ width: 16, height: 1, background: 'rgba(245,200,66,0.4)' }} />
-              <p style={{ margin: 0, fontSize: 10, color: 'rgba(245,200,66,0.6)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Afitsantni tanlang</p>
-            </div>
+            <p className="text-[11px] text-stone-400 leading-tight">Afitsantni tanlang</p>
           </div>
         </div>
 
-        {/* O'ng tugmalar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* O'ng: Tugmalar */}
+        <div className="flex items-center gap-2">
           <StatusBar />
-          {[
-            { icon: <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />, onClick: () => void handleSync(), disabled: syncing, title: 'Yangilash' },
-            { icon: <Settings size={15} />, onClick: () => navigate('/settings'), title: 'Sozlamalar' },
-            { icon: <LogOut size={15} />, onClick: handleLogout, title: 'Chiqish' },
-          ].map((b, i) => (
-            <button key={i} onClick={b.onClick} disabled={b.disabled} title={b.title} style={{
-              width: 36, height: 36, borderRadius: 10, border: '1px solid rgba(245,200,66,0.2)',
-              background: 'rgba(245,200,66,0.07)', color: 'rgba(245,200,66,0.7)',
-              cursor: 'pointer', display: 'grid', placeItems: 'center',
-              transition: 'all .15s', opacity: b.disabled ? 0.4 : 1,
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,200,66,0.15)'; (e.currentTarget as HTMLButtonElement).style.color = '#f5c842' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,200,66,0.07)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(245,200,66,0.7)' }}
-            >
-              {b.icon}
-            </button>
-          ))}
+          <IconButton onClick={() => void handleSync()} disabled={syncing} title="Yangilash">
+            <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />
+          </IconButton>
+          <IconButton onClick={() => navigate('/settings')} title="Sozlamalar">
+            <Settings size={15} />
+          </IconButton>
+          <IconButton onClick={handleLogout} title="Chiqish" danger>
+            <LogOut size={15} />
+          </IconButton>
         </div>
       </header>
 
       {/* ── KONTENT ── */}
-      <main style={{ position: 'relative', zIndex: 10, flex: 1, overflowY: 'auto', padding: '32px 32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: waiters.length === 0 && !loading ? 'center' : 'flex-start' }}>
-
-        {/* Sariq separator */}
-        <div style={{ width: '100%', maxWidth: 900, display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-          <div style={{ flex: 1, height: 1, background: 'linear-gradient(to right, transparent, rgba(245,200,66,0.35))' }} />
-          <span style={{ fontSize: 10, letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(245,200,66,0.55)' }}>✦ Kirish ✦</span>
-          <div style={{ flex: 1, height: 1, background: 'linear-gradient(to left, transparent, rgba(245,200,66,0.35))' }} />
-        </div>
+      <main className="flex-1 overflow-y-auto px-8 py-8">
 
         {loading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16, width: '100%', maxWidth: 900 }}>
+          /* ── Skeleton ── */
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} style={{ height: 180, borderRadius: 20, background: 'rgba(245,200,66,0.05)', border: '1px solid rgba(245,200,66,0.1)', animation: 'pulse 1.5s infinite' }} />
+              <div key={i} className="h-[200px] rounded-2xl bg-stone-100 animate-pulse" />
             ))}
           </div>
         ) : waiters.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <p style={{ color: 'rgba(245,200,66,0.5)', fontSize: 14, marginBottom: 16 }}>Afitsantlar topilmadi</p>
-            <button onClick={() => void handleSync()} disabled={syncing} style={{
-              padding: '12px 28px', borderRadius: 12, border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(180deg,#ffe04d,#f5c000)', color: '#0a1200',
-              fontWeight: 800, fontSize: 13, letterSpacing: '0.1em',
-            }}>
-              <RefreshCw size={14} style={{ display: 'inline', marginRight: 8 }} />
+          /* ── Bo'sh holat ── */
+          <div className="flex flex-col items-center justify-center gap-4 py-20">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-stone-100">
+              <img src={hisobchimLogo} alt="" className="h-10 w-10 object-contain opacity-30" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-stone-500">Afitsantlar topilmadi</p>
+              <p className="mt-1 text-xs text-stone-400">Serverdan sinxronlash kerak</p>
+            </div>
+            <button onClick={() => void handleSync()} disabled={syncing} className="btn-primary mt-2">
+              <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
               Sinxronlash
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: 14, width: '100%', maxWidth: 900 }}>
-            {waiters.map((w) => <WaiterCard key={w.id} waiter={w} onClick={() => navigate(`/pin/${w.id}`)} />)}
-          </div>
+          /* ── Afitsantlar grid ── */
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid gap-4"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}
+          >
+            {waiters.map((w) => (
+              <WaiterCard key={w.id} waiter={w} onClick={() => navigate(`/pin/${w.id}`)} />
+            ))}
+          </motion.div>
         )}
       </main>
     </div>
   )
 }
 
+/* ─── Afitsant kartasi ─── */
 function WaiterCard({ waiter, onClick }: { waiter: Waiter; onClick: () => void }): JSX.Element {
   const isSpecial = waiter.role === 'super_waiter' || waiter.role === 'manager'
-  const [hovered, setHovered] = useState(false)
+  const roleLabel =
+    waiter.role === 'super_waiter' ? 'Super afitsant' :
+    waiter.role === 'manager' ? 'Manager' : 'Afitsant'
+
+  /* To'liq ism: Familiya Ismi — bir qatorda */
+  const fullName = [waiter.lastName, waiter.firstName].filter(Boolean).join(' ')
 
   return (
-    <button
+    <motion.button
+      variants={cardVariants}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', gap: 14, padding: '24px 16px',
-        borderRadius: 20, cursor: 'pointer', border: 'none',
-        background: hovered
-          ? 'rgba(245,200,66,0.12)'
-          : 'rgba(0,0,0,0.55)',
-        outline: `2px solid ${hovered ? 'rgba(245,200,66,0.6)' : isSpecial ? 'rgba(245,200,66,0.25)' : 'rgba(255,255,255,0.07)'}`,
-        outlineOffset: -2,
-        boxShadow: hovered
-          ? '0 12px 36px rgba(0,0,0,0.6), 0 0 20px rgba(245,200,66,0.12)'
-          : '0 4px 20px rgba(0,0,0,0.5)',
-        transform: hovered ? 'translateY(-4px)' : 'none',
-        transition: 'all .2s ease',
-        minHeight: 175,
-      }}
+      whileHover={{ scale: 1.03, y: -3 }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ duration: 0.14 }}
+      className={cn(
+        'group flex flex-col items-center gap-4 rounded-2xl border-2 bg-white px-5 py-6 text-left shadow-card transition-shadow hover:shadow-card-hover',
+        isSpecial
+          ? 'border-amber-200 hover:border-amber-400'
+          : 'border-stone-100 hover:border-stone-300',
+      )}
     >
       {/* Avatar */}
-      <div style={{ position: 'relative' }}>
+      <div className="relative mt-1">
         {isSpecial && (
-          <div style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: '1.5px dashed rgba(245,200,66,0.4)' }} />
+          <div className="absolute -inset-2 rounded-full border-2 border-dashed border-amber-300/70" />
         )}
-        <div style={{
-          width: 68, height: 68, borderRadius: '50%',
-          display: 'grid', placeItems: 'center',
-          fontSize: 22, fontWeight: 800, fontFamily: 'Georgia,serif',
-          color: isSpecial ? '#f5c842' : '#e8d5a3',
-          background: isSpecial
-            ? 'linear-gradient(145deg, rgba(245,200,66,0.18), rgba(245,200,66,0.06))'
-            : 'rgba(255,255,255,0.07)',
-          border: `2px solid ${isSpecial ? 'rgba(245,200,66,0.55)' : 'rgba(255,255,255,0.15)'}`,
-          boxShadow: isSpecial ? '0 0 16px rgba(245,200,66,0.2)' : 'none',
-          letterSpacing: '0.04em',
-        }}>
+        <div className={cn(
+          'flex h-20 w-20 items-center justify-center rounded-full text-xl font-bold tracking-wide',
+          isSpecial
+            ? 'bg-amber-50 text-amber-700 ring-2 ring-amber-300'
+            : 'bg-stone-100 text-stone-600',
+        )}>
           {initials(waiter.firstName, waiter.lastName)}
         </div>
       </div>
 
-      {/* Ism */}
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#e8d5a3', fontFamily: 'Georgia,serif', letterSpacing: '0.04em', lineHeight: 1.3 }}>
-          {waiter.firstName}<br />{waiter.lastName}
+      {/* Ism (Familiya Ismi — bir qatorda) */}
+      <div className="w-full text-center">
+        <p className="text-[15px] font-bold text-stone-800 leading-snug">
+          {fullName || '—'}
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 6 }}>
-          {isSpecial && <Shield size={9} color="#f5c842" />}
-          <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: isSpecial ? '#f5c842' : 'rgba(255,255,255,0.35)' }}>
-            {waiter.role === 'super_waiter' ? 'Super afitsant' : waiter.role === 'manager' ? 'Manager' : 'Afitsant'}
-          </p>
+
+        {/* Role badge */}
+        <div className={cn(
+          'mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1',
+          isSpecial ? 'bg-amber-50' : 'bg-stone-50',
+        )}>
+          {isSpecial && <Shield size={10} className="text-amber-500 shrink-0" />}
+          <span className={cn(
+            'text-[10px] font-bold uppercase tracking-[0.15em]',
+            isSpecial ? 'text-amber-600' : 'text-stone-400',
+          )}>
+            {roleLabel}
+          </span>
         </div>
       </div>
+    </motion.button>
+  )
+}
+
+/* ─── Kichik ikon tugma ─── */
+function IconButton({
+  children, onClick, disabled, title, danger,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  disabled?: boolean
+  title?: string
+  danger?: boolean
+}): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
+        danger
+          ? 'border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
+          : 'border-stone-100 text-stone-400 hover:bg-stone-50 hover:text-stone-700 hover:border-stone-200',
+      )}
+    >
+      {children}
     </button>
   )
 }
