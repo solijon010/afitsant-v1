@@ -85,6 +85,9 @@ export default function SettingsPage(): JSX.Element {
 
   if (!form) return <div className="grid h-full place-items-center"><div className="card h-24 w-72 animate-pulse" /></div>
 
+  /* Manager yoki hech kim kirmagan (admin rejim) → texnik ma'lumotlar ko'rsatiladi */
+  const isAdmin = !waiter || waiter.role === 'manager' || waiter.role === 'super_waiter'
+
   const update = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
     setForm((f) => (f ? { ...f, [key]: value } : f))
   }
@@ -140,41 +143,56 @@ export default function SettingsPage(): JSX.Element {
 
       <main className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-6 pb-10">
         <Section title="Server" icon={<Globe size={16} />}>
-          <Field label="Server manzili (URL)">
-            <input
-              className="input font-mono text-sm"
-              placeholder="https://api-restaurant.hisobchim.uz"
-              value={form.serverUrl ?? ''}
-              onChange={(e) => update('serverUrl', e.target.value)}
-            />
-          </Field>
-          {diagInfo && (
-            <div className="mt-2 rounded-xl border border-line bg-bg-elevated p-3 space-y-1.5 text-xs">
-              <div className="flex items-center gap-2">
-                {diagInfo.hasToken
-                  ? <CheckCircle2 size={13} className="text-brand-success shrink-0" />
-                  : <XCircle size={13} className="text-brand-danger shrink-0" />}
-                <span className="text-ink-soft">Token: </span>
-                <span className={diagInfo.hasToken ? 'text-brand-success' : 'text-brand-danger'}>
-                  {diagInfo.hasToken ? 'Mavjud' : "Yo'q — qayta login qiling"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {diagInfo.branchId
-                  ? <CheckCircle2 size={13} className="text-brand-success shrink-0" />
-                  : <XCircle size={13} className="text-brand-danger shrink-0" />}
-                <span className="text-ink-soft">Filial ID: </span>
-                <span className={cn('font-mono', diagInfo.branchId ? 'text-ink' : 'text-brand-danger')}>
-                  {diagInfo.branchId ? `${diagInfo.branchId.slice(0, 8)}…` : "Saqlanmagan"}
-                </span>
-              </div>
-              <button
-                onClick={() => void window.afisant.diag.openLogs()}
-                className="mt-1 flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors"
-              >
-                <FolderOpen size={12} />
-                Log papkasini och
-              </button>
+          {isAdmin ? (
+            /* ── Admin: to'liq server sozlamalari ── */
+            <>
+              <Field label="Server manzili (URL)">
+                <input
+                  className="input font-mono text-sm"
+                  placeholder="https://api-restaurant.hisobchim.uz"
+                  value={form.serverUrl ?? ''}
+                  onChange={(e) => update('serverUrl', e.target.value)}
+                />
+              </Field>
+              {diagInfo && (
+                <div className="mt-2 rounded-xl border border-line bg-bg-elevated p-3 space-y-1.5 text-xs">
+                  <div className="flex items-center gap-2">
+                    {diagInfo.hasToken
+                      ? <CheckCircle2 size={13} className="text-brand-success shrink-0" />
+                      : <XCircle size={13} className="text-brand-danger shrink-0" />}
+                    <span className="text-ink-soft">Token: </span>
+                    <span className={diagInfo.hasToken ? 'text-brand-success' : 'text-brand-danger'}>
+                      {diagInfo.hasToken ? 'Mavjud' : "Yo'q — qayta login qiling"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {diagInfo.branchId
+                      ? <CheckCircle2 size={13} className="text-brand-success shrink-0" />
+                      : <XCircle size={13} className="text-brand-danger shrink-0" />}
+                    <span className="text-ink-soft">Filial ID: </span>
+                    <span className={cn('font-mono', diagInfo.branchId ? 'text-ink' : 'text-brand-danger')}>
+                      {diagInfo.branchId ? `${diagInfo.branchId.slice(0, 8)}…` : "Saqlanmagan"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => void window.afisant.diag.openLogs()}
+                    className="mt-1 flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors"
+                  >
+                    <FolderOpen size={12} />
+                    Log papkasini och
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            /* ── Oddiy afitsant: faqat ulanish holati ── */
+            <div className="flex items-center gap-2 rounded-xl border border-line bg-bg-elevated px-4 py-3 text-sm">
+              {diagInfo?.hasToken
+                ? <CheckCircle2 size={15} className="text-brand-success shrink-0" />
+                : <XCircle size={15} className="text-brand-danger shrink-0" />}
+              <span className={diagInfo?.hasToken ? 'text-brand-success font-medium' : 'text-brand-danger'}>
+                {diagInfo?.hasToken ? 'Server bilan ulangan' : "Ulanmagan — managerga murojaat qiling"}
+              </span>
             </div>
           )}
         </Section>
