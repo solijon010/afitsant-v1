@@ -279,7 +279,6 @@ export default function OrderPage(): JSX.Element {
             <ArrowLeft size={15} /> Orqaga
           </button>
           <div className="text-center">
-            <p className="text-[10px] font-medium uppercase tracking-widest text-ink-dim">STOL</p>
             <p className="text-lg font-bold text-ink">{table.name}</p>
           </div>
           <div className="w-[80px]" />
