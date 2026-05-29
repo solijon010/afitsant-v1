@@ -19,7 +19,7 @@ function sortTables(list: TableWithOrder[]): TableWithOrder[] {
   return [...list].sort((a, b) => {
     const pa = getPrefix(a.table.name)
     const pb = getPrefix(b.table.name)
-    if (pa !== pb) return pa.localeCompare(pb, 'uz')
+    if (pa !== pb) return pb.localeCompare(pa, 'uz')
     const na = parseInt(a.table.name.replace(/\D/g, '')) || 0
     const nb = parseInt(b.table.name.replace(/\D/g, '')) || 0
     return na - nb
