@@ -60,11 +60,10 @@ export default function WaiterSelect(): JSX.Element {
     } finally { setSyncing(false) }
   }
 
-  const handleLogout = (): void => {
-    // Faqat Zustand state ni tozalaymiz — DB dagi token saqlanib qoladi
-    // (keyingi app ishga tushishida avtomatik login uchun)
-    logout()
-    // WaiterSelect da qolamiz — server-login ga o'tmaymiz
+  const handleLogout = async (): Promise<void> => {
+    await window.afisant.auth.logout()   // DB dagi tokenni o'chiradi
+    logout()                              // Zustand state ni tozalaydi
+    navigate('/server-login', { replace: true })
   }
 
   return (
@@ -99,7 +98,7 @@ export default function WaiterSelect(): JSX.Element {
           <IconButton onClick={() => navigate('/settings')} title="Sozlamalar">
             <Settings size={15} />
           </IconButton>
-          <IconButton onClick={handleLogout} title="Chiqish" danger>
+          <IconButton onClick={() => void handleLogout()} title="Chiqish" danger>
             <LogOut size={15} />
           </IconButton>
         </div>

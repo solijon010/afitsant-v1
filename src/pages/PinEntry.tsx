@@ -6,9 +6,9 @@ import { toast } from 'sonner'
 import type { Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useCart } from '@/stores/cart'
-import { initials } from '@/lib/format'
 import { PIN_LENGTH } from '@/components/PinPad'
 import { cn } from '@/lib/cn'
+import hisobchimLogo from '@/assets/logo.png'
 
 /* ─── Raqam tugmalari ─── */
 const DIGITS = ['1','2','3','4','5','6','7','8','9']
@@ -125,20 +125,19 @@ export default function PinEntry(): JSX.Element {
       {/* ── Asosiy kontent ── */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10">
 
-        {/* Avatar */}
+        {/* Avatar — Logo */}
         <motion.div
           animate={shake ? { x: [-10, 10, -7, 7, -4, 4, 0] } : { x: 0 }}
           transition={{ duration: 0.42, ease: 'easeOut' }}
           className="mb-5"
         >
-          <div className={cn(
-            'flex h-20 w-20 items-center justify-center rounded-full text-2xl font-bold tracking-wide shadow-sm',
-            isSpecial
-              ? 'bg-amber-50 text-amber-700 ring-2 ring-amber-300'
-              : 'bg-white text-stone-700 ring-1 ring-stone-200',
-          )}>
-            {waiter ? initials(waiter.firstName, waiter.lastName) : '…'}
-          </div>
+          <img
+            src={hisobchimLogo}
+            alt="Hisobchim"
+            className="h-52 w-52 object-contain"
+            style={{ mixBlendMode: 'multiply' }}
+            draggable={false}
+          />
         </motion.div>
 
         {/* Ism */}
