@@ -1,9 +1,32 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, globalShortcut } from 'electron'
 import { join } from 'node:path'
+import { appendFileSync, mkdirSync, existsSync } from 'node:fs'
 import { registerIpc } from './ipc'
 import { getDb, closeDb } from './db/connection'
 import { seedIfEmpty } from './db/seed'
 import { startSync, stopSync } from './services/syncEngine'
+
+/* ─── File logger ─────────────────────────────────────── */
+function setupFileLogger(): void {
+  const logDir = app.getPath('logs')
+  if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true })
+  const logFile = join(logDir, 'main.log')
+
+  const write = (level: string, args: unknown[]) => {
+    const line = `[${new Date().toISOString()}] [${level}] ${args.map(a =>
+      typeof a === 'object' ? JSON.stringify(a) : String(a)
+    ).join(' ')}\n`
+    appendFileSync(logFile, line)
+  }
+
+  const orig = { log: console.log, error: console.error, warn: console.warn }
+  console.log   = (...a) => { orig.log(...a);   write('INFO',  a) }
+  console.error = (...a) => { orig.error(...a); write('ERROR', a) }
+  console.warn  = (...a) => { orig.warn(...a);  write('WARN',  a) }
+
+  console.log(`=== App started v${app.getVersion()} ===`)
+  console.log(`Log file: ${logFile}`)
+}
 
 let mainWindow: BrowserWindow | null = null
 
@@ -50,6 +73,8 @@ function getMainWindow(): BrowserWindow | null {
 }
 
 app.whenReady().then(() => {
+  setupFileLogger()
+
   const db = getDb()
   seedIfEmpty(db)
 
@@ -57,12 +82,19 @@ app.whenReady().then(() => {
   createWindow()
   startSync(getMainWindow)
 
+  // F12 → DevTools (debug uchun, production da ham)
+  globalShortcut.register('F12', () => {
+    const win = getMainWindow()
+    if (win) win.webContents.toggleDevTools()
+  })
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
 app.on('window-all-closed', () => {
+  globalShortcut.unregisterAll()
   stopSync()
   closeDb()
   if (process.platform !== 'darwin') app.quit()

@@ -38,8 +38,24 @@ export async function loginWithServer(identifier: string, password: string): Pro
 
     return { ok: true, token: accessToken, user, branches }
   } catch (e: any) {
-    const msg = e?.response?.data?.message
-    const text = Array.isArray(msg) ? msg[0] : (msg ?? 'Login xatosi')
+    const status  = e?.response?.status
+    const msg     = e?.response?.data?.message
+    const errCode = e?.code ?? ''          // ECONNREFUSED, ENOTFOUND, ETIMEDOUT …
+    const errMsg  = e?.message ?? ''
+
+    let text: string
+    if (!e?.response) {
+      // Server bilan aloqa o'rnatilmadi
+      text = `Server bilan ulanishda xatolik: ${errCode || errMsg}`
+    } else if (Array.isArray(msg)) {
+      text = msg[0]
+    } else {
+      text = msg ?? `Server xatosi ${status ?? ''}`
+    }
+
+    console.error('[AUTH] loginWithServer error:', {
+      code: errCode, status, msg: errMsg, data: e?.response?.data
+    })
     return { ok: false, message: text }
   }
 }
