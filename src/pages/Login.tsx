@@ -68,20 +68,36 @@ export default function LoginPage(): JSX.Element {
     else void handleLogin()
   }
 
+  const iOSBtn = (bg: string, shadow: string): React.CSSProperties => ({
+    height: 50, borderRadius: 12, cursor: 'pointer',
+    display: 'grid', placeItems: 'center', border: 'none',
+    background: bg,
+    boxShadow: `${shadow}, inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.2)`,
+    opacity: loading ? 0.5 : 1, transition: 'opacity .1s',
+  })
+
   const S = {
-    numBtn: (accent = false): React.CSSProperties => ({
-      height: 50, borderRadius: 10,
-      fontSize: accent ? 16 : 19, fontWeight: 700,
-      background: accent
-        ? 'linear-gradient(180deg,#ffe04d 0%,#f5c000 60%,#d4a200 100%)'
-        : 'rgba(255,255,255,0.07)',
-      border: `1px solid ${accent ? 'rgba(245,192,0,0.5)' : 'rgba(255,255,255,0.1)'}`,
-      color: accent ? '#0a1200' : 'white',
-      cursor: 'pointer', display: 'grid', placeItems: 'center',
-      boxShadow: accent ? '0 4px 16px rgba(245,192,0,0.45)' : 'none',
-      opacity: loading ? 0.5 : 1,
-      transition: 'opacity .1s',
-    }),
+    numBtn: (variant: 'default'|'gold'|'red'|'blue' = 'default'): React.CSSProperties => {
+      if (variant === 'gold') return {
+        ...iOSBtn('linear-gradient(180deg,#ffe04d 0%,#f5c000 60%,#d4a200 100%)', '0 4px 16px rgba(245,192,0,0.45)'),
+        fontSize: 15, fontWeight: 900, color: '#0a1200',
+      }
+      if (variant === 'red') return {
+        ...iOSBtn('linear-gradient(145deg,#ff5f57 0%,#e53935 50%,#c62828 100%)', '0 4px 14px rgba(229,57,53,0.55)'),
+        fontSize: 18, fontWeight: 700, color: 'white',
+      }
+      if (variant === 'blue') return {
+        ...iOSBtn('linear-gradient(145deg,#64b5f6 0%,#1e88e5 50%,#1565c0 100%)', '0 4px 14px rgba(30,136,229,0.55)'),
+        fontSize: 20, fontWeight: 700, color: 'white',
+      }
+      return {
+        height: 50, borderRadius: 12, fontSize: 19, fontWeight: 700,
+        background: 'rgba(255,255,255,0.07)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        color: 'white', cursor: 'pointer', display: 'grid', placeItems: 'center',
+        opacity: loading ? 0.5 : 1, transition: 'opacity .1s',
+      }
+    },
     input: (focused: boolean): React.CSSProperties => ({
       flex: 1, height: 48, borderRadius: 12,
       padding: '0 36px 0 14px', fontSize: 14,
@@ -148,11 +164,11 @@ export default function LoginPage(): JSX.Element {
                 </div>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
-                    readOnly
                     type="text"
                     style={S.input(activeField === 'phone')}
                     placeholder="+998 90 123 45 67"
                     value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
                     onFocus={() => setActiveField('phone')}
                   />
                   {identifier && activeField === 'phone' && (
@@ -175,11 +191,11 @@ export default function LoginPage(): JSX.Element {
                 </div>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
-                    readOnly
                     type={showPass ? 'text' : 'password'}
                     style={S.input(activeField === 'pass')}
                     placeholder="••••••••"
                     value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     onFocus={() => setActiveField('pass')}
                   />
                   <button type="button" onClick={() => setShowPass(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, display: 'grid', placeItems: 'center' }}>
@@ -194,17 +210,19 @@ export default function LoginPage(): JSX.Element {
               {['1','2','3','4','5','6','7','8','9'].map(n => (
                 <button key={n} type="button" disabled={loading} onClick={() => press(n)} style={S.numBtn()}>{n}</button>
               ))}
-              <button type="button" disabled={loading} onClick={() => press('+')} style={S.numBtn()}>+</button>
+              {/* + — ko'k */}
+              <button type="button" disabled={loading} onClick={() => press('+')} style={S.numBtn('blue')}>+</button>
               <button type="button" disabled={loading} onClick={() => press('0')} style={S.numBtn()}>0</button>
-              <button type="button" disabled={loading} onClick={del} style={S.numBtn()}>
+              {/* delete — qizil */}
+              <button type="button" disabled={loading} onClick={del} style={S.numBtn('red')}>
                 <Delete size={18} />
               </button>
-              {/* OK — to'liq kenglik */}
+              {/* OK — sariq, to'liq kenglik */}
               <button
                 type="button"
                 disabled={loading}
                 onClick={ok}
-                style={{ ...S.numBtn(true), gridColumn: '1 / -1', height: 50, fontSize: 14, letterSpacing: '0.15em' }}
+                style={{ ...S.numBtn('gold'), gridColumn: '1 / -1', height: 52, fontSize: 14, letterSpacing: '0.18em' }}
               >
                 {loading ? '⟳  Kirilmoqda…' : activeField === 'phone' ? '→  KEYINGISI' : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={18} /> KIRISH</span>}
               </button>
