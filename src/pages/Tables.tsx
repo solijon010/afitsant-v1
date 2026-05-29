@@ -101,7 +101,7 @@ export default function TablesPage(): JSX.Element {
 
       {/* ── Area tabs ── */}
       {areas.length > 0 && (
-        <nav className="flex items-center justify-end gap-2 overflow-x-auto border-b border-line bg-white px-6 py-3">
+        <nav className="flex items-center gap-2 overflow-x-auto border-b border-line bg-white px-6 py-3" style={{ justifyContent: 'flex-end' }}>
           {/* Barchasi tab */}
           <button
             onClick={() => setActiveAreaId(null)}
@@ -207,8 +207,8 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
         justifyContent: 'space-between', height: 132,
         borderRadius: 14, padding: '14px 16px',
         textAlign: 'left', cursor: 'pointer',
-        background: isOpen ? '#f0fdf4' : hov ? '#f8fafc' : '#ffffff',
-        border: `1.5px solid ${isOpen ? '#86efac' : hov ? '#cbd5e1' : '#e2e8f0'}`,
+        background: isOpen ? '#f0fdf4' : hov ? '#e8edf5' : '#eef2f7',
+        border: `2px solid ${isOpen ? '#22c55e' : hov ? '#94a3b8' : '#c8d3e0'}`,
         boxShadow: isOpen
           ? '0 4px 16px rgba(34,197,94,0.18)'
           : hov ? '0 6px 16px rgba(0,0,0,0.1)' : '0 1px 4px rgba(0,0,0,0.06)',
