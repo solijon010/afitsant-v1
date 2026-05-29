@@ -57,23 +57,8 @@ export default function LoginPage(): JSX.Element {
     <div style={{
       position: 'fixed', inset: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 50%, #111 100%)',
+      background: '#f5f5f5',
     }}>
-      {/* Subtle grid pattern */}
-      <div style={{
-        position: 'absolute', inset: 0, opacity: 0.03,
-        backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
-        backgroundSize: '40px 40px',
-      }} />
-
-      {/* Glow accent */}
-      <div style={{
-        position: 'absolute', width: 400, height: 400,
-        borderRadius: '50%', top: '10%', left: '50%',
-        transform: 'translateX(-50%)',
-        background: 'radial-gradient(circle, rgba(212,98,42,0.08) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
 
       <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 380, padding: '0 20px' }}>
 
@@ -81,28 +66,28 @@ export default function LoginPage(): JSX.Element {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{
             margin: 0, fontSize: 30, fontWeight: 800,
-            color: '#ffffff', letterSpacing: '-0.5px',
+            color: '#1a1a1a', letterSpacing: '-0.5px',
           }}>
             Sohil Choyxona
           </h1>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: '#888' }}>
             Tizimga kirish
           </p>
         </div>
 
         {/* Karta */}
         <div style={{
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          background: '#ffffff',
+          border: '1px solid #e8e8e8',
           borderRadius: 20,
           padding: '28px 24px',
-          boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
         }}>
           <form onSubmit={(e) => { e.preventDefault(); void handleLogin() }}>
 
             {/* Telefon */}
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600, color: '#999', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 Telefon raqam
               </label>
               <input
@@ -120,10 +105,10 @@ export default function LoginPage(): JSX.Element {
                 style={{
                   width: '100%', height: 50, borderRadius: 12,
                   padding: '0 16px', fontSize: 15,
-                  background: focused === 'phone' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)',
-                  border: `1.5px solid ${focused === 'phone' ? 'rgba(212,98,42,0.7)' : 'rgba(255,255,255,0.1)'}`,
-                  boxShadow: focused === 'phone' ? '0 0 0 3px rgba(212,98,42,0.1)' : 'none',
-                  color: 'white', outline: 'none', caretColor: '#d4622a',
+                  background: '#fafafa',
+                  border: `1.5px solid ${focused === 'phone' ? '#d4622a' : '#e0e0e0'}`,
+                  boxShadow: focused === 'phone' ? '0 0 0 3px rgba(212,98,42,0.08)' : 'none',
+                  color: '#1a1a1a', outline: 'none', caretColor: '#d4622a',
                   boxSizing: 'border-box', transition: 'all .2s',
                 }}
               />
@@ -131,7 +116,7 @@ export default function LoginPage(): JSX.Element {
 
             {/* Parol */}
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 600, color: '#999', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 Parol
               </label>
               <div style={{ position: 'relative' }}>
@@ -148,17 +133,17 @@ export default function LoginPage(): JSX.Element {
                   style={{
                     width: '100%', height: 50, borderRadius: 12,
                     padding: '0 44px 0 16px', fontSize: 15,
-                    background: focused === 'pass' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)',
-                    border: `1.5px solid ${focused === 'pass' ? 'rgba(212,98,42,0.7)' : 'rgba(255,255,255,0.1)'}`,
-                    boxShadow: focused === 'pass' ? '0 0 0 3px rgba(212,98,42,0.1)' : 'none',
-                    color: 'white', outline: 'none', caretColor: '#d4622a',
+                    background: '#fafafa',
+                    border: `1.5px solid ${focused === 'pass' ? '#d4622a' : '#e0e0e0'}`,
+                    boxShadow: focused === 'pass' ? '0 0 0 3px rgba(212,98,42,0.08)' : 'none',
+                    color: '#1a1a1a', outline: 'none', caretColor: '#d4622a',
                     boxSizing: 'border-box', transition: 'all .2s',
                   }}
                 />
                 <button type="button" onClick={() => setShowPass(v => !v)} style={{
                   position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'rgba(255,255,255,0.3)', padding: 0, display: 'grid', placeItems: 'center',
+                  color: '#aaa', padding: 0, display: 'grid', placeItems: 'center',
                 }}>
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
