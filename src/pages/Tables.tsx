@@ -41,10 +41,14 @@ export default function TablesPage(): JSX.Element {
     return m
   }, [snapshot])
 
-  const activeTables = useMemo(
-    () => (activeAreaId !== null ? (grouped.get(activeAreaId) ?? []) : []),
-    [grouped, activeAreaId]
-  )
+  const activeTables = useMemo(() => {
+    const list = activeAreaId !== null ? (grouped.get(activeAreaId) ?? []) : []
+    return [...list].sort((a, b) => {
+      const na = parseInt(a.table.name.replace(/\D/g, '')) || 0
+      const nb = parseInt(b.table.name.replace(/\D/g, '')) || 0
+      return na !== nb ? na - nb : a.table.name.localeCompare(b.table.name)
+    })
+  }, [grouped, activeAreaId])
 
   const totalOccupied = snapshot.filter((s) => s.order?.status === 'open').length
   const totalSum = snapshot.reduce((acc, s) => acc + (s.order?.total ?? 0), 0)
@@ -198,43 +202,56 @@ function TableCard({
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: idx * 0.02, duration: 0.18 }}
-      whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}
+      whileHover={{ y: -2 }}
       whileTap={{ scale: 0.97 }}
-      className={cn(
-        'relative flex h-36 flex-col justify-between rounded-2xl border p-4 text-left transition-colors',
-        isOpen
-          ? 'border-brand-success/40 bg-white shadow-glow'
-          : 'border-line bg-white shadow-card hover:border-line-strong'
-      )}
+      style={{
+        position: 'relative',
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        height: 136, borderRadius: 18, padding: 16, textAlign: 'left',
+        border: isOpen ? '1.5px solid #22c55e' : '1.5px solid #e2e8f0',
+        background: isOpen
+          ? 'linear-gradient(145deg, #f0fdf4 0%, #dcfce7 100%)'
+          : 'linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%)',
+        boxShadow: isOpen
+          ? '0 4px 20px rgba(34,197,94,0.18), 0 1px 4px rgba(0,0,0,0.06)'
+          : '0 2px 8px rgba(0,0,0,0.06)',
+        cursor: 'pointer', transition: 'box-shadow .2s',
+      }}
     >
-      {/* Yuqori rangli chiziq — band bo'lganda */}
-      {isOpen && (
-        <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-brand-success" />
-      )}
+      {/* Yuqori chiziq */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+        borderRadius: '18px 18px 0 0',
+        background: isOpen ? 'linear-gradient(90deg,#16a34a,#22c55e)' : '#e2e8f0',
+      }} />
 
-      {/* Stol nomi va holati */}
-      <div className="flex items-start justify-between">
+      {/* Stol nomi */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <p className="text-base font-bold text-ink leading-tight">{tw.table.name}</p>
-          <p className={cn('mt-1 text-xs', isOpen ? 'text-brand-success' : 'text-ink-dim')}>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: isOpen ? '#14532d' : '#334155', lineHeight: 1.3 }}>
+            {tw.table.name}
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: isOpen ? '#16a34a' : '#94a3b8' }}>
             {isOpen ? `${itemCount} mahsulot` : "Bo'sh"}
           </p>
         </div>
-        {isOpen && (
-          <span className="flex h-2.5 w-2.5 rounded-full bg-brand-success shadow-sm ring-2 ring-brand-success/25" />
+        {isOpen ? (
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 0 3px rgba(34,197,94,0.2)', flexShrink: 0, marginTop: 3 }} />
+        ) : (
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#cbd5e1', flexShrink: 0, marginTop: 3 }} />
         )}
       </div>
 
       {/* Pastki qism */}
       {isOpen ? (
         <div>
-          <p className="text-lg font-bold text-ink">{fmtMoney(total)}</p>
-          <p className="text-[11px] text-ink-dim">so'm</p>
+          <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#15803d' }}>{fmtMoney(total)}</p>
+          <p style={{ margin: 0, fontSize: 10, color: '#4ade80' }}>so'm</p>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 text-xs text-ink-dim">
-          <span className="h-1.5 w-1.5 rounded-full bg-ink-dim/40" />
-          Bo&apos;sh
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#cbd5e1' }} />
+          <span style={{ fontSize: 12, color: '#94a3b8' }}>Bo'sh</span>
         </div>
       )}
     </motion.button>
