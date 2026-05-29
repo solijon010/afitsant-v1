@@ -6,7 +6,7 @@ import { useAuth } from '@/stores/auth'
 import { useMenu } from '@/stores/menu'
 import { useTables } from '@/stores/tables'
 import loginBg from '@/assets/manzara-foto.png'
-import hisobchimLogo from '@/assets/hisobchim-logo.ico'
+import hisobchimLogo from '@/assets/logo.png'
 
 export default function LoginPage(): JSX.Element {
   const [identifier, setIdentifier] = useState('')

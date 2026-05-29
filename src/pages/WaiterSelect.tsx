@@ -9,7 +9,7 @@ import { useSettings } from '@/stores/settings'
 import { initials } from '@/lib/format'
 import StatusBar from '@/components/StatusBar'
 import { cn } from '@/lib/cn'
-import hisobchimLogo from '@/assets/hisobchim-logo.ico'
+import hisobchimLogo from '@/assets/logo.png'
 
 /* ─── Animatsiya variantlari ─── */
 const containerVariants = {
