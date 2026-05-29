@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FolderOpen, Globe, Languages, LayoutList, Printer, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Printer, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Category, Lang, Settings, Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
+import { useMenu } from '@/stores/menu'
 import { useSettings } from '@/stores/settings'
 import { initials } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -22,6 +23,9 @@ export default function SettingsPage(): JSX.Element {
   const [diagInfo, setDiagInfo] = useState<{ hasToken: boolean; branchId: string | null; serverUrl: string; logPath: string } | null>(null)
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  const loadMenu = useMenu((s) => s.load)
 
   useEffect(() => {
     void window.afisant.auth.listWaiters().then(setWaiters)
@@ -56,12 +60,16 @@ export default function SettingsPage(): JSX.Element {
         .filter((r) => r.cat.serverId)
         .map((r, i) => ({
           serverId: r.cat.serverId!,
-          localName: r.localName !== r.cat.nameUzLatn ? r.localName : null,
+          localName: r.localName.trim() || null,
           sortOrderOverride: i,
           isHidden: r.isHidden
         }))
       await window.afisant.category.configSave(configs)
+      // Kesh yangilash — Order sahifasi ham yangi tartibni ko'rsin
+      await Promise.all([loadCatRows(), loadMenu()])
       toast.success("Kategoriyalar saqlandi")
+    } catch (e: any) {
+      toast.error("Saqlashda xatolik", { description: e?.message })
     } finally {
       setCatSaving(false)
     }
@@ -340,34 +348,45 @@ export default function SettingsPage(): JSX.Element {
           ) : (
             <div className="space-y-1.5">
               {catRows.map((row, i) => (
-                <div key={row.cat.id} className="flex items-center gap-2 rounded-xl border border-line bg-bg-elevated px-3 py-2">
-                  {/* Tartib tugmalari */}
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      onClick={() => {
-                        if (i === 0) return
-                        const next = [...catRows]
-                        ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
-                        setCatRows(next)
-                      }}
-                      disabled={i === 0}
-                      className="text-ink-dim hover:text-ink disabled:opacity-20"
-                    >
-                      <ChevronUp size={14} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (i === catRows.length - 1) return
-                        const next = [...catRows]
-                        ;[next[i + 1], next[i]] = [next[i], next[i + 1]]
-                        setCatRows(next)
-                      }}
-                      disabled={i === catRows.length - 1}
-                      className="text-ink-dim hover:text-ink disabled:opacity-20"
-                    >
-                      <ChevronDown size={14} />
-                    </button>
-                  </div>
+                <div
+                  key={row.cat.id}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    if (dragOverIdx !== i) setDragOverIdx(i)
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverIdx(null)
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    if (dragIdx === null || dragIdx === i) { setDragOverIdx(null); return }
+                    const next = [...catRows]
+                    const [removed] = next.splice(dragIdx, 1)
+                    next.splice(i, 0, removed)
+                    setCatRows(next)
+                    setDragIdx(null)
+                    setDragOverIdx(null)
+                  }}
+                  onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+                  className={cn(
+                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-all',
+                    dragIdx === i
+                      ? 'opacity-30 border-line bg-bg-card'
+                      : dragOverIdx === i
+                        ? 'border-brand-primary bg-brand-primary/5 shadow-sm'
+                        : 'border-line bg-bg-card hover:border-line-strong'
+                  )}
+                >
+                  {/* Drag handle */}
+                  <GripVertical
+                    size={15}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragIdx(i)
+                      e.dataTransfer.effectAllowed = 'move'
+                    }}
+                    className="shrink-0 cursor-grab text-ink-dim select-none active:cursor-grabbing"
+                  />
 
                   {/* Nom */}
                   <input
@@ -405,7 +424,7 @@ export default function SettingsPage(): JSX.Element {
                       e.target.value = ''
                     }}
                   >
-                    <option value="">Mahsulotni ko'chirish…</option>
+                    <option value="">Ko'chirish…</option>
                     {catRows
                       .filter((r) => r.cat.id !== row.cat.id && r.cat.serverId)
                       .map((r) => (
