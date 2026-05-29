@@ -551,56 +551,60 @@ function CartPanel({
   const feePct = useCart((s) => s.serviceFeePercent)
 
   return (
-    <aside className="flex h-full flex-col border-l border-line bg-bg-soft">
-      <header className="flex items-center justify-between border-b border-line bg-bg-card px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-primary/10 text-brand-primary">
-            <ShoppingCart size={16} />
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', borderLeft: '1px solid #e2e8f0', background: '#f8fafc' }}>
+
+      {/* Header */}
+      <div style={{ padding: '14px 16px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', display: 'grid', placeItems: 'center', boxShadow: '0 4px 12px rgba(59,130,246,0.35)' }}>
+            <ShoppingCart size={16} color="white" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-ink">Savat</p>
-            <p className="text-xs text-ink-soft">{table.name}</p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#1e293b' }}>Savat</p>
+            <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>{table.name}</p>
           </div>
         </div>
-        <span className="grid h-7 min-w-7 place-items-center rounded-full bg-brand-primary px-2 text-xs font-bold text-white">
-          {lines.length}
-        </span>
-      </header>
+        <div style={{ minWidth: 28, height: 28, borderRadius: 99, background: lines.length > 0 ? '#3b82f6' : '#e2e8f0', display: 'grid', placeItems: 'center', padding: '0 8px' }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: lines.length > 0 ? 'white' : '#94a3b8' }}>{lines.length}</span>
+        </div>
+      </div>
 
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      {/* Mahsulotlar ro'yxati */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
         {lines.length === 0 ? (
-          <div className="grid h-full place-items-center px-6 text-center text-sm text-ink-dim">
-            <div>
-              <ShoppingCart className="mx-auto mb-2 opacity-25" size={32} />
-              Mahsulotlarni tanlang
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', gap: 8 }}>
+            <ShoppingCart size={32} style={{ opacity: 0.2 }} />
+            <span style={{ fontSize: 13 }}>Mahsulotlarni tanlang</span>
           </div>
         ) : (
-          <ul className="space-y-1">
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <AnimatePresence initial={false}>
-              {lines.map((l) => (
-                <motion.li
-                  key={l.localUuid}
-                  layout
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  className="rounded-lg border border-line bg-white px-2 py-1.5 shadow-sm"
+              {lines.map((l, idx) => (
+                <motion.li key={l.localUuid} layout
+                  initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+                  style={{ background: 'white', borderRadius: 10, padding: '8px 10px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}
                 >
-                  {/* Hammasi bir qatorda: nom | miqdor | narx | o'chirish */}
-                  <div className="flex items-center gap-1.5">
-                    <p className="truncate text-xs font-semibold text-ink" style={{ flex: 1, minWidth: 0 }}>{l.productName}</p>
-                    <div className="inline-flex items-center gap-0.5 shrink-0">
-                      <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={11} /></QtyBtn>
-                      <span className="w-5 text-center text-xs font-bold">{fmtQty(l.quantity)}</span>
-                      <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={11} /></QtyBtn>
-                    </div>
-                    <p className="text-xs font-bold text-brand-success shrink-0">
-                      {fmtMoney(Math.round(l.unitPrice * l.quantity))}
+                  {/* Nom + narx */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#1e293b', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {idx + 1}. {l.productName}
                     </p>
-                    <button onClick={() => rem(l.localUuid)} className="grid h-5 w-5 shrink-0 place-items-center rounded text-ink-dim hover:text-brand-danger">
-                      <Trash2 size={11} />
+                    <button onClick={() => rem(l.localUuid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: '2px 4px', borderRadius: 6, display: 'grid', placeItems: 'center', flexShrink: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#fff1f2')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                      <Trash2 size={12} />
                     </button>
+                  </div>
+                  {/* Miqdor + jami */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', borderRadius: 8, padding: '2px 4px', border: '1px solid #e2e8f0' }}>
+                      <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={10} /></QtyBtn>
+                      <span style={{ minWidth: 22, textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#1e293b' }}>{fmtQty(l.quantity)}</span>
+                      <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={10} /></QtyBtn>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#16a34a' }}>
+                      {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
+                    </p>
                   </div>
                 </motion.li>
               ))}
@@ -609,37 +613,45 @@ function CartPanel({
         )}
       </div>
 
-      <footer className="border-t border-line bg-bg-card p-3">
-        <div className="mb-4 space-y-1.5 text-sm">
-          <Row label="Mahsulotlar" value={`${fmtMoney(subtotal)} so'm`} muted />
-          {fee > 0 && <Row label={`Xizmat (${feePct}%)`} value={`${fmtMoney(fee)} so'm`} muted />}
-          <div className="my-2 h-px bg-line" />
-          <Row label="Jami" value={`${fmtMoney(total)} so'm`} large />
+      {/* Footer */}
+      <div style={{ background: 'white', borderTop: '1px solid #e2e8f0', padding: '12px 14px' }}>
+        {/* Jami */}
+        <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '10px 14px', marginBottom: 10, border: '1px solid #bbf7d0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: '#64748b' }}>Mahsulotlar</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{fmtMoney(subtotal)} so'm</span>
+          </div>
+          {fee > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: '#64748b' }}>Xizmat ({feePct}%)</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{fmtMoney(fee)} so'm</span>
+            </div>
+          )}
+          <div style={{ height: 1, background: '#d1fae5', margin: '6px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#15803d' }}>Jami</span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: '#15803d' }}>{fmtMoney(total)} so'm</span>
+          </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={onCancel}
-            className="btn-danger w-full"
-            disabled={saving || printing || lines.length === 0}
-          >
-            <Ban size={14} /> Zakazni bekor qilish
+
+        {/* Tugmalar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <button onClick={onCancel} disabled={saving || printing || lines.length === 0}
+            style={{ width: '100%', height: 40, borderRadius: 10, border: '1.5px solid #fca5a5', background: lines.length === 0 ? '#f8fafc' : '#fff1f2', color: lines.length === 0 ? '#94a3b8' : '#ef4444', fontSize: 12, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Ban size={13} /> Zakazni bekor qilish
           </button>
-          <button
-            onClick={() => void onSave()}
-            className="btn-primary w-full"
-            disabled={saving || printing}
-          >
-            <Save size={14} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
-          </button>
-          <button
-            onClick={onClosePrint}
-            className="btn-success w-full"
-            disabled={lines.length === 0 || printing || saving}
-          >
-            <Printer size={14} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
-          </button>
+          <div style={{ display: 'flex', gap: 7 }}>
+            <button onClick={() => void onSave()} disabled={saving || printing}
+              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 12px rgba(59,130,246,0.35)', opacity: saving || printing ? 0.6 : 1 }}>
+              <Save size={13} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
+            </button>
+            <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
+              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: lines.length === 0 ? '#e2e8f0' : 'linear-gradient(145deg,#22c55e,#15803d)', color: lines.length === 0 ? '#94a3b8' : 'white', fontSize: 13, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: lines.length > 0 ? '0 4px 12px rgba(34,197,94,0.35)' : 'none', opacity: printing || saving ? 0.6 : 1 }}>
+              <Printer size={13} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
+            </button>
+          </div>
         </div>
-      </footer>
+      </div>
     </aside>
   )
 }
