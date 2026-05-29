@@ -350,26 +350,29 @@ export default function SettingsPage(): JSX.Element {
               {catRows.map((row, i) => (
                 <div
                   key={row.cat.id}
+                  draggable
+                  onDragStart={(e) => {
+                    setDragIdx(i)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
                   onDragOver={(e) => {
                     e.preventDefault()
-                    if (dragOverIdx !== i) setDragOverIdx(i)
-                  }}
-                  onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverIdx(null)
+                    setDragOverIdx(i)
                   }}
                   onDrop={(e) => {
                     e.preventDefault()
-                    if (dragIdx === null || dragIdx === i) { setDragOverIdx(null); return }
-                    const next = [...catRows]
-                    const [removed] = next.splice(dragIdx, 1)
-                    next.splice(i, 0, removed)
-                    setCatRows(next)
+                    if (dragIdx !== null && dragIdx !== i) {
+                      const next = [...catRows]
+                      const [removed] = next.splice(dragIdx, 1)
+                      next.splice(i, 0, removed)
+                      setCatRows(next)
+                    }
                     setDragIdx(null)
                     setDragOverIdx(null)
                   }}
                   onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
                   className={cn(
-                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-all',
+                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-all cursor-grab active:cursor-grabbing select-none',
                     dragIdx === i
                       ? 'opacity-30 border-line bg-bg-card'
                       : dragOverIdx === i
@@ -377,21 +380,14 @@ export default function SettingsPage(): JSX.Element {
                         : 'border-line bg-bg-card hover:border-line-strong'
                   )}
                 >
-                  {/* Drag handle */}
-                  <GripVertical
-                    size={15}
-                    draggable
-                    onDragStart={(e) => {
-                      setDragIdx(i)
-                      e.dataTransfer.effectAllowed = 'move'
-                    }}
-                    className="shrink-0 cursor-grab text-ink-dim select-none active:cursor-grabbing"
-                  />
+                  {/* Drag handle — ko'rinma uchun, asl drag div dan ishlaydi */}
+                  <GripVertical size={15} className="shrink-0 text-ink-dim pointer-events-none" />
 
                   {/* Nom */}
                   <input
-                    className="input flex-1 py-1.5 text-sm"
+                    className="input flex-1 py-1.5 text-sm cursor-text select-text"
                     value={row.localName}
+                    onMouseDown={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       const next = [...catRows]
                       next[i] = { ...next[i], localName: e.target.value }
