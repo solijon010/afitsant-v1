@@ -268,24 +268,24 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full grid-cols-[1fr_400px]">
+    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 320px' }}>
       <section className="flex flex-col overflow-hidden bg-bg">
-        <header className="flex items-center justify-between border-b border-line bg-bg-card px-6 py-4 shadow-sm">
+        <header className="flex items-center justify-between border-b border-line bg-bg-card px-4 py-3 shadow-sm">
           <button
             onClick={() => void handleSave()}
             className="btn-ghost"
             disabled={saving || printing}
           >
-            <ArrowLeft size={16} /> Orqaga
+            <ArrowLeft size={15} /> Orqaga
           </button>
           <div className="text-center">
-            <p className="text-[11px] font-medium uppercase tracking-widest text-ink-dim">STOL</p>
-            <p className="text-xl font-bold text-ink">{table.name}</p>
+            <p className="text-[10px] font-medium uppercase tracking-widest text-ink-dim">STOL</p>
+            <p className="text-lg font-bold text-ink">{table.name}</p>
           </div>
-          <div className="w-[100px]" />
+          <div className="w-[80px]" />
         </header>
 
-        <nav className="flex gap-2 overflow-x-auto border-b border-line bg-bg-card px-6 py-3">
+        <nav className="flex gap-1.5 overflow-x-auto border-b border-line bg-bg-card px-4 py-2">
           {categories.map((c) => (
             <CategoryPill
               key={c.id}
@@ -296,13 +296,13 @@ export default function OrderPage(): JSX.Element {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto bg-bg px-6 py-5">
+        <div className="flex-1 overflow-y-auto bg-bg px-4 py-4">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
               Bu kategoriyada mahsulot yo'q
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))' }}>
               {shownProducts.map((p, idx) => (
                 <ProductCard key={p.id} product={p} idx={idx} />
               ))}
@@ -354,7 +354,7 @@ function CategoryPill({
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex shrink-0 items-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold transition-all',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all',
         active
           ? 'border-brand-primary bg-brand-primary text-white shadow-sm shadow-brand-primary/20'
           : 'border-line bg-white text-ink-soft hover:border-line-strong hover:text-ink'
@@ -401,37 +401,27 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
 
       {/* Rasm qismi */}
       {product.photo ? (
-        <div className="relative h-36 w-full overflow-hidden bg-slate-50">
+        <div className="relative h-28 w-full overflow-hidden bg-slate-50">
           <img
             src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
             alt={product.nameUzLatn}
-            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-            onError={(e) => {
-              const el = e.target as HTMLImageElement
-              el.style.display = 'none'
-              el.parentElement!.innerHTML +=
-                '<div class="flex h-full items-center justify-center text-4xl">📦</div>'
-            }}
+            className="h-full w-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
-          {qty > 0 && (
-            <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-success" />
-          )}
+          {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-success" />}
         </div>
       ) : (
-        <div className={cn(
-          'flex h-28 items-center justify-center text-5xl',
-          qty > 0 ? 'bg-brand-success/5' : 'bg-slate-50'
-        )}>
+        <div className={cn('flex h-20 items-center justify-center text-4xl', qty > 0 ? 'bg-brand-success/5' : 'bg-slate-50')}>
           {product.emoji ?? '📦'}
         </div>
       )}
 
       {/* Matn qismi */}
-      <div className="flex flex-col gap-1 p-3">
-        <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
+      <div className="flex flex-col gap-0.5 p-2.5">
+        <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">
           {product.nameUzLatn}
         </p>
-        <p className="text-sm font-bold text-brand-success">
+        <p className="text-xs font-bold text-brand-success">
           {fmtMoney(product.price)} so'm
         </p>
       </div>
@@ -465,7 +455,7 @@ function CartPanel({
 
   return (
     <aside className="flex h-full flex-col border-l border-line bg-bg-soft">
-      <header className="flex items-center justify-between border-b border-line bg-bg-card px-5 py-4">
+      <header className="flex items-center justify-between border-b border-line bg-bg-card px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-primary/10 text-brand-primary">
             <ShoppingCart size={16} />
@@ -480,7 +470,7 @@ function CartPanel({
         </span>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3">
+      <div className="flex-1 overflow-y-auto px-2 py-2">
         {lines.length === 0 ? (
           <div className="grid h-full place-items-center px-6 text-center text-sm text-ink-dim">
             <div>
@@ -498,7 +488,7 @@ function CartPanel({
                   initial={{ opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 8 }}
-                  className="rounded-xl border border-line bg-white px-3 py-2.5 shadow-sm"
+                  className="rounded-xl border border-line bg-white px-2.5 py-2 shadow-sm"
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -533,7 +523,7 @@ function CartPanel({
         )}
       </div>
 
-      <footer className="border-t border-line bg-bg-card p-4">
+      <footer className="border-t border-line bg-bg-card p-3">
         <div className="mb-4 space-y-1.5 text-sm">
           <Row label="Mahsulotlar" value={`${fmtMoney(subtotal)} so'm`} muted />
           {fee > 0 && <Row label={`Xizmat (${feePct}%)`} value={`${fmtMoney(fee)} so'm`} muted />}
