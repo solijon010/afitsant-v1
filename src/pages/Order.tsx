@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -55,6 +55,8 @@ export default function OrderPage(): JSX.Element {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Server dan yuklangan dastlabki items — saqlashda o'chirilganlarni aniqlash uchun
+  const initialServerItemsRef = useRef<CartLine[]>([])
 
   useEffect(() => {
     if (!activeCatId && categories[0]) setActiveCatId(categories[0].id)
@@ -77,21 +79,19 @@ export default function OrderPage(): JSX.Element {
         const existingOrder = await window.afisant.orders.getByRoom(roomServerId)
         if (cancelled) return
         if (existingOrder) {
-          // Server buyurtmasi bor — local SQLite ga sync qilib yuklaymiz
-          const baseOrder = await window.afisant.orders.upsert({
-            tableId: tId,
-            waiterId: waiter.id,
-            serviceFeePercent: fee
-          })
+          // Local SQLite ni ham tekshiramiz — agar saqlab qo'yilgan bo'lsa uni oldinlikka qo'yamiz
+          const localOrder = await window.afisant.tables.getByTable(tId)
           if (cancelled) return
-          cart.setOrder(baseOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
-          cart.hydrateFromOrder(
-            existingOrder.items.map<CartLine>((it) => {
-              const product = products.find((p) => p.id === it.productId || p.serverId === it.serverId)
-              return {
+
+          if (localOrder && localOrder.items.length > 0) {
+            // Foydalanuvchi bu qurilmada saqlagan — local versiyani ishlatamiz
+            // Server order ID ni saqlab qolamiz, future sync uchun
+            cart.setOrder(localOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
+            cart.hydrateFromOrder(
+              localOrder.items.map<CartLine>((it) => ({
                 localUuid: it.localUuid,
                 productId: it.productId,
-                productServerId: product?.serverId ?? null,
+                productServerId: null,
                 productName: it.productName,
                 unitPrice: it.unitPrice,
                 quantity: it.quantity,
@@ -99,9 +99,38 @@ export default function OrderPage(): JSX.Element {
                 flushed: true,
                 itemId: it.id,
                 addedAt: it.createdAt
-              }
-            })
-          )
+              }))
+            )
+            return
+          }
+
+          // Local yoq — server buyurtmasini yuklaymiz
+          const serverLines = existingOrder.items.map<CartLine>((it) => {
+            const product = products.find((p) => p.id === it.productId || p.serverId === it.serverId)
+            return {
+              localUuid: it.localUuid,
+              productId: it.productId,
+              productServerId: product?.serverId ?? null,
+              productName: it.productName,
+              unitPrice: it.unitPrice,
+              quantity: it.quantity,
+              notes: it.notes,
+              flushed: true,
+              itemId: it.id,
+              addedAt: it.createdAt
+            }
+          })
+          // Dastlabki server items ni eslab qolamiz — saqlashda o'chirilganlarni topish uchun
+          initialServerItemsRef.current = serverLines
+
+          const baseOrder = await window.afisant.orders.upsert({
+            tableId: tId,
+            waiterId: waiter.id,
+            serviceFeePercent: fee
+          })
+          if (cancelled) return
+          cart.setOrder(baseOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
+          cart.hydrateFromOrder(serverLines)
           return
         }
       }
@@ -187,20 +216,34 @@ export default function OrderPage(): JSX.Element {
       // Server sync — ulanish yo'q bo'lsa ogohlantirib o'tkazib yuboriladi
       if (roomServerId && waiterServerId) {
         const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
-        if (itemsWithServerId.length > 0) {
+        // Server dan yuklangan va endi savatchada yo'q mahsulotlar — count:0 bilan yuboriladi
+        const removedFromServer = initialServerItemsRef.current.filter(
+          (init) => init.productServerId &&
+            !cart.lines.some((l) => l.productServerId === init.productServerId)
+        )
+        const syncItems = [
+          ...itemsWithServerId.map((l) => ({
+            productServerId: l.productServerId!,
+            count: Math.round(l.quantity)
+          })),
+          ...removedFromServer.map((item) => ({
+            productServerId: item.productServerId!,
+            count: 0
+          }))
+        ]
+        if (syncItems.length > 0) {
           try {
             const res = await window.afisant.orders.syncAll({
               roomServerId,
               waiterServerId,
-              items: itemsWithServerId.map((l) => ({
-                productServerId: l.productServerId!,
-                count: Math.round(l.quantity)
-              }))
+              items: syncItems
             })
             useCart.setState({ serverOrderId: res.serverId })
             useCart.setState({
               lines: cart.lines.map((l) => ({ ...l, flushed: true }))
             })
+            // Saqlangandan keyin initialServerItems ni yangilaymiz
+            initialServerItemsRef.current = cart.lines.filter((l) => l.productServerId)
           } catch {
             toast.warning("Server bilan ulanish yo'q — mahalliy saqlandi")
           }
