@@ -18,11 +18,14 @@ function buildOrderWithItems(orderId: number): OrderWithItems | null {
 
 export async function getOrderByRoom(roomServerId: string): Promise<OrderWithItems | null> {
   const s = getSettings()
-  if (!s.apiToken || !s.branchId) return null
+  if (!s.apiToken) return null
 
   const api = getApi()
   try {
-    const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+    const endpoint = s.branchId
+      ? `/api/order/branch/${s.branchId}?limit=50`
+      : `/api/order/room/${roomServerId}`
+    const res = await api.get(endpoint)
     const data = res.data as any
     const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
     const active = orders.find(
@@ -97,23 +100,29 @@ export async function syncAllItems(input: {
   items: Array<{ productServerId: string; count: number }>
 }): Promise<{ serverId: string }> {
   const s = getSettings()
-  if (!s.apiToken || !s.branchId) throw new Error('Token yoki branchId yo\'q')
+  if (!s.apiToken) throw new Error('Token yo\'q')
 
   const api = getApi()
   const { roomServerId, waiterServerId, items } = input
 
-  const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
-  const data = res.data as any
-  const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
-  const existing = orders.find(
-    (o: any) =>
-      o.room?.id === roomServerId &&
-      (o.status === 'PENDING' || o.status === 'READY')
-  )
+  // Mavjud orderni topishga urinib ko'ramiz (403 bo'lsa o'tkazib yuboramiz)
+  let existing: any = null
+  try {
+    if (s.branchId) {
+      const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+      const data = res.data as any
+      const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+      existing = orders.find(
+        (o: any) => o.room?.id === roomServerId && (o.status === 'PENDING' || o.status === 'READY')
+      ) ?? null
+    }
+  } catch {
+    // 403 yoki boshqa xato — mavjud order yo'q deb hisoblaymiz
+    existing = null
+  }
 
   if (existing) {
     if (items.length === 0) {
-      // Bo'sh savat — orderni bekor qilish, yangi order yaratmaslik
       await api.patch(`/api/order/status/${existing.id}`, null, { params: { status: 'CANCELED' } })
       return { serverId: existing.id }
     }
@@ -121,7 +130,6 @@ export async function syncAllItems(input: {
     return { serverId: existing.id }
   }
 
-  // Yangi order yaratish faqat kamida bitta mahsulot bo'lganda
   if (items.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
 
   const createRes = await api.post('/api/order', {
