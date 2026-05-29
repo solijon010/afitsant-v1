@@ -46,15 +46,15 @@ export default function WaiterSelect(): JSX.Element {
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', background: '#050e05' }}>
       {/* Fon */}
-      <img src={loginBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.55) saturate(1.1)' }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,10,0,0.65) 0%, rgba(0,8,0,0.45) 40%, rgba(0,10,0,0.72) 100%)' }} />
+      <img src={loginBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.75)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.38)' }} />
 
       {/* ── HEADER ── */}
       <header style={{
         position: 'relative', zIndex: 10,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 28px',
-        background: 'rgba(3,10,3,0.72)',
+        background: 'rgba(0,0,0,0.55)',
         borderBottom: '1px solid rgba(245,200,66,0.18)',
       }}>
         {/* Logo + nom */}
@@ -148,8 +148,8 @@ function WaiterCard({ waiter, onClick }: { waiter: Waiter; onClick: () => void }
         justifyContent: 'center', gap: 14, padding: '24px 16px',
         borderRadius: 20, cursor: 'pointer', border: 'none',
         background: hovered
-          ? 'rgba(245,200,66,0.1)'
-          : 'rgba(6,15,6,0.82)',
+          ? 'rgba(245,200,66,0.12)'
+          : 'rgba(0,0,0,0.55)',
         outline: `2px solid ${hovered ? 'rgba(245,200,66,0.6)' : isSpecial ? 'rgba(245,200,66,0.25)' : 'rgba(255,255,255,0.07)'}`,
         outlineOffset: -2,
         boxShadow: hovered
