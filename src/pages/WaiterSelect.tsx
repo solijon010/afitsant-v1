@@ -110,9 +110,9 @@ export default function WaiterSelect(): JSX.Element {
 
         {loading ? (
           /* ── Skeleton ── */
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+          <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-[200px] rounded-2xl bg-stone-100 animate-pulse" />
+              <div key={i} className="h-[260px] rounded-2xl bg-stone-100 animate-pulse" />
             ))}
           </div>
         ) : waiters.length === 0 ? (
@@ -136,8 +136,8 @@ export default function WaiterSelect(): JSX.Element {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid gap-4"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}
+            className="grid gap-5"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
           >
             {waiters.map((w) => (
               <WaiterCard key={w.id} waiter={w} onClick={() => navigate(`/pin/${w.id}`)} />
@@ -167,7 +167,7 @@ function WaiterCard({ waiter, onClick }: { waiter: Waiter; onClick: () => void }
       whileTap={{ scale: 0.97 }}
       transition={{ duration: 0.14 }}
       className={cn(
-        'group flex flex-col items-center gap-4 rounded-2xl border-2 bg-white px-5 py-6 text-left shadow-card transition-shadow hover:shadow-card-hover',
+        'group flex flex-col items-center gap-5 rounded-2xl border-2 bg-white px-6 py-8 text-left shadow-card transition-shadow hover:shadow-card-hover',
         isSpecial
           ? 'border-amber-200 hover:border-amber-400'
           : 'border-stone-100 hover:border-stone-300',
@@ -176,10 +176,10 @@ function WaiterCard({ waiter, onClick }: { waiter: Waiter; onClick: () => void }
       {/* Avatar */}
       <div className="relative mt-1">
         {isSpecial && (
-          <div className="absolute -inset-2 rounded-full border-2 border-dashed border-amber-300/70" />
+          <div className="absolute -inset-3 rounded-full border-2 border-dashed border-amber-300/70" />
         )}
         <div className={cn(
-          'flex h-20 w-20 items-center justify-center rounded-full text-xl font-bold tracking-wide',
+          'flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold tracking-wide',
           isSpecial
             ? 'bg-amber-50 text-amber-700 ring-2 ring-amber-300'
             : 'bg-stone-100 text-stone-600',
@@ -190,18 +190,18 @@ function WaiterCard({ waiter, onClick }: { waiter: Waiter; onClick: () => void }
 
       {/* Ism (Familiya Ismi — bir qatorda) */}
       <div className="w-full text-center">
-        <p className="text-[15px] font-bold text-stone-800 leading-snug">
+        <p className="text-[17px] font-bold text-stone-800 leading-snug">
           {fullName || '—'}
         </p>
 
         {/* Role badge */}
         <div className={cn(
-          'mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1',
+          'mt-2.5 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5',
           isSpecial ? 'bg-amber-50' : 'bg-stone-50',
         )}>
-          {isSpecial && <Shield size={10} className="text-amber-500 shrink-0" />}
+          {isSpecial && <Shield size={11} className="text-amber-500 shrink-0" />}
           <span className={cn(
-            'text-[10px] font-bold uppercase tracking-[0.15em]',
+            'text-[11px] font-bold uppercase tracking-[0.15em]',
             isSpecial ? 'text-amber-600' : 'text-stone-400',
           )}>
             {roleLabel}

@@ -434,7 +434,7 @@ export default function OrderPage(): JSX.Element {
           <div className="w-[80px]" />
         </header>
 
-        <nav className="flex gap-1.5 overflow-x-auto border-b border-stone-100 bg-white px-4 py-2.5 shrink-0">
+        <nav className="flex gap-2 overflow-x-auto border-b border-stone-100 bg-white px-5 py-3 shrink-0">
           {categories.map((c) => (
             <CategoryPill
               key={c.id}
@@ -504,7 +504,7 @@ function CategoryPill({
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all',
+        'inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all',
         active
           ? 'border-[#C2410C] bg-[#C2410C] text-white shadow-sm'
           : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-700'
