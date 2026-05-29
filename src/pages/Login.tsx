@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { useAuth } from '@/stores/auth'
 import { useMenu } from '@/stores/menu'
 import { useTables } from '@/stores/tables'
-import logoImg from '@/assets/logo.png'
 
 export default function LoginPage(): JSX.Element {
   const [identifier, setIdentifier] = useState('')
@@ -78,24 +77,15 @@ export default function LoginPage(): JSX.Element {
 
       <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 380, padding: '0 20px' }}>
 
-        {/* Logo */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: '50%',
-            overflow: 'hidden', marginBottom: 16,
-            border: '2px solid rgba(212,98,42,0.4)',
-            boxShadow: '0 0 0 6px rgba(212,98,42,0.06), 0 8px 32px rgba(0,0,0,0.5)',
-          }}>
-            <img src={logoImg} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
+        {/* Sarlavha */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{
-            margin: 0, fontSize: 28, fontWeight: 800,
+            margin: 0, fontSize: 30, fontWeight: 800,
             color: '#ffffff', letterSpacing: '-0.5px',
-            fontFamily: 'system-ui, sans-serif',
           }}>
             Sohil Choyxona
           </h1>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.02em' }}>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
             Tizimga kirish
           </p>
         </div>
