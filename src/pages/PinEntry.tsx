@@ -124,9 +124,9 @@ export default function PinEntry(): JSX.Element {
       <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 340, padding: '0 16px' }}>
         <div style={{
           background: 'rgba(0,0,0,0.78)',
-          border: `1px solid rgba(34,197,94,0.35)`,
+          border: `1px solid rgba(245,200,66,0.35)`,
           borderRadius: 24, overflow: 'hidden',
-          boxShadow: `0 24px 60px rgba(0,0,0,0.75), 0 0 0 1px rgba(34,197,94,0.08)`,
+          boxShadow: `0 24px 60px rgba(0,0,0,0.75), 0 0 0 1px rgba(245,200,66,0.08)`,
         }}>
           {/* Yuqori yashil chiziq */}
           <div style={{ height: 3, background: `linear-gradient(90deg,transparent,${G2} 35%,${G} 50%,${G2} 65%,transparent)` }} />
@@ -136,7 +136,7 @@ export default function PinEntry(): JSX.Element {
             {/* Avatar */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
               <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', inset: -7, borderRadius: '50%', border: `1px dashed rgba(34,197,94,0.3)` }} />
+                <div style={{ position: 'absolute', inset: -7, borderRadius: '50%', border: `1px dashed rgba(245,200,66,0.3)` }} />
                 <motion.div
                   animate={shake ? { x: [-8,8,-6,6,-3,3,0] } : { x: 0 }}
                   transition={{ duration: 0.36 }}
@@ -145,9 +145,9 @@ export default function PinEntry(): JSX.Element {
                     display: 'grid', placeItems: 'center',
                     fontSize: 24, fontWeight: 800, fontFamily: 'Georgia,serif',
                     color: G, letterSpacing: '0.05em',
-                    background: `rgba(34,197,94,0.1)`,
-                    border: `2px solid rgba(34,197,94,0.6)`,
-                    boxShadow: `0 0 20px rgba(34,197,94,0.2)`,
+                    background: `rgba(245,200,66,0.1)`,
+                    border: `2px solid rgba(245,200,66,0.6)`,
+                    boxShadow: `0 0 20px rgba(245,200,66,0.2)`,
                   }}
                 >
                   {initials(waiter.firstName, waiter.lastName)}
@@ -161,17 +161,17 @@ export default function PinEntry(): JSX.Element {
                 {waiter.firstName} {waiter.lastName}
               </h2>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 }}>
-                <div style={{ height: 1, width: 18, background: `rgba(34,197,94,0.3)` }} />
+                <div style={{ height: 1, width: 18, background: `rgba(245,200,66,0.3)` }} />
                 {lockedUntil ? (
                   <span style={{ fontSize: 11, color: '#ff5f57', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Lock size={10} /> Bloklangan · {lockSecondsLeft}s
                   </span>
                 ) : (
-                  <span style={{ fontSize: 10, color: `rgba(34,197,94,0.65)`, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: 10, color: `rgba(245,200,66,0.65)`, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
                     PIN-kodni kiriting
                   </span>
                 )}
-                <div style={{ height: 1, width: 18, background: `rgba(34,197,94,0.3)` }} />
+                <div style={{ height: 1, width: 18, background: `rgba(245,200,66,0.3)` }} />
               </div>
               {!lockedUntil && (
                 <p style={{ margin: '4px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>
@@ -188,8 +188,8 @@ export default function PinEntry(): JSX.Element {
                   <div key={i} style={{
                     width: 13, height: 13, borderRadius: '50%',
                     background: filled ? G : 'transparent',
-                    border: `2px solid ${filled ? G : 'rgba(34,197,94,0.35)'}`,
-                    boxShadow: filled ? `0 0 10px rgba(34,197,94,0.7)` : 'none',
+                    border: `2px solid ${filled ? G : 'rgba(245,200,66,0.35)'}`,
+                    boxShadow: filled ? `0 0 10px rgba(245,200,66,0.7)` : 'none',
                     transition: 'all .15s',
                   }} />
                 )
@@ -228,7 +228,7 @@ export default function PinEntry(): JSX.Element {
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
                   opacity: disabled ? 0.4 : 1,
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(34,197,94,0.18)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(34,197,94,0.5)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,200,66,0.15)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(245,200,66,0.5)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)' }}
               >
                 0
