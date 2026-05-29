@@ -677,10 +677,8 @@ function CartPanel({
           </div>
         ) : (
           <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <AnimatePresence initial={false}>
               {lines.map((l, idx) => (
-                <motion.li key={l.localUuid} layout
-                  initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+                <li key={l.localUuid}
                   style={{ background: 'white', borderRadius: 10, padding: '8px 10px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -703,9 +701,8 @@ function CartPanel({
                       {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
                     </p>
                   </div>
-                </motion.li>
+                </li>
               ))}
-            </AnimatePresence>
           </ul>
         )}
 
