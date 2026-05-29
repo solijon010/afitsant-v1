@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ChefHat,
   CupSoda,
+  Delete,
   Flame,
   Leaf,
   Minus,
