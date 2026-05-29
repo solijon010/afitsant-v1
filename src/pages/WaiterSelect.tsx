@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LogOut, RefreshCw, Settings, Shield, UtensilsCrossed } from 'lucide-react'
+import { LogOut, RefreshCw, Settings, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -14,11 +14,23 @@ import hisobchimLogo from '@/assets/hisobchim-logo.ico'
 /* ─── Animatsiya variantlari ─── */
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.05 } },
+  visible: { transition: { staggerChildren: 0.06 } },
 }
 const cardVariants = {
   hidden: { opacity: 0, y: 16, scale: 0.97 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: 'easeOut' } },
+}
+
+/* Afitsantlarni yaratilish vaqti bo'yicha tartiblaymiz (birinchi yaratilgan — birinchida) */
+function sortWaiters(list: Waiter[]): Waiter[] {
+  return [...list].sort((a, b) => {
+    // Manager/super_waiter yuqorida tursin
+    const rankA = a.role === 'manager' ? 0 : a.role === 'super_waiter' ? 1 : 2
+    const rankB = b.role === 'manager' ? 0 : b.role === 'super_waiter' ? 1 : 2
+    if (rankA !== rankB) return rankA - rankB
+    // Bir xil darajada — yaratilish vaqti bo'yicha (kichik id = avval yaratilgan)
+    return a.createdAt - b.createdAt
+  })
 }
 
 export default function WaiterSelect(): JSX.Element {
@@ -32,7 +44,7 @@ export default function WaiterSelect(): JSX.Element {
   const loadWaiters = (): void => {
     setLoading(true)
     void window.afisant.auth.listWaiters().then((list) => {
-      setWaiters(list)
+      setWaiters(sortWaiters(list))
       setLoading(false)
     })
   }
@@ -58,11 +70,15 @@ export default function WaiterSelect(): JSX.Element {
     <div className="flex h-full flex-col bg-[#F5F5F4]">
 
       {/* ── HEADER ── */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-6 shadow-sm">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-6 shadow-sm">
 
         {/* Chap: Logo + nom */}
         <div className="flex items-center gap-3">
-          <img src={hisobchimLogo} alt="Hisobchim" className="h-9 w-9 rounded-xl object-contain" />
+          <img
+            src={hisobchimLogo}
+            alt="Hisobchim"
+            className="h-11 w-11 rounded-xl object-contain"
+          />
           <div>
             <p className="text-sm font-semibold text-stone-900 leading-tight">
               {settings?.organizationName ?? 'Hisobchim POS'}
@@ -89,37 +105,24 @@ export default function WaiterSelect(): JSX.Element {
       {/* ── KONTENT ── */}
       <main className="flex-1 overflow-y-auto px-8 py-8">
 
-        {/* Sarlavha */}
-        <div className="mb-6 flex items-center gap-3">
-          <div className="h-[2px] w-6 rounded-full bg-[#C2410C]" />
-          <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-400">
-            Kimsan?
-          </h2>
-          <div className="flex-1 h-px bg-stone-100" />
-        </div>
-
         {loading ? (
           /* ── Skeleton ── */
-          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-[168px] rounded-2xl bg-stone-100 animate-pulse" />
+              <div key={i} className="h-[200px] rounded-2xl bg-stone-100 animate-pulse" />
             ))}
           </div>
         ) : waiters.length === 0 ? (
           /* ── Bo'sh holat ── */
           <div className="flex flex-col items-center justify-center gap-4 py-20">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-stone-100">
-              <UtensilsCrossed size={28} className="text-stone-300" />
+              <img src={hisobchimLogo} alt="" className="h-10 w-10 object-contain opacity-30" />
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-stone-500">Afitsantlar topilmadi</p>
               <p className="mt-1 text-xs text-stone-400">Serverdan sinxronlash kerak</p>
             </div>
-            <button
-              onClick={() => void handleSync()}
-              disabled={syncing}
-              className="btn-primary mt-2"
-            >
+            <button onClick={() => void handleSync()} disabled={syncing} className="btn-primary mt-2">
               <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
               Sinxronlash
             </button>
@@ -130,8 +133,8 @@ export default function WaiterSelect(): JSX.Element {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid gap-3"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}
+            className="grid gap-4"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}
           >
             {waiters.map((w) => (
               <WaiterCard key={w.id} waiter={w} onClick={() => navigate(`/pin/${w.id}`)} />
@@ -150,49 +153,56 @@ function WaiterCard({ waiter, onClick }: { waiter: Waiter; onClick: () => void }
     waiter.role === 'super_waiter' ? 'Super afitsant' :
     waiter.role === 'manager' ? 'Manager' : 'Afitsant'
 
+  /* To'liq ism: Familiya Ismi — bir qatorda */
+  const fullName = [waiter.lastName, waiter.firstName].filter(Boolean).join(' ')
+
   return (
     <motion.button
       variants={cardVariants}
       onClick={onClick}
-      whileHover={{ scale: 1.03, y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.15 }}
+      whileHover={{ scale: 1.03, y: -3 }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ duration: 0.14 }}
       className={cn(
-        'group flex flex-col items-center gap-3 rounded-2xl border-2 bg-white px-4 py-5 text-left shadow-card transition-shadow hover:shadow-card-hover',
+        'group flex flex-col items-center gap-4 rounded-2xl border-2 bg-white px-5 py-6 text-left shadow-card transition-shadow hover:shadow-card-hover',
         isSpecial
           ? 'border-amber-200 hover:border-amber-400'
           : 'border-stone-100 hover:border-stone-300',
       )}
     >
       {/* Avatar */}
-      <div className="relative">
+      <div className="relative mt-1">
         {isSpecial && (
-          <div className="absolute -inset-1.5 rounded-full border-2 border-dashed border-amber-300/60" />
+          <div className="absolute -inset-2 rounded-full border-2 border-dashed border-amber-300/70" />
         )}
         <div className={cn(
-          'flex h-16 w-16 items-center justify-center rounded-full text-lg font-bold tracking-wide',
+          'flex h-20 w-20 items-center justify-center rounded-full text-xl font-bold tracking-wide',
           isSpecial
-            ? 'bg-amber-50 text-amber-700 ring-2 ring-amber-200'
+            ? 'bg-amber-50 text-amber-700 ring-2 ring-amber-300'
             : 'bg-stone-100 text-stone-600',
         )}>
           {initials(waiter.firstName, waiter.lastName)}
         </div>
       </div>
 
-      {/* Ism */}
+      {/* Ism (Familiya Ismi — bir qatorda) */}
       <div className="w-full text-center">
-        <p className="text-sm font-semibold text-stone-800 leading-tight">
-          {waiter.firstName}
-          {waiter.lastName ? <><br />{waiter.lastName}</> : null}
+        <p className="text-[15px] font-bold text-stone-800 leading-snug">
+          {fullName || '—'}
         </p>
-        <div className="mt-2 flex items-center justify-center gap-1">
-          {isSpecial && <Shield size={9} className="text-amber-500" />}
-          <p className={cn(
-            'text-[10px] font-medium uppercase tracking-widest',
-            isSpecial ? 'text-amber-500' : 'text-stone-400',
+
+        {/* Role badge */}
+        <div className={cn(
+          'mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1',
+          isSpecial ? 'bg-amber-50' : 'bg-stone-50',
+        )}>
+          {isSpecial && <Shield size={10} className="text-amber-500 shrink-0" />}
+          <span className={cn(
+            'text-[10px] font-bold uppercase tracking-[0.15em]',
+            isSpecial ? 'text-amber-600' : 'text-stone-400',
           )}>
             {roleLabel}
-          </p>
+          </span>
         </div>
       </div>
     </motion.button>

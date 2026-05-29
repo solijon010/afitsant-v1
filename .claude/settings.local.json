@@ -16,7 +16,8 @@
       "Bash(git commit -m 'Rename to Hisobchim and redesign main screens *)",
       "Bash(git push *)",
       "Bash(git commit -m 'Add Hisobchim logo to app icon and UI headers *)",
-      "Bash(git commit -m 'Fix Login.tsx broken logo.png import and update branding *)"
+      "Bash(git commit -m 'Fix Login.tsx broken logo.png import and update branding *)",
+      "Bash(git commit -m 'Fix cart footer always visible and improve WaiterSelect *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Ikromov Solijon\\Desktop\\afisant\\@\\components\\ui"

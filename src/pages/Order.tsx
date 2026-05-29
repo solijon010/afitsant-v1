@@ -711,7 +711,7 @@ function CartPanel({
     .slice(0, 30)
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', borderLeft: '1px solid #E7E5E4', background: '#FAFAF9' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#FAFAF9' }}>
 
       {/* Header */}
       <div style={{ padding: '14px 16px', background: 'white', borderBottom: '1px solid #E7E5E4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -746,8 +746,8 @@ function CartPanel({
         </div>
       </div>
 
-      {/* Mahsulotlar ro'yxati */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+      {/* Mahsulotlar ro'yxati — minHeight:0 flex child overflow fix */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px' }}>
         {lines.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A8A29E', gap: 8 }}>
             <ShoppingCart size={32} style={{ opacity: 0.25 }} />
@@ -809,7 +809,7 @@ function CartPanel({
       </div>
 
       {/* Footer */}
-      <div style={{ background: 'white', borderTop: '1px solid #E7E5E4', padding: '12px 14px' }}>
+      <div style={{ background: 'white', borderTop: '1px solid #E7E5E4', padding: '12px 14px', flexShrink: 0 }}>
         {/* Jami */}
         <div style={{ background: '#F5F5F4', borderRadius: 12, padding: '10px 14px', marginBottom: 10, border: '1px solid #E7E5E4' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
