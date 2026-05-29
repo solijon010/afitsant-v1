@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, FolderOpen, Globe, Languages, Printer, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FolderOpen, Globe, Languages, LayoutList, Printer, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Lang, Settings, Waiter } from '@shared/types'
+import type { Category, Lang, Settings, Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { initials } from '@/lib/format'
@@ -20,11 +20,52 @@ export default function SettingsPage(): JSX.Element {
   const [waiters, setWaiters] = useState<Waiter[]>([])
   const [pinTarget, setPinTarget] = useState<Waiter | null>(null)
   const [diagInfo, setDiagInfo] = useState<{ hasToken: boolean; branchId: string | null; serverUrl: string; logPath: string } | null>(null)
+  const [catRows, setCatRows] = useState<CatRow[]>([])
+  const [catSaving, setCatSaving] = useState(false)
 
   useEffect(() => {
     void window.afisant.auth.listWaiters().then(setWaiters)
     void window.afisant.diag.getInfo().then(setDiagInfo)
+    void loadCatRows()
   }, [])
+
+  const loadCatRows = async (): Promise<void> => {
+    const [cats, configs] = await Promise.all([
+      window.afisant.menu.getCategories(),
+      window.afisant.category.configGet()
+    ])
+    const configMap = new Map(configs.map((c) => [c.serverId, c]))
+    const rows: CatRow[] = cats.map((cat, i) => {
+      const cfg = cat.serverId ? configMap.get(cat.serverId) : undefined
+      return {
+        cat,
+        localName: cfg?.localName ?? cat.nameUzLatn,
+        sortOrder: cfg?.sortOrderOverride ?? i,
+        isHidden: cfg?.isHidden ?? false,
+        moveTarget: null
+      }
+    }).sort((a, b) => a.sortOrder - b.sortOrder)
+    // Agar config bo'lmasa ham barcha serverId'li kategoriyalarni ko'rsatamiz
+    setCatRows(rows)
+  }
+
+  const saveCatConfigs = async (): Promise<void> => {
+    setCatSaving(true)
+    try {
+      const configs = catRows
+        .filter((r) => r.cat.serverId)
+        .map((r, i) => ({
+          serverId: r.cat.serverId!,
+          localName: r.localName !== r.cat.nameUzLatn ? r.localName : null,
+          sortOrderOverride: i,
+          isHidden: r.isHidden
+        }))
+      await window.afisant.category.configSave(configs)
+      toast.success("Kategoriyalar saqlandi")
+    } finally {
+      setCatSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (!settings) void load()
@@ -293,6 +334,99 @@ export default function SettingsPage(): JSX.Element {
           </div>
         </Section>
 
+        <Section title="Kategoriyalar" icon={<LayoutList size={16} />}>
+          {catRows.length === 0 ? (
+            <p className="text-sm text-ink-soft">Kategoriyalar topilmadi. Avval sinxronlang.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {catRows.map((row, i) => (
+                <div key={row.cat.id} className="flex items-center gap-2 rounded-xl border border-line bg-bg-elevated px-3 py-2">
+                  {/* Tartib tugmalari */}
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      onClick={() => {
+                        if (i === 0) return
+                        const next = [...catRows]
+                        ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
+                        setCatRows(next)
+                      }}
+                      disabled={i === 0}
+                      className="text-ink-dim hover:text-ink disabled:opacity-20"
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (i === catRows.length - 1) return
+                        const next = [...catRows]
+                        ;[next[i + 1], next[i]] = [next[i], next[i + 1]]
+                        setCatRows(next)
+                      }}
+                      disabled={i === catRows.length - 1}
+                      className="text-ink-dim hover:text-ink disabled:opacity-20"
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+
+                  {/* Nom */}
+                  <input
+                    className="input flex-1 py-1.5 text-sm"
+                    value={row.localName}
+                    onChange={(e) => {
+                      const next = [...catRows]
+                      next[i] = { ...next[i], localName: e.target.value }
+                      setCatRows(next)
+                    }}
+                  />
+
+                  {/* Ko'rinish toggle */}
+                  <button
+                    onClick={() => {
+                      const next = [...catRows]
+                      next[i] = { ...next[i], isHidden: !next[i].isHidden }
+                      setCatRows(next)
+                    }}
+                    title={row.isHidden ? "Ko'rsatish" : "Yashirish"}
+                    className={cn('transition-colors', row.isHidden ? 'text-brand-danger' : 'text-ink-soft hover:text-ink')}
+                  >
+                    {row.isHidden ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+
+                  {/* Mahsulotlarni ko'chirish */}
+                  <select
+                    className="rounded-lg border border-line bg-bg-card px-2 py-1 text-xs text-ink-soft"
+                    defaultValue=""
+                    onChange={async (e) => {
+                      const toId = e.target.value
+                      if (!toId || !row.cat.serverId) return
+                      const r = await window.afisant.category.moveProducts(row.cat.serverId, toId)
+                      toast.success(`${r.moved} mahsulot ko'chirildi`)
+                      e.target.value = ''
+                    }}
+                  >
+                    <option value="">Mahsulotni ko'chirish…</option>
+                    {catRows
+                      .filter((r) => r.cat.id !== row.cat.id && r.cat.serverId)
+                      .map((r) => (
+                        <option key={r.cat.id} value={r.cat.serverId!}>
+                          → {r.localName}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              ))}
+              <button
+                onClick={() => void saveCatConfigs()}
+                disabled={catSaving}
+                className="btn-primary mt-2 w-full"
+              >
+                {catSaving ? 'Saqlanmoqda…' : 'Kategoriyalarni saqlash'}
+              </button>
+            </div>
+          )}
+        </Section>
+
         <Section title="Afitsantlar" icon={<Users size={16} />}>
           {waiters.length === 0 ? (
             <p className="text-sm text-ink-soft">Afitsantlar topilmadi</p>
@@ -339,6 +473,14 @@ export default function SettingsPage(): JSX.Element {
       )}
     </div>
   )
+}
+
+interface CatRow {
+  cat: Category
+  localName: string
+  sortOrder: number
+  isHidden: boolean
+  moveTarget: string | null
 }
 
 function Section({

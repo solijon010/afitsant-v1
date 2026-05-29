@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export const MIGRATIONS: Record<number, string> = {
   1: `
@@ -134,6 +134,20 @@ export const MIGRATIONS: Record<number, string> = {
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
       value TEXT
+    );
+  `,
+
+  2: `
+    CREATE TABLE IF NOT EXISTS category_config (
+      server_id TEXT PRIMARY KEY,
+      local_name TEXT,
+      sort_order_override INTEGER,
+      is_hidden INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS product_category_override (
+      product_server_id TEXT PRIMARY KEY,
+      target_category_server_id TEXT NOT NULL
     );
   `
 }

@@ -3,20 +3,25 @@ import { mapCategory, mapProduct } from '../db/mappers'
 import type { Category, Product } from '@shared/types'
 
 export function getCategories(): Category[] {
-  // MIN(id) GROUP BY nom — bir xil nomli kategoriya bir marta chiqadi
   const rows = getDb()
     .prepare(
-      `SELECT * FROM categories
-       WHERE is_active = 1
-         AND id IN (
+      `SELECT
+         c.*,
+         COALESCE(cc.local_name, c.name_uz_latn) AS eff_name,
+         COALESCE(cc.sort_order_override, c.sort_order) AS eff_order
+       FROM categories c
+       LEFT JOIN category_config cc ON cc.server_id = c.server_id
+       WHERE c.is_active = 1
+         AND COALESCE(cc.is_hidden, 0) = 0
+         AND c.id IN (
            SELECT MIN(id) FROM categories
            WHERE is_active = 1
            GROUP BY LOWER(TRIM(name_uz_latn))
          )
-       ORDER BY sort_order, name_uz_latn`
+       ORDER BY eff_order, eff_name`
     )
     .all() as any[]
-  return rows.map(mapCategory)
+  return rows.map((r) => mapCategory({ ...r, name_uz_latn: r.eff_name }))
 }
 
 export function getProducts(categoryId?: number): Product[] {

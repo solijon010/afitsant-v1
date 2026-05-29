@@ -5,6 +5,7 @@ import { getSettings } from './settings'
 import { getDb } from '../db/connection'
 import { dequeueBatch, markDone, markFailed, queuedCount } from './syncQueue'
 import { syncWaitersForBranch } from './auth'
+import { applyProductCategoryOverrides } from './categoryConfig'
 
 let socket: Socket | null = null
 let flushTimer: NodeJS.Timeout | null = null
@@ -259,6 +260,11 @@ export async function fullPull(): Promise<{
     }
 
     await syncWaitersForBranch(branchId)
+
+    // Mahsulot ko'chirish override'larini qo'lla (sync keyin ham saqlanishi kerak)
+    try { applyProductCategoryOverrides() } catch (e: any) {
+      console.warn('[SYNC] applyProductCategoryOverrides error:', e?.message)
+    }
 
     console.log(`[SYNC] fullPull done — areas:${areaCount} tables:${tableCount} cats:${categoryCount} prods:${productCount}`)
     lastSyncAt = Date.now()

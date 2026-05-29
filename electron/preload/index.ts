@@ -59,6 +59,12 @@ const api: BridgeAPI = {
     set: (patch) => ipcRenderer.invoke(IPC.settingsSet, patch)
   },
 
+  category: {
+    configGet: () => ipcRenderer.invoke(IPC.categoryConfigGet),
+    configSave: (configs: any[]) => ipcRenderer.invoke(IPC.categoryConfigSave, configs),
+    moveProducts: (fromId: string, toId: string) => ipcRenderer.invoke(IPC.categoryMoveProducts, fromId, toId)
+  },
+
   diag: {
     getInfo: () => ipcRenderer.invoke(IPC.diagGetInfo),
     openLogs: () => ipcRenderer.invoke(IPC.diagOpenLogs)

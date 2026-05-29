@@ -56,6 +56,10 @@ export const IPC = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
 
+  categoryConfigGet: 'category:configGet',
+  categoryConfigSave: 'category:configSave',
+  categoryMoveProducts: 'category:moveProducts',
+
   diagGetInfo: 'diag:getInfo',
   diagOpenLogs: 'diag:openLogs',
 
@@ -156,6 +160,12 @@ export interface BridgeAPI {
   settings: {
     get: () => Promise<Settings>
     set: (patch: Partial<Settings>) => Promise<Settings>
+  }
+
+  category: {
+    configGet: () => Promise<Array<{ serverId: string; localName: string | null; sortOrderOverride: number | null; isHidden: boolean }>>
+    configSave: (configs: Array<{ serverId: string; localName: string | null; sortOrderOverride: number | null; isHidden: boolean }>) => Promise<void>
+    moveProducts: (fromServerId: string, toServerId: string) => Promise<{ moved: number }>
   }
 
   diag: {

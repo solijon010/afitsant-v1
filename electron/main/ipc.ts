@@ -8,6 +8,7 @@ import * as orders from './services/orders'
 import * as printer from './services/printer'
 import * as sync from './services/syncEngine'
 import * as settings from './services/settings'
+import * as catConfig from './services/categoryConfig'
 import { resetApi } from './services/apiClient'
 
 export function registerIpc(): void {
@@ -71,6 +72,12 @@ export function registerIpc(): void {
     resetApi()
     return updated
   })
+
+  ipcMain.handle(IPC.categoryConfigGet, () => catConfig.getCategoryConfigs())
+  ipcMain.handle(IPC.categoryConfigSave, (_e, configs) => catConfig.saveCategoryConfigs(configs))
+  ipcMain.handle(IPC.categoryMoveProducts, (_e, fromId: string, toId: string) =>
+    catConfig.moveProductsToCategory(fromId, toId)
+  )
 
   ipcMain.handle(IPC.diagGetInfo, () => {
     const s = settings.getSettings()
