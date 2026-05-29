@@ -37,4 +37,19 @@ nsis:
 portable:
   artifactName: Afisant-${version}-portable.exe
 
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  icon: build/icon.png
+  category: Office
+  artifactName: Afisant-${version}-${arch}.${ext}
+
+deb:
+  depends:
+    - libusb-1.0-0
+  afterInstall: build/after-install.sh
+
 publish: null

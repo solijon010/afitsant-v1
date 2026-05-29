@@ -53,7 +53,8 @@ export async function snapshot(): Promise<TableWithOrder[]> {
   return tables.map((table) => {
     const backendOrder = activeOrders.find((o: any) => o.room?.id === table.serverId)
     if (!backendOrder) {
-      return { table, order: null }
+      // Server da topilmasa — local SQLite dan olish
+      return { table, order: getOpenOrderByTable(table.id) }
     }
 
     const waiter = backendOrder.user

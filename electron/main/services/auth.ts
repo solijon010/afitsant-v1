@@ -31,10 +31,17 @@ export async function loginWithServer(identifier: string, password: string): Pro
 
     const branches = await fetchBranches(accessToken)
 
-    if (user.branchId) {
-      setSettings({ branchId: user.branchId })
+    // branchId JWT payload ichida — uni decode qilib olamiz
+    let branchId: string | null = user.branchId ?? null
+    try {
+      const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString())
+      if (payload.branchId) branchId = payload.branchId
+    } catch {}
+
+    if (branchId) {
+      setSettings({ branchId })
     }
-    await syncWaitersForBranch(user.branchId ?? null)
+    await syncWaitersForBranch(branchId)
 
     return { ok: true, token: accessToken, user, branches }
   } catch (e: any) {

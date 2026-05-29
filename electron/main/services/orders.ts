@@ -18,11 +18,14 @@ function buildOrderWithItems(orderId: number): OrderWithItems | null {
 
 export async function getOrderByRoom(roomServerId: string): Promise<OrderWithItems | null> {
   const s = getSettings()
-  if (!s.apiToken || !s.branchId) return null
+  if (!s.apiToken) return null
 
   const api = getApi()
   try {
-    const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+    const endpoint = s.branchId
+      ? `/api/order/branch/${s.branchId}?limit=50`
+      : `/api/order/room/${roomServerId}`
+    const res = await api.get(endpoint)
     const data = res.data as any
     const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
     const active = orders.find(
@@ -97,23 +100,29 @@ export async function syncAllItems(input: {
   items: Array<{ productServerId: string; count: number }>
 }): Promise<{ serverId: string }> {
   const s = getSettings()
-  if (!s.apiToken || !s.branchId) throw new Error('Token yoki branchId yo\'q')
+  if (!s.apiToken) throw new Error('Token yo\'q')
 
   const api = getApi()
   const { roomServerId, waiterServerId, items } = input
 
-  const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
-  const data = res.data as any
-  const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
-  const existing = orders.find(
-    (o: any) =>
-      o.room?.id === roomServerId &&
-      (o.status === 'PENDING' || o.status === 'READY')
-  )
+  // Mavjud orderni topishga urinib ko'ramiz (403 bo'lsa o'tkazib yuboramiz)
+  let existing: any = null
+  try {
+    if (s.branchId) {
+      const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+      const data = res.data as any
+      const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+      existing = orders.find(
+        (o: any) => o.room?.id === roomServerId && (o.status === 'PENDING' || o.status === 'READY')
+      ) ?? null
+    }
+  } catch {
+    // 403 yoki boshqa xato — mavjud order yo'q deb hisoblaymiz
+    existing = null
+  }
 
   if (existing) {
     if (items.length === 0) {
-      // Bo'sh savat — orderni bekor qilish, yangi order yaratmaslik
       await api.patch(`/api/order/status/${existing.id}`, null, { params: { status: 'CANCELED' } })
       return { serverId: existing.id }
     }
@@ -121,12 +130,18 @@ export async function syncAllItems(input: {
     return { serverId: existing.id }
   }
 
-  // Yangi order yaratish faqat kamida bitta mahsulot bo'lganda
   if (items.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
+
+  // JWT tokendan real user ID ni olamiz — server shu IDni tekshiradi
+  let realWaiterId = waiterServerId
+  try {
+    const payload = JSON.parse(Buffer.from(s.apiToken.split('.')[1], 'base64').toString())
+    if (payload.id) realWaiterId = payload.id
+  } catch {}
 
   const createRes = await api.post('/api/order', {
     roomId: roomServerId,
-    waiterId: waiterServerId,
+    waiterId: realWaiterId,
     orderItems: items.map((it) => ({ productId: it.productServerId, count: it.count }))
   })
   return { serverId: createRes.data.id }
@@ -166,6 +181,38 @@ export function upsertOpenOrder(input: {
 
   const order = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(info.lastInsertRowid) as any
   return mapOrder(order)
+}
+
+export function replaceOrderItems(
+  orderId: number,
+  items: Array<{
+    productId: number
+    productName: string
+    unitPrice: number
+    quantity: number
+    notes?: string | null
+    localUuid: string
+  }>
+): OrderItem[] {
+  const db = getDb()
+  const ts = now()
+
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM order_items WHERE order_id = ?`).run(orderId)
+
+    const insert = db.prepare(
+      `INSERT INTO order_items (local_uuid, order_id, product_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+    )
+    for (const it of items) {
+      insert.run(it.localUuid, orderId, it.productId, it.productName, it.unitPrice, it.quantity, it.notes ?? null, ts, ts)
+    }
+    recalculateOrder(orderId)
+  })
+  tx()
+
+  const rows = db.prepare(`SELECT * FROM order_items WHERE order_id = ? ORDER BY id`).all(orderId) as any[]
+  return rows.map(mapOrderItem)
 }
 
 export function addItems(
