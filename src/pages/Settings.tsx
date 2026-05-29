@@ -8,7 +8,6 @@ import { useSettings } from '@/stores/settings'
 import { initials } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import PinPad from '@/components/PinPad'
-import { KbInput } from '@/components/VirtualKeyboard'
 
 export default function SettingsPage(): JSX.Element {
   const navigate = useNavigate()
@@ -68,22 +67,21 @@ export default function SettingsPage(): JSX.Element {
       <main className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-6 pb-10">
         <Section title="Tashkilot" icon={<Store size={16} />}>
           <Field label="Tashkilot nomi">
-            <KbInput
+            <input
               className="input"
               value={form.organizationName}
-              onChange={(v) => update('organizationName', v)}
+              onChange={(e) => update('organizationName', e.target.value)}
             />
           </Field>
           <Field label="Xizmat haqi (%)">
-            <KbInput
+            <input
               type="number"
               className="input"
               min={0}
               max={20}
               step={0.5}
               value={form.serviceFeePercent}
-              onChange={(v) => update('serviceFeePercent', Number(v))}
-              layout="numeric"
+              onChange={(e) => update('serviceFeePercent', Number(e.target.value))}
             />
           </Field>
         </Section>
@@ -140,37 +138,36 @@ export default function SettingsPage(): JSX.Element {
           </Field>
           {form.printerType === 'network' && (
             <Field label="Printer IP">
-              <KbInput
+              <input
                 className="input font-mono text-sm"
                 placeholder="192.168.1.100"
                 value={form.printerIp ?? ''}
-                onChange={(v) => update('printerIp', v || null)}
-                layout="numeric"
+                onChange={(e) => update('printerIp', e.target.value || null)}
               />
             </Field>
           )}
           {(form.printerType === 'usb' || form.printerType === 'windows') && (
             <Field label="Printer nomi">
-              <KbInput
+              <input
                 className="input"
                 placeholder="XPrinter XP-58 yoki Windows printer nomi"
                 value={form.printerName ?? ''}
-                onChange={(v) => update('printerName', v || null)}
+                onChange={(e) => update('printerName', e.target.value || null)}
               />
             </Field>
           )}
           <Field label="Chek sarlavhasi">
-            <KbInput
+            <input
               className="input"
               value={form.receiptHeader ?? ''}
-              onChange={(v) => update('receiptHeader', v || null)}
+              onChange={(e) => update('receiptHeader', e.target.value || null)}
             />
           </Field>
           <Field label="Chek pastki yozuvi">
-            <KbInput
+            <input
               className="input"
               value={form.receiptFooter ?? ''}
-              onChange={(v) => update('receiptFooter', v || null)}
+              onChange={(e) => update('receiptFooter', e.target.value || null)}
             />
           </Field>
           <button onClick={() => void testPrint()} className="btn-ghost mt-1">

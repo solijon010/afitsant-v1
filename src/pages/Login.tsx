@@ -5,21 +5,17 @@ import { toast } from 'sonner'
 import { useAuth } from '@/stores/auth'
 import { useMenu } from '@/stores/menu'
 import { useTables } from '@/stores/tables'
-import { useVirtualInput, type KbLayout } from '@/components/VirtualKeyboard'
 import loginBg from '@/assets/manzara-foto.png'
 import logoImg from '@/assets/logo.png'
 
 /* ─── Yordamchi: bitta input ──────────────────────────────────── */
 function Field({
-  value, onChange, disabled, placeholder, type = 'text', autoComplete, right, kbLayout,
+  value, onChange, disabled, placeholder, type = 'text', autoComplete, right,
 }: {
   value: string; onChange: (v: string) => void; disabled: boolean
   placeholder: string; type?: string; autoComplete?: string; right?: React.ReactNode
-  kbLayout?: KbLayout
 }): JSX.Element {
   const [focused, setFocused] = useState(false)
-  const vkb = useVirtualInput(value, onChange, kbLayout ?? 'alpha')
-
   return (
     <div style={{ flex: 1, position: 'relative' }}>
       <input
@@ -29,7 +25,7 @@ function Field({
         disabled={disabled}
         placeholder={placeholder}
         autoComplete={autoComplete}
-        onFocus={(e) => { setFocused(true); vkb.onFocus?.(e) }}
+        onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={{
           width: '100%', height: 46, boxSizing: 'border-box' as const,
@@ -233,7 +229,7 @@ export default function LoginPage(): JSX.Element {
                 <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                   <IconBox><Phone size={18} color="white"/></IconBox>
                   <Field value={identifier} onChange={setIdentifier} disabled={loading}
-                    placeholder="+998901234567" type="tel" autoComplete="tel" kbLayout="numeric"/>
+                    placeholder="+998901234567" type="tel" autoComplete="tel"/>
                 </div>
               </div>
 
@@ -247,7 +243,7 @@ export default function LoginPage(): JSX.Element {
                   <IconBox><Lock size={18} color="white"/></IconBox>
                   <Field value={password} onChange={setPassword} disabled={loading}
                     placeholder="••••••••" type={showPass ? 'text' : 'password'}
-                    autoComplete="current-password" kbLayout="alpha"
+                    autoComplete="current-password"
                     right={
                       <button type="button" onClick={() => setShowPass(v => !v)}
                         style={{ background:'none', border:'none', cursor:'pointer',
