@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LogOut, Settings as SettingsIcon, UtensilsCrossed } from 'lucide-react'
-import type { Area, TableWithOrder } from '@shared/types'
+import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
-import { fmtMoney, initials } from '@/lib/format'
+import { fmtMoney } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
 
@@ -23,11 +23,8 @@ export default function TablesPage(): JSX.Element {
     return () => clearInterval(t)
   }, [load])
 
-  // Birinchi area avtomatik tanlanadi
   useEffect(() => {
-    if (areas.length > 0 && activeAreaId === null) {
-      setActiveAreaId(areas[0].id)
-    }
+    if (areas.length > 0 && activeAreaId === null) setActiveAreaId(areas[0].id)
   }, [areas, activeAreaId])
 
   const grouped = useMemo(() => {
@@ -51,9 +48,7 @@ export default function TablesPage(): JSX.Element {
 
   const totalOccupied = snapshot.filter((s) => s.order?.status === 'open').length
   const totalSum = snapshot.reduce((acc, s) => acc + (s.order?.total ?? 0), 0)
-
-  const occupiedInArea = (areaId: number): number =>
-    (grouped.get(areaId) ?? []).filter((t) => !!t.order).length
+  const occupiedInArea = (areaId: number) => (grouped.get(areaId) ?? []).filter((t) => !!t.order).length
 
   const handleLogout = (): void => {
     logout()
@@ -62,6 +57,7 @@ export default function TablesPage(): JSX.Element {
 
   return (
     <div className="flex h-full flex-col bg-bg">
+
       {/* Header */}
       <header className="flex items-center justify-between border-b border-line bg-bg-card px-6 py-4 shadow-sm">
         <div className="flex items-center gap-3">
@@ -69,44 +65,25 @@ export default function TablesPage(): JSX.Element {
             <UtensilsCrossed size={20} />
           </div>
           <div>
-            <h1 className="text-base font-bold text-ink">
-              {settings?.organizationName ?? 'Afisant'}
-            </h1>
+            <h1 className="text-base font-bold text-ink">{settings?.organizationName ?? 'Afisant'}</h1>
             <p className="text-xs text-ink-soft">
               {waiter?.firstName} {waiter?.lastName} ·{' '}
-              {waiter?.role === 'super_waiter'
-                ? 'Super afitsant'
-                : waiter?.role === 'manager'
-                  ? 'Manager'
-                  : 'Afitsant'}
+              {waiter?.role === 'super_waiter' ? 'Super afitsant' : waiter?.role === 'manager' ? 'Manager' : 'Afitsant'}
             </p>
           </div>
         </div>
-
         <div className="flex items-center gap-2">
           {totalOccupied > 0 && (
             <div className="rounded-xl border border-brand-success/25 bg-brand-success/8 px-4 py-2 text-right">
-              <p className="text-[11px] font-medium text-brand-success/80">
-                {totalOccupied} ta band
-              </p>
-              <p className="text-sm font-bold text-brand-success">
-                {fmtMoney(totalSum)} so'm
-              </p>
+              <p className="text-[11px] font-medium text-brand-success/80">{totalOccupied} ta band</p>
+              <p className="text-sm font-bold text-brand-success">{fmtMoney(totalSum)} so'm</p>
             </div>
           )}
           <StatusBar />
-          <button
-            onClick={() => navigate('/settings')}
-            className="btn-ghost h-10 w-10 p-0"
-            title="Sozlamalar"
-          >
+          <button onClick={() => navigate('/settings')} className="btn-ghost h-10 w-10 p-0" title="Sozlamalar">
             <SettingsIcon size={16} />
           </button>
-          <button
-            onClick={handleLogout}
-            className="btn-ghost h-10 w-10 p-0"
-            title="Chiqish"
-          >
+          <button onClick={handleLogout} className="btn-ghost h-10 w-10 p-0" title="Chiqish">
             <LogOut size={16} />
           </button>
         </div>
@@ -131,14 +108,9 @@ export default function TablesPage(): JSX.Element {
               >
                 {area.name}
                 {occupied > 0 && (
-                  <span
-                    className={cn(
-                      'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold',
-                      isActive
-                        ? 'bg-white/25 text-white'
-                        : 'bg-brand-success/15 text-brand-success'
-                    )}
-                  >
+                  <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold',
+                    isActive ? 'bg-white/25 text-white' : 'bg-brand-success/15 text-brand-success'
+                  )}>
                     {occupied}
                   </span>
                 )}
@@ -155,20 +127,13 @@ export default function TablesPage(): JSX.Element {
             <div className="text-center">
               <UtensilsCrossed className="mx-auto mb-3 text-ink-dim" size={40} />
               <p className="text-sm text-ink-soft">Xonalar topilmadi</p>
-              <p className="mt-1 text-xs text-ink-dim">
-                Sozlamalar → Serverdan sinxronlash
-              </p>
+              <p className="mt-1 text-xs text-ink-dim">Sozlamalar → Serverdan sinxronlash</p>
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 24 }}>
             {activeTables.map((tw, i) => (
-              <TableCard
-                key={tw.table.id}
-                tw={tw}
-                idx={i}
-                onClick={() => navigate(`/order/${tw.table.id}`)}
-              />
+              <TableCard key={tw.table.id} tw={tw} idx={i} onClick={() => navigate(`/order/${tw.table.id}`)} />
             ))}
             {activeTables.length === 0 && activeAreaId !== null && (
               <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', justifyContent: 'center', height: 192, fontSize: 14, color: '#94a3b8' }}>
@@ -188,54 +153,48 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
   const itemCount = tw.order?.items.length ?? 0
   const [hovered, setHovered] = useState(false)
 
-  const cardStyle: React.CSSProperties = {
-    position: 'relative',
-    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-    height: 144, borderRadius: 16, padding: '16px 18px',
-    textAlign: 'left', cursor: 'pointer', border: 'none', outline: 'none',
-    background: isOpen
-      ? 'linear-gradient(145deg,#f0fdf4,#dcfce7)'
-      : hovered ? '#f1f5f9' : '#ffffff',
-    boxShadow: isOpen
-      ? '0 4px 24px rgba(34,197,94,0.22), 0 1px 4px rgba(0,0,0,0.05)'
-      : hovered
-        ? '0 6px 20px rgba(0,0,0,0.1)'
-        : '0 2px 8px rgba(0,0,0,0.07)',
-    outline: isOpen ? '2px solid #22c55e' : hovered ? '2px solid #cbd5e1' : '2px solid #e2e8f0',
-    outlineOffset: -2,
-    transform: hovered ? 'translateY(-2px)' : 'none',
-    transition: 'all .18s ease',
-  }
-
   return (
     <button
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={cardStyle}
+      style={{
+        position: 'relative',
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        height: 148, borderRadius: 16, padding: '16px 18px',
+        textAlign: 'left', cursor: 'pointer',
+        /* Rang: band=yashil, bo'sh=kulrang */
+        background: isOpen
+          ? 'linear-gradient(145deg, #f0fdf4, #dcfce7)'
+          : '#f1f5f9',
+        border: `2px solid ${isOpen ? '#22c55e' : hovered ? '#94a3b8' : '#e2e8f0'}`,
+        boxShadow: isOpen
+          ? '0 4px 20px rgba(34,197,94,0.25)'
+          : hovered ? '0 6px 18px rgba(0,0,0,0.12)' : '0 2px 6px rgba(0,0,0,0.06)',
+        transform: hovered ? 'translateY(-3px)' : 'none',
+        transition: 'all .18s ease',
+      }}
     >
       {/* Yuqori rang chizig'i */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: 4,
-        borderRadius: '16px 16px 0 0',
-        background: isOpen
-          ? 'linear-gradient(90deg,#16a34a,#4ade80)'
-          : '#e2e8f0',
+        borderRadius: '14px 14px 0 0',
+        background: isOpen ? 'linear-gradient(90deg,#16a34a,#4ade80)' : '#cbd5e1',
       }} />
 
-      {/* Stol nomi + status nuqta */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 4 }}>
+      {/* Stol nomi + status */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 6 }}>
         <div>
-          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: isOpen ? '#14532d' : '#1e293b', lineHeight: 1.2 }}>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: isOpen ? '#14532d' : '#334155', lineHeight: 1.2 }}>
             {tw.table.name}
           </p>
-          <p style={{ margin: '5px 0 0', fontSize: 12, fontWeight: 500, color: isOpen ? '#16a34a' : '#94a3b8' }}>
+          <p style={{ margin: '5px 0 0', fontSize: 12, fontWeight: 500, color: isOpen ? '#16a34a' : '#64748b' }}>
             {isOpen ? `${itemCount} ta mahsulot` : "Bo'sh"}
           </p>
         </div>
         <div style={{
-          width: 12, height: 12, borderRadius: '50%', flexShrink: 0, marginTop: 4,
-          background: isOpen ? '#22c55e' : '#cbd5e1',
+          width: 11, height: 11, borderRadius: '50%', flexShrink: 0, marginTop: 5,
+          background: isOpen ? '#22c55e' : '#94a3b8',
           boxShadow: isOpen ? '0 0 0 4px rgba(34,197,94,0.2)' : 'none',
         }} />
       </div>
@@ -246,12 +205,12 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
           <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#15803d', letterSpacing: '-0.5px' }}>
             {fmtMoney(total)}
           </p>
-          <p style={{ margin: 0, fontSize: 11, color: '#4ade80', fontWeight: 500 }}>so'm</p>
+          <p style={{ margin: 0, fontSize: 11, color: '#22c55e', fontWeight: 500 }}>so'm</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e2e8f0' }} />
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Bo'sh</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#cbd5e1' }} />
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>Bo'sh</span>
         </div>
       )}
     </button>
