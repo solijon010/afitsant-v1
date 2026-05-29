@@ -31,8 +31,7 @@ export default function TablesPage(): JSX.Element {
   const waiter = useAuth((s) => s.waiter)
   const logout = useAuth((s) => s.logout)
   const settings = useSettings((s) => s.settings)
-  const { areas, snapshot, load } = useTables()
-  const [activeAreaId, setActiveAreaId] = useState<number | null>(null)
+  const { areas, snapshot, load, activeAreaId, setActiveAreaId } = useTables()
 
   useEffect(() => {
     void load()
@@ -102,24 +101,6 @@ export default function TablesPage(): JSX.Element {
       {/* ── Area tabs ── */}
       {areas.length > 0 && (
         <nav className="flex items-center gap-3 overflow-x-auto border-b border-line bg-white px-6 py-3">
-          <button
-            onClick={() => setActiveAreaId(null)}
-            className={cn(
-              'inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all',
-              activeAreaId === null
-                ? 'bg-slate-800 text-white shadow-md'
-                : 'border-2 border-slate-200 bg-white text-slate-500 hover:border-slate-400 hover:text-slate-700'
-            )}
-          >
-            Barchasi
-            {totalOccupied > 0 && (
-              <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold',
-                activeAreaId === null ? 'bg-white/25 text-white' : 'bg-green-100 text-green-700')}>
-                {totalOccupied}
-              </span>
-            )}
-          </button>
-
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
