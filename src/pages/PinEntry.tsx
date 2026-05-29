@@ -111,8 +111,7 @@ export default function PinEntry(): JSX.Element {
           padding: '10px 20px', borderRadius: 14, border: 'none',
           background: `linear-gradient(145deg, #ffe04d, ${G}, ${G3})`,
           boxShadow: `0 6px 18px rgba(245,200,66,0.5), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,0,0,0.15)`,
-          color: '#0a1200',
-          color: 'white', fontSize: 14, fontWeight: 700,
+          color: '#0a1200', fontSize: 14, fontWeight: 700,
           cursor: 'pointer', letterSpacing: '0.04em',
         }}
       >
