@@ -72,21 +72,19 @@ export default function OrderPage(): JSX.Element {
       useCart.setState({ serviceFeePercent: fee })
       const roomServerId = table.serverId
 
-      // Always create/get a local SQLite order so items can be persisted offline
-      const baseOrder = await window.afisant.orders.upsert({
-        tableId: tId,
-        waiterId: waiter.id,
-        serviceFeePercent: fee
-      })
-      if (cancelled) return
-      cart.setOrder(baseOrder.id, tId, null, roomServerId ?? null)
-
       if (roomServerId) {
-        // Try to load active order from server
+        // Avval serverda aktiv buyurtma bormi tekshiramiz
         const existingOrder = await window.afisant.orders.getByRoom(roomServerId)
         if (cancelled) return
         if (existingOrder) {
-          useCart.setState({ serverOrderId: existingOrder.serverId ?? null, roomServerId })
+          // Server buyurtmasi bor — local SQLite ga sync qilib yuklaymiz
+          const baseOrder = await window.afisant.orders.upsert({
+            tableId: tId,
+            waiterId: waiter.id,
+            serviceFeePercent: fee
+          })
+          if (cancelled) return
+          cart.setOrder(baseOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
           cart.hydrateFromOrder(
             existingOrder.items.map<CartLine>((it) => {
               const product = products.find((p) => p.id === it.productId || p.serverId === it.serverId)
@@ -108,10 +106,12 @@ export default function OrderPage(): JSX.Element {
         }
       }
 
-      // Local SQLite fallback — for local-only tables or when server has no active order
+      // Server buyurtmasi yo'q — local SQLite dan tekshiramiz
       const localOrder = await window.afisant.tables.getByTable(tId)
       if (cancelled) return
       if (localOrder && localOrder.items.length > 0) {
+        // Mahsulotlari bor local buyurtma — yuklaymiz (yangi buyurtma yaratmaymiz)
+        cart.setOrder(localOrder.id, tId, null, roomServerId ?? null)
         cart.hydrateFromOrder(
           localOrder.items.map<CartLine>((it) => ({
             localUuid: it.localUuid,
@@ -126,6 +126,15 @@ export default function OrderPage(): JSX.Element {
             addedAt: it.createdAt
           }))
         )
+      } else {
+        // Hech qanday buyurtma yo'q — lazy rejim: mahsulot qo'shilganda yaratiladi
+        useCart.setState({
+          orderId: null,
+          tableId: tId,
+          serverOrderId: null,
+          roomServerId: roomServerId ?? null,
+          lines: []
+        })
       }
     })()
     return () => {
@@ -148,21 +157,32 @@ export default function OrderPage(): JSX.Element {
     try {
       const roomServerId = useCart.getState().roomServerId
       const waiterServerId = waiter.serverId
+      const fee = settings?.serviceFeePercent ?? 0
+
+      // Lazy order creation — mahsulot qo'shilganda birinchi marta SQLite buyurtma yaratiladi
+      let orderId = cart.orderId
+      if (!orderId) {
+        const baseOrder = await window.afisant.orders.upsert({
+          tableId: tId,
+          waiterId: waiter.id,
+          serviceFeePercent: fee
+        })
+        orderId = baseOrder.id
+        useCart.setState({ orderId: baseOrder.id })
+      }
 
       // Har doim local SQLite ga saqlash (offline persistence uchun)
-      if (cart.orderId && cart.lines.length > 0) {
-        await window.afisant.orders.replaceItems(
-          cart.orderId,
-          cart.lines.map((l) => ({
-            productId: l.productId,
-            productName: l.productName,
-            unitPrice: l.unitPrice,
-            quantity: l.quantity,
-            notes: l.notes ?? null,
-            localUuid: l.localUuid
-          }))
-        )
-      }
+      await window.afisant.orders.replaceItems(
+        orderId,
+        cart.lines.map((l) => ({
+          productId: l.productId,
+          productName: l.productName,
+          unitPrice: l.unitPrice,
+          quantity: l.quantity,
+          notes: l.notes ?? null,
+          localUuid: l.localUuid
+        }))
+      )
 
       // Server sync — ulanish yo'q bo'lsa ogohlantirib o'tkazib yuboriladi
       if (roomServerId && waiterServerId) {
@@ -250,6 +270,19 @@ export default function OrderPage(): JSX.Element {
       const roomServerId = useCart.getState().roomServerId
       const waiterServerId = waiter.serverId
       let serverOrderId = useCart.getState().serverOrderId
+      const fee = settings?.serviceFeePercent ?? 0
+
+      // Lazy order creation — mahsulot bor bo'lsa SQLite buyurtma yaratamiz
+      let orderId = cart.orderId
+      if (!orderId && cart.lines.length > 0) {
+        const baseOrder = await window.afisant.orders.upsert({
+          tableId: tId,
+          waiterId: waiter.id,
+          serviceFeePercent: fee
+        })
+        orderId = baseOrder.id
+        useCart.setState({ orderId: baseOrder.id })
+      }
 
       if (roomServerId && waiterServerId && cart.lines.length > 0) {
         const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
@@ -274,7 +307,7 @@ export default function OrderPage(): JSX.Element {
         organizationName: settings?.organizationName ?? 'Restoran',
         tableName: table.name,
         waiterName: `${waiter.firstName} ${waiter.lastName}`,
-        orderLocalUuid: serverOrderId ?? String(cart.orderId ?? 'unkwn'),
+        orderLocalUuid: serverOrderId ?? String(orderId ?? 'unkwn'),
         items: cart.lines.map((l) => ({
           name: l.productName,
           quantity: l.quantity,
@@ -315,9 +348,9 @@ export default function OrderPage(): JSX.Element {
       }
 
       if (serverOrderId) {
-        await window.afisant.orders.close(cart.orderId ?? 0, serverOrderId)
-      } else if (cart.orderId) {
-        await window.afisant.orders.close(cart.orderId)
+        await window.afisant.orders.close(orderId ?? 0, serverOrderId)
+      } else if (orderId) {
+        await window.afisant.orders.close(orderId)
       }
 
       cart.clear()
