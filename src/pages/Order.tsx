@@ -441,134 +441,82 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
 }
 
 function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () => void; onAdd: (weight: number) => void }): JSX.Element {
-  const [active, setActive] = useState<'kg'|'summa'>('kg')
   const [kg, setKg] = useState('1')
   const [summa, setSumma] = useState(String(product.price))
 
-  const applyKg = (v: string): void => {
+  const handleKg = (v: string): void => {
     setKg(v)
     const n = parseFloat(v)
     setSumma(!isNaN(n) && n > 0 ? String(Math.round(product.price * n)) : '')
   }
 
-  const applySumma = (v: string): void => {
+  const handleSumma = (v: string): void => {
     setSumma(v)
     const n = parseFloat(v)
-    setKg(!isNaN(n) && n > 0 && product.price > 0
-      ? (n / product.price).toFixed(3).replace(/\.?0+$/, '')
-      : '')
-  }
-
-  const pressNum = (d: string): void => {
-    if (active === 'kg') {
-      const next = kg === '0' ? d : kg + d
-      applyKg(next)
-    } else {
-      const next = summa === '0' ? d : summa + d
-      applySumma(next)
-    }
-  }
-
-  const pressDot = (): void => {
-    if (active === 'kg' && !kg.includes('.')) applyKg(kg + '.')
-  }
-
-  const pressDel = (): void => {
-    if (active === 'kg') { const v = kg.slice(0,-1)||'0'; applyKg(v) }
-    else { const v = summa.slice(0,-1)||'0'; applySumma(v) }
+    setKg(!isNaN(n) && n > 0 ? (n / product.price).toFixed(3).replace(/\.?0+$/, '') : '')
   }
 
   const parsedKg = parseFloat(kg) || 0
   const canAdd = parsedKg > 0
 
-  const tabStyle = (t: 'kg'|'summa'): React.CSSProperties => ({
-    flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
-    background: active === t ? (t === 'kg' ? '#16a34a' : '#2563eb') : '#f1f5f9',
-    color: active === t ? 'white' : '#64748b',
-    transition: 'all .15s',
+  const inp = (active: boolean): React.CSSProperties => ({
+    width: '100%', height: 52, borderRadius: 12, border: `2px solid ${active ? '#22c55e' : '#e2e8f0'}`,
+    background: active ? '#f0fdf4' : '#f8fafc', color: '#1e293b',
+    fontSize: 20, fontWeight: 700, textAlign: 'center',
+    outline: 'none', caretColor: '#16a34a', boxSizing: 'border-box',
   })
 
-  const numBtnStyle: React.CSSProperties = {
-    height: 46, borderRadius: 10, border: '1px solid #e2e8f0',
-    background: 'white', color: '#1e293b', fontSize: 18, fontWeight: 700,
-    cursor: 'pointer', display: 'grid', placeItems: 'center',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-  }
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.45)' }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+      style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
+      <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.96, opacity: 0 }} transition={{ duration: 0.15 }}
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 340, borderRadius: 20, overflow: 'hidden', background: 'white', boxShadow: '0 24px 60px rgba(0,0,0,0.3)' }}
-      >
+        style={{ width: 320, borderRadius: 20, background: 'white', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 14px', borderBottom: '1px solid #f1f5f9' }}>
           <div>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{product.nameUzLatn}</p>
             <p style={{ margin: '2px 0 0', fontSize: 12, color: '#22c55e', fontWeight: 600 }}>{fmtMoney(product.price)} so'm / kg</p>
           </div>
-          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', color: '#64748b' }}>
-            <X size={14} />
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: 30, height: 30, borderRadius: 8, display: 'grid', placeItems: 'center', color: '#64748b' }}>
+            <X size={15} />
           </button>
         </div>
 
-        <div style={{ padding: '14px 16px 16px' }}>
-          {/* Tab switcher */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12, background: '#f1f5f9', borderRadius: 12, padding: 4 }}>
-            <button style={tabStyle('kg')} onClick={() => setActive('kg')}>⚖ KG</button>
-            <button style={tabStyle('summa')} onClick={() => setActive('summa')}>💰 So'm</button>
-          </div>
-
-          {/* Display */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <div
-              onClick={() => setActive('kg')}
-              style={{ flex: 1, borderRadius: 12, padding: '10px 12px', background: active==='kg'?'#f0fdf4':'#f8fafc', border: `2px solid ${active==='kg'?'#22c55e':'#e2e8f0'}`, cursor: 'pointer', transition: 'all .15s' }}>
-              <p style={{ margin:0, fontSize:10, color:'#64748b', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em' }}>KG</p>
-              <p style={{ margin:'2px 0 0', fontSize:22, fontWeight:800, color: active==='kg'?'#15803d':'#334155', lineHeight:1 }}>{kg || '0'}</p>
+        <div style={{ padding: '16px 18px 20px' }}>
+          {/* Ikki input */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 14 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>KG</label>
+              <input type="number" min="0.01" step="0.1" autoFocus
+                value={kg} onChange={(e) => handleKg(e.target.value)}
+                style={inp(true)} />
             </div>
-            <div style={{ padding:'0 2px', display:'flex', alignItems:'center', color:'#94a3b8', fontSize:18 }}>=</div>
-            <div
-              onClick={() => setActive('summa')}
-              style={{ flex: 1.2, borderRadius: 12, padding: '10px 12px', background: active==='summa'?'#eff6ff':'#f8fafc', border: `2px solid ${active==='summa'?'#2563eb':'#e2e8f0'}`, cursor: 'pointer', transition: 'all .15s' }}>
-              <p style={{ margin:0, fontSize:10, color:'#64748b', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em' }}>SO'M</p>
-              <p style={{ margin:'2px 0 0', fontSize:active==='summa'?18:16, fontWeight:800, color: active==='summa'?'#1d4ed8':'#334155', lineHeight:1 }}>{summa ? fmtMoney(Number(summa)) : '0'}</p>
+            <div style={{ paddingBottom: 14, color: '#94a3b8', fontSize: 20 }}>=</div>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>So'm</label>
+              <input type="number" min="0" step="1000"
+                value={summa} onChange={(e) => handleSumma(e.target.value)}
+                style={{ ...inp(false), border: '2px solid #3b82f6', background: '#eff6ff', caretColor: '#3b82f6' }} />
             </div>
           </div>
 
-          {/* Numpad */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, marginBottom:10 }}>
-            {['1','2','3','4','5','6','7','8','9'].map(n=>(
-              <button key={n} onClick={()=>pressNum(n)} style={numBtnStyle}>{n}</button>
-            ))}
-            <button onClick={pressDot} style={{...numBtnStyle, fontSize:22}}>.</button>
-            <button onClick={()=>pressNum('0')} style={numBtnStyle}>0</button>
-            <button onClick={pressDel} style={{...numBtnStyle, background:'#fff5f5', color:'#ef4444', borderColor:'#fecaca'}}>
-              <Delete size={18}/>
-            </button>
-          </div>
-
-          {/* Jami + tugmalar */}
           {canAdd && (
-            <div style={{ background:'#f0fdf4', borderRadius:10, padding:'8px 12px', marginBottom:10, display:'flex', justifyContent:'space-between', border:'1px solid #bbf7d0' }}>
-              <span style={{ color:'#64748b', fontSize:12 }}>{kg} kg</span>
-              <span style={{ color:'#16a34a', fontWeight:800, fontSize:14 }}>{fmtMoney(Math.round(product.price*parsedKg))} so'm</span>
+            <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', border: '1px solid #bbf7d0' }}>
+              <span style={{ color: '#64748b', fontSize: 12 }}>{kg} kg × {fmtMoney(product.price)}</span>
+              <span style={{ color: '#16a34a', fontWeight: 800, fontSize: 15 }}>{fmtMoney(Math.round(product.price * parsedKg))} so'm</span>
             </div>
           )}
 
-          <div style={{ display:'flex', gap:8 }}>
-            <button onClick={onClose} style={{ flex:1, height:44, borderRadius:12, border:'1px solid #e2e8f0', background:'white', color:'#64748b', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onClose} style={{ flex: 1, height: 46, borderRadius: 12, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               Bekor
             </button>
-            <button onClick={()=>{ if(canAdd) onAdd(parsedKg) }} disabled={!canAdd}
-              style={{ flex:1.6, height:44, borderRadius:12, border:'none', background: canAdd?'linear-gradient(145deg,#22c55e,#16a34a)':'#e2e8f0', color: canAdd?'white':'#94a3b8', fontSize:13, fontWeight:700, cursor: canAdd?'pointer':'not-allowed', boxShadow: canAdd?'0 4px 12px rgba(34,197,94,0.35)':'none' }}>
+            <button onClick={() => { if (canAdd) onAdd(parsedKg) }} disabled={!canAdd}
+              style={{ flex: 1.6, height: 46, borderRadius: 12, border: 'none', background: canAdd ? 'linear-gradient(145deg,#22c55e,#16a34a)' : '#e2e8f0', color: canAdd ? 'white' : '#94a3b8', fontSize: 14, fontWeight: 700, cursor: canAdd ? 'pointer' : 'not-allowed', boxShadow: canAdd ? '0 4px 12px rgba(34,197,94,0.35)' : 'none' }}>
               + Qo'shish
             </button>
           </div>
