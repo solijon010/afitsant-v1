@@ -89,18 +89,22 @@ export default function OrderPage(): JSX.Element {
             // Server order ID ni saqlab qolamiz, future sync uchun
             cart.setOrder(localOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
             cart.hydrateFromOrder(
-              localOrder.items.map<CartLine>((it) => ({
-                localUuid: it.localUuid,
-                productId: it.productId,
-                productServerId: null,
-                productName: it.productName,
-                unitPrice: it.unitPrice,
-                quantity: it.quantity,
-                notes: it.notes,
-                flushed: true,
-                itemId: it.id,
-                addedAt: it.createdAt
-              }))
+              localOrder.items.map<CartLine>((it) => {
+                // productServerId ni products store'dan qidiramiz — server sync uchun zarur
+                const prod = products.find((p) => p.id === it.productId)
+                return {
+                  localUuid: it.localUuid,
+                  productId: it.productId,
+                  productServerId: prod?.serverId ?? null,
+                  productName: it.productName,
+                  unitPrice: it.unitPrice,
+                  quantity: it.quantity,
+                  notes: it.notes,
+                  flushed: true,
+                  itemId: it.id,
+                  addedAt: it.createdAt
+                }
+              })
             )
             return
           }
@@ -143,18 +147,22 @@ export default function OrderPage(): JSX.Element {
         // Mahsulotlari bor local buyurtma — yuklaymiz (yangi buyurtma yaratmaymiz)
         cart.setOrder(localOrder.id, tId, null, roomServerId ?? null)
         cart.hydrateFromOrder(
-          localOrder.items.map<CartLine>((it) => ({
-            localUuid: it.localUuid,
-            productId: it.productId,
-            productServerId: null,
-            productName: it.productName,
-            unitPrice: it.unitPrice,
-            quantity: it.quantity,
-            notes: it.notes,
-            flushed: true,
-            itemId: it.id,
-            addedAt: it.createdAt
-          }))
+          localOrder.items.map<CartLine>((it) => {
+            // productServerId ni products store'dan qidiramiz — server sync uchun zarur
+            const prod = products.find((p) => p.id === it.productId)
+            return {
+              localUuid: it.localUuid,
+              productId: it.productId,
+              productServerId: prod?.serverId ?? null,
+              productName: it.productName,
+              unitPrice: it.unitPrice,
+              quantity: it.quantity,
+              notes: it.notes,
+              flushed: true,
+              itemId: it.id,
+              addedAt: it.createdAt
+            }
+          })
         )
       } else {
         // Hech qanday buyurtma yo'q — lazy rejim: mahsulot qo'shilganda yaratiladi
