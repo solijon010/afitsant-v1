@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LogOut, RefreshCw, Settings, Shield, UtensilsCrossed, Wifi, WifiOff } from 'lucide-react'
+import { LogOut, RefreshCw, Settings, Shield, UtensilsCrossed } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -9,6 +9,7 @@ import { useSettings } from '@/stores/settings'
 import { initials } from '@/lib/format'
 import StatusBar from '@/components/StatusBar'
 import { cn } from '@/lib/cn'
+import hisobchimLogo from '@/assets/hisobchim-logo.ico'
 
 /* ─── Animatsiya variantlari ─── */
 const containerVariants = {
@@ -61,9 +62,7 @@ export default function WaiterSelect(): JSX.Element {
 
         {/* Chap: Logo + nom */}
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#C2410C]/10">
-            <UtensilsCrossed size={18} className="text-[#C2410C]" />
-          </div>
+          <img src={hisobchimLogo} alt="Hisobchim" className="h-9 w-9 rounded-xl object-contain" />
           <div>
             <p className="text-sm font-semibold text-stone-900 leading-tight">
               {settings?.organizationName ?? 'Hisobchim POS'}

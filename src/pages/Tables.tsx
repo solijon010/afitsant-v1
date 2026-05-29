@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { LogOut, Settings as SettingsIcon, UtensilsCrossed } from 'lucide-react'
+import hisobchimLogo from '@/assets/hisobchim-logo.ico'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
@@ -93,9 +94,7 @@ export default function TablesPage(): JSX.Element {
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-6 shadow-sm">
         {/* Chap: Logo + foydalanuvchi */}
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#C2410C]/10">
-            <UtensilsCrossed size={18} className="text-[#C2410C]" />
-          </div>
+          <img src={hisobchimLogo} alt="Hisobchim" className="h-9 w-9 rounded-xl object-contain" />
           <div>
             <p className="text-sm font-semibold text-stone-900 leading-tight">
               {settings?.organizationName ?? 'Hisobchim POS'}

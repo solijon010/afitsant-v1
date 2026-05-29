@@ -37,11 +37,12 @@ function createWindow(): void {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
-    backgroundColor: '#06101f',
+    backgroundColor: '#F5F5F4',
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: 'default',
     frame: true,
+    icon: join(__dirname, '../../src/assets/hisobchim-logo.ico'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

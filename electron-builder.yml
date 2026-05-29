@@ -23,7 +23,7 @@ win:
       arch: [x64]
     - target: portable
       arch: [x64]
-  icon: src/assets/logo.png
+  icon: src/assets/hisobchim-logo.ico
   artifactName: Hisobchim-${version}-${arch}.${ext}
 
 nsis:

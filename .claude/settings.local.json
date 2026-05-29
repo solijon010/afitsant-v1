@@ -13,7 +13,9 @@
       "Bash(npx shadcn@latest add avatar badge button card scroll-area separator skeleton tabs --yes)",
       "Bash(cd \"c:\\\\Users\\\\Ikromov Solijon\\\\Desktop\\\\afisant\" && mkdir -p src/components/ui && cp \"@/components/ui/\"*.tsx src/components/ui/ && rm -rf \"@\" && ls src/components/ui/)",
       "Bash(git add *)",
-      "Bash(git commit -m 'Rename to Hisobchim and redesign main screens *)"
+      "Bash(git commit -m 'Rename to Hisobchim and redesign main screens *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'Add Hisobchim logo to app icon and UI headers *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Ikromov Solijon\\Desktop\\afisant\\@\\components\\ui"
