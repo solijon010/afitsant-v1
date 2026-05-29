@@ -479,7 +479,7 @@ function CartPanel({
             </div>
           </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             <AnimatePresence initial={false}>
               {lines.map((l) => (
                 <motion.li
@@ -488,31 +488,23 @@ function CartPanel({
                   initial={{ opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 8 }}
-                  className="rounded-xl border border-line bg-white px-2.5 py-2 shadow-sm"
+                  className="rounded-lg border border-line bg-white px-2.5 py-2 shadow-sm"
                 >
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{l.productName}</p>
-                      <p className="text-xs text-ink-soft">{fmtMoney(l.unitPrice)} so'm</p>
-                    </div>
-                    <button
-                      onClick={() => rem(l.localUuid)}
-                      className="grid h-7 w-7 place-items-center rounded-lg text-ink-dim hover:bg-brand-danger/10 hover:text-brand-danger"
-                    >
-                      <Trash2 size={14} />
+                  {/* Nom + o'chirish */}
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <p className="truncate text-xs font-semibold flex-1 text-ink">{l.productName}</p>
+                    <button onClick={() => rem(l.localUuid)} className="grid h-6 w-6 shrink-0 place-items-center rounded text-ink-dim hover:text-brand-danger">
+                      <Trash2 size={12} />
                     </button>
                   </div>
+                  {/* Miqdor + narx bir qatorda */}
                   <div className="flex items-center justify-between">
                     <div className="inline-flex items-center gap-1">
-                      <QtyBtn onClick={() => dec(l.localUuid)}>
-                        <Minus size={14} />
-                      </QtyBtn>
-                      <span className="w-8 text-center text-sm font-semibold">{fmtQty(l.quantity)}</span>
-                      <QtyBtn onClick={() => inc(l.localUuid)}>
-                        <Plus size={14} />
-                      </QtyBtn>
+                      <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={12} /></QtyBtn>
+                      <span className="w-6 text-center text-xs font-bold">{fmtQty(l.quantity)}</span>
+                      <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={12} /></QtyBtn>
                     </div>
-                    <p className="text-sm font-semibold text-brand-success">
+                    <p className="text-xs font-bold text-brand-success">
                       {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
                     </p>
                   </div>
@@ -562,7 +554,7 @@ function QtyBtn({ children, onClick }: { children: React.ReactNode; onClick: () 
   return (
     <button
       onClick={onClick}
-      className="grid h-7 w-7 place-items-center rounded-lg border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
+      className="grid h-6 w-6 place-items-center rounded border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
     >
       {children}
     </button>
