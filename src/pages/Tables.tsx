@@ -94,7 +94,13 @@ export default function TablesPage(): JSX.Element {
             </div>
           )}
           <StatusBar />
-          <button onClick={() => navigate('/settings')} className="btn-ghost h-10 w-10 p-0"><SettingsIcon size={16} /></button>
+          <button
+            onClick={() => navigate('/settings')}
+            className="inline-flex items-center gap-2 rounded-xl border border-line bg-bg-card px-4 py-2.5 text-sm font-semibold text-ink hover:bg-bg-elevated hover:border-line-strong transition-all shadow-sm"
+          >
+            <SettingsIcon size={16} />
+            Sozlamalar
+          </button>
           <button onClick={() => { useAuth.getState().logout(); navigate('/select-waiter', { replace: true }) }} className="btn-ghost h-10 w-10 p-0"><LogOut size={16} /></button>
         </div>
       </header>
