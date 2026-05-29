@@ -550,11 +550,6 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             : 'border-stone-100 bg-white shadow-card hover:shadow-card-hover hover:border-stone-300'
         )}
       >
-        {qty > 0 && (
-          <div className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#C2410C] text-xs font-bold text-white shadow-md ring-2 ring-white">
-            {qty}
-          </div>
-        )}
         {imgSrc ? (
           <div className="relative aspect-square w-full overflow-hidden bg-white">
             <img
@@ -772,7 +767,7 @@ function CartPanel({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F5F5F4', borderRadius: 8, padding: '2px 4px', border: '1px solid #E7E5E4' }}>
                       <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={10} /></QtyBtn>
-                      <span style={{ minWidth: 22, textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#1C1917' }}>{fmtQty(l.quantity)}</span>
+                      <span style={{ minWidth: 28, textAlign: 'center', fontSize: 16, fontWeight: 800, color: '#1C1917' }}>{fmtQty(l.quantity)}</span>
                       <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={10} /></QtyBtn>
                     </div>
                     <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>
