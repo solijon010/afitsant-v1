@@ -143,8 +143,8 @@ export default function LoginPage(): JSX.Element {
                 Telefon raqam
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 12, background: '#16a34a', display: 'grid', placeItems: 'center', boxShadow: '0 4px 12px rgba(22,163,74,0.5)', cursor: 'pointer' }} onClick={() => setActiveField('phone')}>
-                  <Phone size={18} color="white" strokeWidth={2.5} />
+                <div style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 14, background: 'linear-gradient(145deg,#34d058 0%,#22c55e 40%,#16a34a 100%)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 6px 16px rgba(22,163,74,0.55), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.15)' }} onClick={() => setActiveField('phone')}>
+                  <Phone size={20} color="white" strokeWidth={2} />
                 </div>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
@@ -170,8 +170,8 @@ export default function LoginPage(): JSX.Element {
                 Parol
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 12, background: '#16a34a', display: 'grid', placeItems: 'center', boxShadow: '0 4px 12px rgba(22,163,74,0.5)', cursor: 'pointer' }} onClick={() => setActiveField('pass')}>
-                  <Lock size={18} color="white" strokeWidth={2.5} />
+                <div style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 14, background: 'linear-gradient(145deg,#34d058 0%,#22c55e 40%,#16a34a 100%)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 6px 16px rgba(22,163,74,0.55), inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.15)' }} onClick={() => setActiveField('pass')}>
+                  <Lock size={20} color="white" strokeWidth={2} />
                 </div>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
