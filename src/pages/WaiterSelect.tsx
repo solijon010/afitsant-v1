@@ -61,9 +61,10 @@ export default function WaiterSelect(): JSX.Element {
   }
 
   const handleLogout = (): void => {
-    void window.afisant.auth.logout()
+    // Faqat Zustand state ni tozalaymiz — DB dagi token saqlanib qoladi
+    // (keyingi app ishga tushishida avtomatik login uchun)
     logout()
-    navigate('/server-login', { replace: true })
+    // WaiterSelect da qolamiz — server-login ga o'tmaymiz
   }
 
   return (
@@ -74,11 +75,13 @@ export default function WaiterSelect(): JSX.Element {
 
         {/* Chap: Logo + nom */}
         <div className="flex items-center gap-3">
-          <img
-            src={hisobchimLogo}
-            alt="Hisobchim"
-            className="h-11 w-11 rounded-xl object-contain"
-          />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm border border-stone-100">
+            <img
+              src={hisobchimLogo}
+              alt="Hisobchim"
+              className="h-10 w-10 object-contain"
+            />
+          </div>
           <div>
             <p className="text-sm font-semibold text-stone-900 leading-tight">
               {settings?.organizationName ?? 'Hisobchim POS'}

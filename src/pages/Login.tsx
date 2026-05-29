@@ -78,8 +78,15 @@ export default function LoginPage(): JSX.Element {
 
         {/* Logo */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-          <div style={{ width: 78, height: 78, borderRadius: '50%', border: '3px solid #f5c842', boxShadow: '0 0 0 5px rgba(245,200,66,0.13), 0 8px 28px rgba(0,0,0,0.7)', overflow: 'hidden' }}>
-            <img src={hisobchimLogo} alt="Hisobchim" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
+          <div style={{
+            width: 96, height: 96, borderRadius: '50%',
+            border: '3px solid #f5c842',
+            boxShadow: '0 0 0 6px rgba(245,200,66,0.14), 0 8px 32px rgba(0,0,0,0.75)',
+            background: 'white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 10,
+          }}>
+            <img src={hisobchimLogo} alt="Hisobchim" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
         </div>
 
