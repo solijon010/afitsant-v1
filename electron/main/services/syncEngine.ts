@@ -130,37 +130,59 @@ export async function fullPull(): Promise<{
     if (catsRes.status === 'fulfilled') {
       const cats = toArray(catsRes.value.data)
       console.log(`[SYNC] categories raw count: ${cats.length}`)
-      const upsertCat = db.prepare(
-        `INSERT INTO categories (server_id, name_uz_latn, name_uz_cyrl, icon, color, sort_order, is_active)
-         VALUES (?, ?, NULL, NULL, NULL, ?, ?)
-         ON CONFLICT(server_id) DO UPDATE SET
-           name_uz_latn = excluded.name_uz_latn,
-           sort_order = excluded.sort_order,
-           is_active = excluded.is_active`
+
+      // Avval hammani o'chirib qayta yozamiz — NULL server_id muammosini hal qiladi
+      // Products CASCADE DELETE bo'ladi lekin keyingi qadamda qayta yoziladi
+      db.prepare(`DELETE FROM categories`).run()
+
+      const insertCat = db.prepare(
+        `INSERT OR IGNORE INTO categories (server_id, name_uz_latn, name_uz_cyrl, icon, color, sort_order, is_active)
+         VALUES (?, ?, NULL, NULL, NULL, ?, ?)`
       )
       db.transaction(() => {
+        const seenIds = new Set<string>()
+        const seenNames = new Set<string>()
         for (let i = 0; i < cats.length; i++) {
           const c = cats[i]
-          upsertCat.run(c.id, c.name, i, c.status === 'ACTIVE' ? 1 : 0)
+          if (!c.name) continue
+          // server_id yoki nom bo'yicha dublikatni o'tkazib yuborish
+          const idKey = String(c.id ?? '')
+          const nameKey = String(c.name).toLowerCase().trim()
+          if (idKey && seenIds.has(idKey)) continue
+          if (seenNames.has(nameKey)) continue
+          if (idKey) seenIds.add(idKey)
+          seenNames.add(nameKey)
+          insertCat.run(c.id ?? null, c.name, i, c.status === 'ACTIVE' ? 1 : 0)
           categoryCount++
         }
       })()
     }
 
-    // Xona kategoriyalarini (areas) saqlash
+    // Xona kategoriyalarini (areas) saqlash — ham DELETE+INSERT
     if (roomCatsRes.status === 'fulfilled') {
       const roomCats = toArray(roomCatsRes.value.data)
       console.log(`[SYNC] room-categories raw count: ${roomCats.length}`)
-      const upsertArea = db.prepare(
-        `INSERT INTO areas (server_id, name, type, icon, color, sort_order)
-         VALUES (?, ?, 'xona', NULL, NULL, ?)
-         ON CONFLICT(server_id) DO UPDATE SET name = excluded.name, sort_order = excluded.sort_order`
+
+      // Tables CASCADE bilan o'chadi, keyingi qadamda qayta yoziladi
+      db.prepare(`DELETE FROM areas`).run()
+
+      const insertArea = db.prepare(
+        `INSERT OR IGNORE INTO areas (server_id, name, type, icon, color, sort_order)
+         VALUES (?, ?, 'xona', NULL, NULL, ?)`
       )
       db.transaction(() => {
+        const seenIds = new Set<string>()
+        const seenNames = new Set<string>()
         for (let i = 0; i < roomCats.length; i++) {
           const rc = roomCats[i]
-          if (rc.status !== 'ACTIVE') continue
-          upsertArea.run(rc.id, rc.name, i)
+          if (rc.status !== 'ACTIVE' || !rc.name) continue
+          const idKey = String(rc.id ?? '')
+          const nameKey = String(rc.name).toLowerCase().trim()
+          if (idKey && seenIds.has(idKey)) continue
+          if (seenNames.has(nameKey)) continue
+          if (idKey) seenIds.add(idKey)
+          seenNames.add(nameKey)
+          insertArea.run(rc.id ?? null, rc.name, i)
           areaCount++
         }
       })()
@@ -187,7 +209,8 @@ export async function fullPull(): Promise<{
            price = excluded.price,
            unit = excluded.unit,
            image_url = excluded.image_url,
-           category_id = (SELECT id FROM categories WHERE server_id = excluded.server_id)`
+           sort_order = excluded.sort_order,
+           category_id = excluded.category_id`
       )
       db.transaction(() => {
         for (let i = 0; i < prods.length; i++) {
@@ -197,9 +220,9 @@ export async function fullPull(): Promise<{
           const safeUnit = ['dona', 'kg', 'porsiya', 'litr'].includes(unit) ? unit : 'dona'
           const catServerId = p.productCategoryId ?? p.categoryId ?? null
           if (!catServerId) continue
-          const photoUrl = p.photo ? `${getSettings().serverUrl}/api/image/${p.photo}` : null
+          const photoFilename: string | null = p.photo ?? null
           try {
-            upsertProd.run(p.id, p.name, Math.round(Number(p.price)), safeUnit, photoUrl, i, catServerId)
+            upsertProd.run(p.id, p.name, Math.round(Number(p.price)), safeUnit, photoFilename, i, catServerId)
             productCount++
           } catch (err: any) {
             console.warn(`[SYNC] product skip: ${p.name} — ${err?.message}`)
@@ -218,7 +241,8 @@ export async function fullPull(): Promise<{
          FROM areas WHERE areas.server_id = ?
          ON CONFLICT(server_id) DO UPDATE SET
            name = excluded.name,
-           area_id = (SELECT id FROM areas WHERE server_id = excluded.server_id)`
+           sort_order = excluded.sort_order,
+           area_id = excluded.area_id`
       )
       db.transaction(() => {
         for (let i = 0; i < rooms.length; i++) {

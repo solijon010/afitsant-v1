@@ -35,7 +35,7 @@ export default function App(): JSX.Element {
   const navigate = useNavigate()
   const waiter = useAuth((s) => s.waiter)
   const settings = useSettings((s) => s.settings)
-  const setServerAuth = useAuth((s) => s.setServerAuth)
+  const restoreSession = useAuth((s) => s.restoreSession)
 
   useEffect(() => {
     void loadSettings().then(() => {
@@ -45,10 +45,12 @@ export default function App(): JSX.Element {
   }, [loadSettings, loadMenu, loadTables])
 
   useEffect(() => {
+    // Ilovani qayta ochganda token saqlangan bo'lsa — sessionni tiklash
+    // serverUser null qoladi (to'liq login ma'lumotlari yo'q), token bor bo'lsa yetarli
     if (settings?.apiToken && !useAuth.getState().serverToken) {
-      setServerAuth({ id: '', firstName: '', lastName: '', role: '', phoneNumer: '' }, settings.apiToken, settings.branchId ?? null)
+      restoreSession(settings.apiToken, settings.branchId ?? null)
     }
-  }, [settings, setServerAuth])
+  }, [settings, restoreSession])
 
   useEffect(() => {
     const off = window.afisant.on.sync(({ channel }) => {
@@ -118,9 +120,9 @@ export default function App(): JSX.Element {
           <Route
             path="/settings"
             element={
-              <RequireAuth>
+              <RequireServerAuth>
                 <SettingsPage />
-              </RequireAuth>
+              </RequireServerAuth>
             }
           />
           <Route path="*" element={<Navigate to="/server-login" replace />} />

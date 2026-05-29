@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ChefHat,
   CupSoda,
+  Delete,
   Flame,
   Leaf,
   Minus,
@@ -14,7 +15,8 @@ import {
   Save,
   ShoppingCart,
   Trash2,
-  X
+  X,
+  Ban
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Category, Product, ReceiptPayload, TableEntity } from '@shared/types'
@@ -50,6 +52,7 @@ export default function OrderPage(): JSX.Element {
   const [activeCatId, setActiveCatId] = useState<number | null>(null)
   const [table, setTable] = useState<TableEntity | null>(null)
   const [confirmClose, setConfirmClose] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -215,6 +218,27 @@ export default function OrderPage(): JSX.Element {
     }
   }
 
+  const handleCancel = async (): Promise<void> => {
+    setSaving(true)
+    try {
+      const serverOrderId = useCart.getState().serverOrderId
+      const orderId = cart.orderId
+      if (orderId || serverOrderId) {
+        await window.afisant.orders.cancel(orderId ?? 0, serverOrderId ?? undefined)
+      }
+      cart.clear()
+      cart.setOrder(null, null)
+      await refreshTable(tId)
+      toast.success("Buyurtma bekor qilindi")
+      navigate('/tables')
+    } catch (e: any) {
+      toast.error('Bekor qilishda xatolik', { description: e?.message })
+    } finally {
+      setSaving(false)
+      setConfirmCancel(false)
+    }
+  }
+
   const handleCloseAndPrint = async (): Promise<void> => {
     if (!table || !waiter) return
     if (cart.lines.length === 0 && !cart.serverOrderId) {
@@ -317,20 +341,23 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full grid-cols-[1fr_400px]">
-      <section className="flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-line px-6 py-4">
-          <button onClick={() => navigate('/tables')} className="btn-ghost">
-            <ArrowLeft size={16} /> Orqaga
+    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 370px' }}>
+      <section className="flex flex-col overflow-hidden bg-bg">
+        <header className="flex items-center justify-between border-b border-line bg-bg-card px-4 py-3 shadow-sm">
+          <button
+            onClick={() => void handleSave()}
+            className="btn-ghost"
+            disabled={saving || printing}
+          >
+            <ArrowLeft size={15} /> Orqaga
           </button>
           <div className="text-center">
-            <p className="text-xs uppercase tracking-wider text-ink-soft">XONA / STOL</p>
-            <p className="text-xl font-bold">{table.name}</p>
+            <p className="text-lg font-bold text-ink">{table.name}</p>
           </div>
-          <div className="w-[100px]" />
+          <div className="w-[80px]" />
         </header>
 
-        <nav className="flex gap-3 overflow-x-auto border-b border-line px-6 py-4">
+        <nav className="flex gap-1.5 overflow-x-auto border-b border-line bg-bg-card px-4 py-2">
           {categories.map((c) => (
             <CategoryPill
               key={c.id}
@@ -341,13 +368,13 @@ export default function OrderPage(): JSX.Element {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto bg-bg px-4 py-4">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
               Bu kategoriyada mahsulot yo'q
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))' }}>
               {shownProducts.map((p, idx) => (
                 <ProductCard key={p.id} product={p} idx={idx} />
               ))}
@@ -361,6 +388,7 @@ export default function OrderPage(): JSX.Element {
         tableId={tId}
         onSave={handleSave}
         onClosePrint={() => setConfirmClose(true)}
+        onCancel={() => setConfirmCancel(true)}
         printing={printing}
         saving={saving}
       />
@@ -372,6 +400,13 @@ export default function OrderPage(): JSX.Element {
             onConfirm={handleCloseAndPrint}
             total={cart.total()}
             busy={printing}
+          />
+        )}
+        {confirmCancel && (
+          <ConfirmCancelModal
+            onCancel={() => setConfirmCancel(false)}
+            onConfirm={handleCancel}
+            busy={saving}
           />
         )}
       </AnimatePresence>
@@ -392,19 +427,19 @@ function CategoryPill({
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex shrink-0 items-center gap-2.5 rounded-2xl border px-5 py-3 text-base font-semibold transition-all',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all',
         active
-          ? 'border-brand-primary bg-brand-primary text-black shadow-glow-amber'
-          : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
+          ? 'border-brand-primary bg-brand-primary text-white shadow-sm shadow-brand-primary/20'
+          : 'border-line bg-white text-ink-soft hover:border-line-strong hover:text-ink'
       )}
       style={
         active && cat.color
-          ? { borderColor: cat.color, background: cat.color, boxShadow: `0 0 24px ${cat.color}55` }
+          ? { borderColor: cat.color, background: cat.color }
           : undefined
       }
     >
-      <span className={active ? 'text-black' : 'text-ink-soft'}>
-        {CAT_ICON[cat.icon ?? ''] ?? <Package size={18} />}
+      <span className={active ? 'text-white/80' : 'text-ink-dim'}>
+        {CAT_ICON[cat.icon ?? ''] ?? <Package size={16} />}
       </span>
       {cat.nameUzLatn}
     </button>
@@ -414,69 +449,151 @@ function CategoryPill({
 function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
-  const dec = useCart((s) => s.decrement)
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
-  const activeLine =
-    lines.find((l) => l.productId === product.id && !l.flushed) ??
-    lines.find((l) => l.productId === product.id)
+  const [showKgModal, setShowKgModal] = useState(false)
+
+  const handleClick = (): void => {
+    if (product.unit === 'kg') setShowKgModal(true)
+    else add(product)
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.015 }}
-      className="relative"
-    >
+    <>
       <motion.div
-        whileTap={{ scale: 0.95 }}
-        onClick={() => add(product)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && add(product)}
+        onClick={handleClick}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: idx * 0.015 }}
+        whileTap={{ scale: 0.97 }}
         className={cn(
-          'flex select-none cursor-pointer flex-col rounded-2xl border p-4 transition-all',
+          'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all select-none',
           qty > 0
-            ? 'border-brand-success/50 bg-brand-success/8 shadow-glow'
-            : 'border-line bg-bg-card hover:border-line-strong hover:bg-bg-elevated'
+            ? 'border-brand-success/50 bg-white shadow-glow'
+            : 'border-line bg-white shadow-card hover:shadow-card-hover hover:border-line-strong'
         )}
       >
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt={product.nameUzLatn}
-            className="mb-2 h-20 w-full rounded-xl object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none'
-            }}
-          />
+        {qty > 0 && (
+          <div className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-brand-success text-xs font-bold text-white shadow-md ring-2 ring-white">
+            {qty}
+          </div>
+        )}
+        {product.photo ? (
+          <div className="relative h-28 w-full overflow-hidden bg-slate-50">
+            <img
+              src={`${import.meta.env.VITE_API_URL}/image/${product.photo}`}
+              alt={product.nameUzLatn}
+              className="h-full w-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+            {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-brand-success" />}
+          </div>
         ) : (
-          <div className="mb-2 flex h-16 items-center justify-start text-3xl">
+          <div className={cn('flex h-20 items-center justify-center text-4xl', qty > 0 ? 'bg-brand-success/5' : 'bg-slate-50')}>
             {product.emoji ?? '📦'}
           </div>
         )}
-        <p className="line-clamp-2 flex-1 text-sm font-semibold leading-tight">{product.nameUzLatn}</p>
-        <p className="mt-1 text-sm font-bold text-brand-success">{fmtMoney(product.price)} so'm</p>
+        <div className="flex flex-col gap-0.5 p-2.5">
+          <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{product.nameUzLatn}</p>
+          <p className="text-xs font-bold text-brand-success">
+            {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
+          </p>
+        </div>
+      </motion.div>
 
-        {qty > 0 && activeLine ? (
-          <div className="mt-3 flex items-center justify-between">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                dec(activeLine.localUuid)
-              }}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
-            >
-              <Minus size={14} />
-            </button>
-            <span className="grid h-8 min-w-[2rem] place-items-center rounded-full bg-brand-success px-2 text-sm font-bold text-black">
-              {fmtQty(qty)}
-            </span>
-          </div>
-        ) : (
-          <div className="mt-3 h-8 flex items-center justify-center rounded-xl border border-dashed border-line text-xs text-ink-dim">
-            Bosing → +1
-          </div>
+      <AnimatePresence>
+        {showKgModal && (
+          <KgModal
+            product={product}
+            onClose={() => setShowKgModal(false)}
+            onAdd={(weight) => { add(product, weight); setShowKgModal(false) }}
+          />
         )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () => void; onAdd: (weight: number) => void }): JSX.Element {
+  const [kg, setKg] = useState('1')
+  const [summa, setSumma] = useState(String(product.price))
+
+  const handleKg = (v: string): void => {
+    setKg(v)
+    const n = parseFloat(v)
+    setSumma(!isNaN(n) && n > 0 ? String(Math.round(product.price * n)) : '')
+  }
+
+  const handleSumma = (v: string): void => {
+    setSumma(v)
+    const n = parseFloat(v)
+    setKg(!isNaN(n) && n > 0 ? (n / product.price).toFixed(3).replace(/\.?0+$/, '') : '')
+  }
+
+  const parsedKg = parseFloat(kg) || 0
+  const canAdd = parsedKg > 0
+
+  const inp = (active: boolean): React.CSSProperties => ({
+    width: '100%', height: 52, borderRadius: 12, border: `2px solid ${active ? '#22c55e' : '#e2e8f0'}`,
+    background: active ? '#f0fdf4' : '#f8fafc', color: '#1e293b',
+    fontSize: 20, fontWeight: 700, textAlign: 'center',
+    outline: 'none', caretColor: '#16a34a', boxSizing: 'border-box',
+  })
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
+      <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.96, opacity: 0 }} transition={{ duration: 0.15 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: 320, borderRadius: 20, background: 'white', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 14px', borderBottom: '1px solid #f1f5f9' }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{product.nameUzLatn}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#22c55e', fontWeight: 600 }}>{fmtMoney(product.price)} so'm / kg</p>
+          </div>
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: 30, height: 30, borderRadius: 8, display: 'grid', placeItems: 'center', color: '#64748b' }}>
+            <X size={15} />
+          </button>
+        </div>
+
+        <div style={{ padding: '16px 18px 20px' }}>
+          {/* Ikki input */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 14 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>KG</label>
+              <input type="number" min="0.01" step="0.1" autoFocus
+                value={kg} onChange={(e) => handleKg(e.target.value)}
+                style={inp(true)} />
+            </div>
+            <div style={{ paddingBottom: 14, color: '#94a3b8', fontSize: 20 }}>=</div>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: 6, fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>So'm</label>
+              <input type="number" min="0" step="1000"
+                value={summa} onChange={(e) => handleSumma(e.target.value)}
+                style={{ ...inp(false), border: '2px solid #3b82f6', background: '#eff6ff', caretColor: '#3b82f6' }} />
+            </div>
+          </div>
+
+          {canAdd && (
+            <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', border: '1px solid #bbf7d0' }}>
+              <span style={{ color: '#64748b', fontSize: 12 }}>{kg} kg × {fmtMoney(product.price)}</span>
+              <span style={{ color: '#16a34a', fontWeight: 800, fontSize: 15 }}>{fmtMoney(Math.round(product.price * parsedKg))} so'm</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onClose} style={{ flex: 1, height: 46, borderRadius: 12, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              Bekor
+            </button>
+            <button onClick={() => { if (canAdd) onAdd(parsedKg) }} disabled={!canAdd}
+              style={{ flex: 1.6, height: 46, borderRadius: 12, border: 'none', background: canAdd ? 'linear-gradient(145deg,#22c55e,#16a34a)' : '#e2e8f0', color: canAdd ? 'white' : '#94a3b8', fontSize: 14, fontWeight: 700, cursor: canAdd ? 'pointer' : 'not-allowed', boxShadow: canAdd ? '0 4px 12px rgba(34,197,94,0.35)' : 'none' }}>
+              + Qo'shish
+            </button>
+          </div>
+        </div>
       </motion.div>
     </motion.div>
   )
@@ -487,6 +604,7 @@ function CartPanel({
   tableId,
   onSave,
   onClosePrint,
+  onCancel,
   printing,
   saving
 }: {
@@ -494,6 +612,7 @@ function CartPanel({
   tableId: number
   onSave: () => Promise<void> | void
   onClosePrint: () => void
+  onCancel: () => void
   printing: boolean
   saving: boolean
 }): JSX.Element {
@@ -514,92 +633,81 @@ function CartPanel({
     .slice(0, 30)
 
   return (
-    <aside className="flex h-full flex-col border-l border-line bg-bg-soft/40">
-      <header className="flex items-center justify-between border-b border-line px-5 py-4">
-        <div className="flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-success/15 text-brand-success">
-            <ShoppingCart size={16} />
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', borderLeft: '1px solid #e2e8f0', background: '#f8fafc' }}>
+
+      {/* Header */}
+      <div style={{ padding: '14px 16px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', display: 'grid', placeItems: 'center', boxShadow: '0 4px 12px rgba(59,130,246,0.35)' }}>
+            <ShoppingCart size={16} color="white" />
           </div>
           <div>
-            <p className="text-sm font-semibold">Savat</p>
-            <p className="text-xs text-ink-soft">{table.name}</p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#1e293b' }}>Savat</p>
+            <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>{table.name}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {historyEntries.length > 0 && (
             <button
               onClick={() => setShowHistory((v) => !v)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all',
-                showHistory
-                  ? 'border-brand-danger/50 bg-brand-danger/15 text-brand-danger'
-                  : 'border-line text-ink-soft hover:border-line-strong hover:text-ink'
-              )}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                background: showHistory ? '#fff1f2' : '#f1f5f9',
+                border: `1px solid ${showHistory ? '#fca5a5' : '#e2e8f0'}`,
+                color: showHistory ? '#ef4444' : '#64748b',
+                borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer'
+              }}
             >
               <Printer size={11} />
               Tarix ({historyEntries.length})
             </button>
           )}
-          <span className="grid h-7 min-w-7 place-items-center rounded-full bg-brand-success px-2 text-xs font-bold text-black">
-            {lines.length}
-          </span>
+          <div style={{ minWidth: 28, height: 28, borderRadius: 99, background: lines.length > 0 ? '#3b82f6' : '#e2e8f0', display: 'grid', placeItems: 'center', padding: '0 8px' }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: lines.length > 0 ? 'white' : '#94a3b8' }}>{lines.length}</span>
+          </div>
         </div>
-      </header>
+      </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Joriy savat */}
-        <div className="px-3 py-3">
-          {lines.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-center text-sm text-ink-dim">
-              <div>
-                <ShoppingCart className="mx-auto mb-2 opacity-30" size={28} />
-                Mahsulotlarni tanlang
-              </div>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              <AnimatePresence initial={false}>
-                {lines.map((l) => (
-                  <motion.li
-                    key={l.localUuid}
-                    layout
-                    initial={{ opacity: 0, x: 8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 8 }}
-                    className="rounded-xl border border-line bg-bg-card px-3 py-2.5"
-                  >
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{l.productName}</p>
-                        <p className="text-xs text-ink-soft">{fmtMoney(l.unitPrice)} so'm</p>
-                      </div>
-                      <button
-                        onClick={() => rem(l.localUuid)}
-                        className="grid h-7 w-7 place-items-center rounded-lg text-ink-dim hover:bg-brand-danger/10 hover:text-brand-danger"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+      {/* Mahsulotlar ro'yxati */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+        {lines.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', gap: 8 }}>
+            <ShoppingCart size={32} style={{ opacity: 0.2 }} />
+            <span style={{ fontSize: 13 }}>Mahsulotlarni tanlang</span>
+          </div>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <AnimatePresence initial={false}>
+              {lines.map((l, idx) => (
+                <motion.li key={l.localUuid} layout
+                  initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+                  style={{ background: 'white', borderRadius: 10, padding: '8px 10px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#1e293b', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {idx + 1}. {l.productName}
+                    </p>
+                    <button onClick={() => rem(l.localUuid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: '2px 4px', borderRadius: 6, display: 'grid', placeItems: 'center', flexShrink: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#fff1f2')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', borderRadius: 8, padding: '2px 4px', border: '1px solid #e2e8f0' }}>
+                      <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={10} /></QtyBtn>
+                      <span style={{ minWidth: 22, textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#1e293b' }}>{fmtQty(l.quantity)}</span>
+                      <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={10} /></QtyBtn>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="inline-flex items-center gap-1">
-                        <QtyBtn onClick={() => dec(l.localUuid)}>
-                          <Minus size={14} />
-                        </QtyBtn>
-                        <span className="w-8 text-center text-sm font-semibold">{fmtQty(l.quantity)}</span>
-                        <QtyBtn onClick={() => inc(l.localUuid)}>
-                          <Plus size={14} />
-                        </QtyBtn>
-                      </div>
-                      <p className="text-sm font-semibold text-brand-success">
-                        {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
-                      </p>
-                    </div>
-                  </motion.li>
-                ))}
-              </AnimatePresence>
-            </ul>
-          )}
-        </div>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#16a34a' }}>
+                      {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
+                    </p>
+                  </div>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+        )}
 
         {/* Tarix paneli */}
         <AnimatePresence>
@@ -608,13 +716,13 @@ function CartPanel({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden border-t border-line"
+              style={{ overflow: 'hidden', borderTop: '1px solid #e2e8f0', marginTop: 8 }}
             >
-              <div className="px-3 py-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-soft">
+              <div style={{ padding: '10px 4px' }}>
+                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   {table.name} — Zakazlar tarixi
                 </p>
-                <ul className="space-y-2">
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {historyEntries.map((entry) => (
                     <HistoryEntryRow key={entry.id} entry={entry} />
                   ))}
@@ -625,30 +733,45 @@ function CartPanel({
         </AnimatePresence>
       </div>
 
-      <footer className="border-t border-line bg-bg-soft/60 p-4">
-        <div className="mb-3 space-y-1.5 text-sm">
-          <Row label="Mahsulotlar" value={`${fmtMoney(subtotal)} so'm`} muted />
-          {fee > 0 && <Row label={`Xizmat (${feePct}%)`} value={`${fmtMoney(fee)} so'm`} muted />}
-          <div className="my-2 h-px bg-line" />
-          <Row label="Jami" value={`${fmtMoney(total)} so'm`} large />
+      {/* Footer */}
+      <div style={{ background: 'white', borderTop: '1px solid #e2e8f0', padding: '12px 14px' }}>
+        {/* Jami */}
+        <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '10px 14px', marginBottom: 10, border: '1px solid #bbf7d0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: '#64748b' }}>Mahsulotlar</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{fmtMoney(subtotal)} so'm</span>
+          </div>
+          {fee > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: '#64748b' }}>Xizmat ({feePct}%)</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>{fmtMoney(fee)} so'm</span>
+            </div>
+          )}
+          <div style={{ height: 1, background: '#d1fae5', margin: '6px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#15803d' }}>Jami</span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: '#15803d' }}>{fmtMoney(total)} so'm</span>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => void onSave()}
-            className="btn-ghost"
-            disabled={saving || printing}
-          >
-            <Save size={14} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
+
+        {/* Tugmalar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <button onClick={onCancel} disabled={saving || printing || lines.length === 0}
+            style={{ width: '100%', height: 40, borderRadius: 10, border: '1.5px solid #fca5a5', background: lines.length === 0 ? '#f8fafc' : '#fff1f2', color: lines.length === 0 ? '#94a3b8' : '#ef4444', fontSize: 12, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Ban size={13} /> Zakazni bekor qilish
           </button>
-          <button
-            onClick={onClosePrint}
-            className="btn-success"
-            disabled={lines.length === 0 || printing || saving}
-          >
-            <Printer size={14} /> Chek & Yopish
-          </button>
+          <div style={{ display: 'flex', gap: 7 }}>
+            <button onClick={() => void onSave()} disabled={saving || printing}
+              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 12px rgba(59,130,246,0.35)', opacity: saving || printing ? 0.6 : 1 }}>
+              <Save size={13} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
+            </button>
+            <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
+              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: lines.length === 0 ? '#e2e8f0' : 'linear-gradient(145deg,#22c55e,#15803d)', color: lines.length === 0 ? '#94a3b8' : 'white', fontSize: 13, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: lines.length > 0 ? '0 4px 12px rgba(34,197,94,0.35)' : 'none', opacity: printing || saving ? 0.6 : 1 }}>
+              <Printer size={13} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
+            </button>
+          </div>
         </div>
-      </footer>
+      </div>
     </aside>
   )
 }
@@ -701,7 +824,7 @@ function QtyBtn({ children, onClick }: { children: React.ReactNode; onClick: () 
   return (
     <button
       onClick={onClick}
-      className="grid h-7 w-7 place-items-center rounded-lg border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
+      className="grid h-5 w-5 place-items-center rounded border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
     >
       {children}
     </button>
@@ -722,10 +845,58 @@ function Row({
   return (
     <div className="flex items-baseline justify-between">
       <span className={cn(muted && 'text-ink-soft', large && 'text-base font-semibold')}>{label}</span>
-      <span className={cn(large ? 'text-xl font-bold text-brand-success' : 'font-medium', muted && !large && 'text-ink-soft')}>
+      <span className={cn(large ? 'text-xl font-bold text-ink' : 'font-medium', muted && !large && 'text-ink-soft')}>
         {value}
       </span>
     </div>
+  )
+}
+
+function ConfirmCancelModal({
+  onCancel,
+  onConfirm,
+  busy
+}: {
+  onCancel: () => void
+  onConfirm: () => void | Promise<void>
+  busy: boolean
+}): JSX.Element {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="card w-full max-w-sm p-6"
+      >
+        <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-brand-danger/10 text-brand-danger">
+          <Ban size={22} />
+        </div>
+        <h3 className="text-lg font-semibold text-ink">Zakazni bekor qilish</h3>
+        <p className="mt-1 text-sm text-ink-soft">
+          Barcha mahsulotlar o'chirilib, buyurtma bekor qilinadi. Davom etasizmi?
+        </p>
+        <div className="mt-5 flex gap-2">
+          <button onClick={onCancel} className="btn-ghost flex-1" disabled={busy}>
+            <X size={14} /> Orqaga
+          </button>
+          <button
+            onClick={() => void onConfirm()}
+            className="btn-danger flex-1"
+            disabled={busy}
+          >
+            <Ban size={14} /> {busy ? 'Bekor qilinmoqda…' : 'Ha, bekor qilish'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -755,16 +926,16 @@ function ConfirmCloseModal({
         onClick={(e) => e.stopPropagation()}
         className="card-elevated w-full max-w-sm p-6"
       >
-        <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-brand-success/15 text-brand-success">
+        <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-brand-primary/10 text-brand-primary">
           <Printer size={22} />
         </div>
-        <h3 className="text-lg font-semibold">Buyurtmani yopish</h3>
+        <h3 className="text-lg font-semibold text-ink">Buyurtmani yopish</h3>
         <p className="mt-1 text-sm text-ink-soft">
           Chek chiqariladi va buyurtma yopiladi. Davom etamizmi?
         </p>
-        <div className="my-4 rounded-2xl border border-line bg-bg-card p-3 text-center">
-          <p className="text-xs uppercase tracking-wider text-ink-soft">Jami</p>
-          <p className="text-3xl font-bold text-brand-success">{fmtMoney(total)} so'm</p>
+        <div className="my-4 rounded-2xl border border-line bg-bg p-4 text-center">
+          <p className="text-xs font-medium uppercase tracking-wider text-ink-dim">Jami to'lov</p>
+          <p className="mt-1 text-3xl font-bold text-ink">{fmtMoney(total)} so'm</p>
         </div>
         <div className="flex gap-2">
           <button onClick={onCancel} className="btn-ghost flex-1" disabled={busy}>

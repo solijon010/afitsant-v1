@@ -20,6 +20,7 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IPC.authListWaiters, () => auth.listWaiters())
   ipcMain.handle(IPC.authVerifyPin, (_e, waiterId: number, pin: string) => auth.verifyPin(waiterId, pin))
+  ipcMain.handle(IPC.authSetPin, (_e, waiterId: number, pin: string) => auth.setWaiterPin(waiterId, pin))
   ipcMain.handle(IPC.authLogout, () => {
     settings.setSettings({ apiToken: null, branchId: null })
     resetApi()
