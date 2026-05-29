@@ -10,9 +10,9 @@ import { initials } from '@/lib/format'
 import { PIN_LENGTH } from '@/components/PinPad'
 import loginBg from '@/assets/manzara-foto.png'
 
-const G = '#22c55e'
-const G2 = '#16a34a'
-const G3 = '#15803d'
+const G = '#f5c842'
+const G2 = '#d4a200'
+const G3 = '#b38a00'
 
 export default function PinEntry(): JSX.Element {
   const { waiterId } = useParams<{ waiterId: string }>()
@@ -109,8 +109,9 @@ export default function PinEntry(): JSX.Element {
           position: 'absolute', left: 20, top: 20, zIndex: 20,
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 20px', borderRadius: 14, border: 'none',
-          background: `linear-gradient(145deg, #34d058, ${G}, ${G3})`,
-          boxShadow: `0 6px 18px rgba(34,197,94,0.5), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,0,0,0.15)`,
+          background: `linear-gradient(145deg, #ffe04d, ${G}, ${G3})`,
+          boxShadow: `0 6px 18px rgba(245,200,66,0.5), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,0,0,0.15)`,
+          color: '#0a1200',
           color: 'white', fontSize: 14, fontWeight: 700,
           cursor: 'pointer', letterSpacing: '0.04em',
         }}
@@ -209,7 +210,7 @@ export default function PinEntry(): JSX.Element {
                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
                     opacity: disabled ? 0.4 : 1,
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(34,197,94,0.18)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(34,197,94,0.5)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,200,66,0.15)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(245,200,66,0.5)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)' }}
                 >
                   {n}
