@@ -568,8 +568,8 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl transition-all select-none"
         style={{
           background: '#151728',
-          border: qty > 0 ? '2px solid #27ff44' : '2px solid rgba(255,255,255,0.18)',
-          boxShadow: qty > 0 ? '0 0 12px rgba(39,255,68,0.25)' : '0 2px 8px rgba(0,0,0,0.3)',
+          border: qty > 0 ? '3px solid #27ff44' : '1.5px solid rgba(255,255,255,0.2)',
+          boxShadow: qty > 0 ? '0 0 18px rgba(39,255,68,0.5), 0 0 6px rgba(39,255,68,0.3)' : '0 2px 8px rgba(0,0,0,0.3)',
         }}
       >
         {/* Miqdor badge */}
@@ -601,9 +601,10 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             {product.emoji ?? '📦'}
           </div>
         )}
-        <div className="flex flex-col gap-1.5 p-3">
-          <p className="line-clamp-2 text-sm font-semibold leading-snug" style={{ color: '#ffffff', fontSize: 14 }}>{product.nameUzLatn}</p>
-          <p className="font-mono font-bold" style={{ color: '#ffffff', fontSize: 14 }}>
+        <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <p className="line-clamp-2" style={{ color: '#ffffff', fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: 6 }}>{product.nameUzLatn}</p>
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.12)', marginBottom: 6 }} />
+          <p style={{ color: '#f5c842', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
             {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
           </p>
         </div>
@@ -1019,7 +1020,8 @@ function QtyBtn({ children, onClick }: { children: React.ReactNode; onClick: () 
   return (
     <button
       onClick={onClick}
-      className="grid h-5 w-5 place-items-center rounded border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
+      className="grid h-6 w-6 place-items-center rounded-lg font-bold"
+      style={{ background: '#000000', color: '#ffffff', border: '1.5px solid rgba(255,255,255,0.25)', fontSize: 14 }}
     >
       {children}
     </button>
