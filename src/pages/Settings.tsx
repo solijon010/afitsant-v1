@@ -117,13 +117,21 @@ export default function SettingsPage(): JSX.Element {
       const found = devices.filter((d) => d.product).map((d) => ({ product: d.product! }))
       setUsbDevices(found)
       if (found.length === 1) {
+        const d = found[0]
         if (isWindows) {
-          // Windows: printerName ga yozamiz
-          setForm((f) => f ? { ...f, printerName: found[0].product } : f)
+          // USB port (USB001) yoki Windows printer nomi
+          const isUsbPort = (devices.find(dev => dev.product === d.product)?.vendorId === 'usb-port')
+          if (isUsbPort) {
+            setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
+            toast.success(`USB port aniqlandi: ${d.product} — Test chek bosing`)
+          } else {
+            setForm((f) => f ? { ...f, printerName: d.product } : f)
+            toast.success(`Printer aniqlandi: ${d.product}`)
+          }
         } else {
-          setForm((f) => f ? { ...f, printerDevicePath: found[0].product } : f)
+          setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
+          toast.success(`Printer aniqlandi: ${d.product}`)
         }
-        toast.success(`Printer aniqlandi: ${found[0].product}`)
       } else if (found.length > 1) {
         toast.info(`${found.length} ta printer topildi — birini tanlang`)
       } else if (found.length === 0) {
@@ -317,41 +325,50 @@ export default function SettingsPage(): JSX.Element {
           )}
           {form.printerType === 'usb' && (
             isWindows ? (
-              /* Windows: USB tanlangan bo'lsa ham Windows printer nomi kerak */
-              <Field label="Printer nomi (Windows)">
-                <p className="mb-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
-                  ℹ️ Windows da USB printer uchun Windows drayverida ko'rinadigan printer nomini kiriting
+              /* Windows: USB port orqali driver siz chop etish */
+              <Field label="USB Port">
+                <p className="mb-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+                  ✅ Driver kerak emas! Windows USB port orqali to'g'ridan chop etiladi.
+                  Printer ulangan bo'lsa "Aniqlash" tugmasini bosing.
                 </p>
                 <div className="flex gap-2">
                   <input
-                    className="input flex-1"
-                    placeholder="Masalan: XPrinter XP-58 yoki EPSON TM-T20"
-                    value={form.printerName ?? ''}
-                    onChange={(e) => update('printerName', e.target.value || null)}
+                    className="input flex-1 font-mono text-sm"
+                    placeholder="USB001"
+                    value={form.printerDevicePath ?? 'USB001'}
+                    onChange={(e) => update('printerDevicePath', e.target.value || 'USB001')}
                   />
                   <button
                     onClick={() => void detectUsb()}
                     disabled={detecting}
                     className="btn-ghost shrink-0"
-                    title="Windows printerlarni avtomatik aniqlash"
+                    title="USB printerlarni avtomatik aniqlash"
                   >
                     <ScanLine size={14} /> {detecting ? '…' : 'Aniqlash'}
                   </button>
                 </div>
-                {usbDevices.length > 1 && (
+                {usbDevices.length > 0 && (
                   <div className="mt-2 space-y-1">
                     {usbDevices.map((d) => (
                       <button
                         key={d.product}
-                        onClick={() => update('printerName', d.product)}
+                        onClick={() => {
+                          const isUsbPort = d.vendorId === 'usb-port'
+                          if (isUsbPort) {
+                            update('printerDevicePath', d.product ?? 'USB001')
+                          } else {
+                            update('printerName', d.product ?? '')
+                          }
+                        }}
                         className={cn(
                           'w-full rounded-xl border px-3 py-1.5 text-left text-xs transition-all',
-                          form.printerName === d.product
+                          (form.printerDevicePath === d.product || form.printerName === d.product)
                             ? 'border-brand-success bg-brand-success/10 text-brand-success'
                             : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
                         )}
                       >
-                        🖨 {d.product}
+                        {d.vendorId === 'usb-port' ? '🔌' : '🖨'} {d.product}
+                        {d.manufacturer && <span className="ml-1 opacity-60">({d.manufacturer})</span>}
                       </button>
                     ))}
                   </div>
