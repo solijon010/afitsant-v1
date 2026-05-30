@@ -22,13 +22,10 @@ function useClock() {
     return () => clearInterval(t)
   }, [])
   const pad = (n: number) => String(n).padStart(2, '0')
-  const h24 = tick.getHours()           // 0–23, mahalliy vaqt (% 12 EMAS!)
-  const h12 = h24 % 12 || 12           // 0→12, 12→12, 13→1 (to'g'ri 12-soatlik)
-  const ampm = h24 < 12 ? 'AM' : 'PM'
+  const h = tick.getHours()  // 0–23, 24-soatlik format (13:08, 00:00 va h.k.)
   return {
-    time: `${pad(h12)}:${pad(tick.getMinutes())}`,
+    time: `${pad(h)}:${pad(tick.getMinutes())}`,
     secs: pad(tick.getSeconds()),
-    ampm,
     date: `${UZ_DAYS[tick.getDay()]}, ${tick.getDate()}-${UZ_MONTHS[tick.getMonth()]}`,
   }
 }
@@ -134,15 +131,12 @@ export default function TablesPage(): JSX.Element {
 
         {/* Markaz: Soat */}
         <div className="flex flex-col items-center justify-center">
-          <div className="flex items-baseline gap-1">
+          <div className="flex items-baseline gap-0.5">
             <span className="font-mono text-[22px] font-bold tabular-nums text-stone-800 leading-none">
               {clock.time}
             </span>
             <span className="font-mono text-[13px] font-semibold tabular-nums text-stone-300 leading-none">
               :{clock.secs}
-            </span>
-            <span className="text-[11px] font-bold text-stone-400 leading-none ml-0.5">
-              {clock.ampm}
             </span>
           </div>
           <span className="mt-0.5 text-[10px] font-medium text-stone-400 leading-none tracking-wide">
