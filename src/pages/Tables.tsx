@@ -260,39 +260,12 @@ function TableCard({
   const itemCount = tw.order?.items.length ?? 0
   const openedAt = tw.order?.openedAt
 
-  /* Rang konfiguratsiyasi */
-  const cfg = {
-    empty: {
-      bg: 'bg-white',
-      border: 'border-stone-100 hover:border-stone-300',
-      bar: 'bg-stone-200',
-      dot: 'bg-stone-300',
-      label: 'Bo\'sh',
-      labelColor: 'text-stone-400',
-      badgeBg: 'bg-stone-50',
-      badgeText: 'text-stone-500',
-    },
-    active: {
-      bg: 'bg-white',
-      border: 'border-[#32b80d] hover:border-[#28a00a]',
-      bar: 'bg-[#32b80d]',
-      dot: 'bg-[#32b80d]',
-      label: 'Band',
-      labelColor: 'text-[#1a6b07]',
-      badgeBg: 'bg-[#32b80d]',
-      badgeText: 'text-white',
-    },
-    waiting: {
-      bg: 'bg-red-50',
-      border: 'border-red-200 hover:border-red-300',
-      bar: 'bg-red-400',
-      dot: 'bg-red-400',
-      label: 'Kutmoqda',
-      labelColor: 'text-red-600',
-      badgeBg: 'bg-red-100',
-      badgeText: 'text-red-700',
-    },
-  }[status]
+  const ACTIVE_COLOR = '#32b80d'
+  const EMPTY_COLOR  = '#ab101a'
+
+  const isActive  = status === 'active'
+  const isEmpty   = status === 'empty'
+  const accentColor = isActive ? ACTIVE_COLOR : EMPTY_COLOR
 
   return (
     <motion.button
@@ -300,49 +273,93 @@ function TableCard({
       variants={cardVariants}
       initial="hidden"
       animate="visible"
-      whileHover={{ y: -2, transition: { duration: 0.12 } }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ y: -3, transition: { duration: 0.12 } }}
+      whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className={cn(
-        'relative flex flex-col justify-between rounded-2xl border-2 p-4 text-left transition-all',
-        cfg.bg,
-        cfg.border,
-      )}
       style={{
-        minHeight: 136,
-        boxShadow: status === 'active'
-          ? '0 4px 20px rgba(50,184,13,0.25), 0 1px 4px rgba(0,0,0,0.08)'
-          : '0 2px 8px rgba(0,0,0,0.06)',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'white',
+        borderRadius: 20,
+        border: `2px solid ${accentColor}22`,
+        padding: '16px 16px 14px',
+        textAlign: 'left',
+        minHeight: 160,
+        boxShadow: isActive
+          ? `0 6px 24px ${ACTIVE_COLOR}30, 0 1px 4px rgba(0,0,0,0.06)`
+          : `0 4px 16px ${EMPTY_COLOR}20, 0 1px 4px rgba(0,0,0,0.05)`,
+        overflow: 'hidden',
+        transition: 'all 0.18s ease',
       }}
     >
-      {/* Status bar — tepada */}
-      <div className={cn('absolute left-0 right-0 top-0 h-[3px] rounded-t-xl', cfg.bar)} />
+      {/* Yuqori rang chizig'i */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: accentColor, borderRadius: '18px 18px 0 0' }} />
 
-      {/* Sarlavha + badge */}
-      <div className="mt-1 flex items-start justify-between gap-2">
-        <span className="text-[15px] font-bold" style={{ color: '#000000' }}>{tw.table.name}</span>
-        <span className={cn(
-          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-          cfg.badgeBg, cfg.badgeText,
-        )}>
-          <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-          {cfg.label}
+      {/* BAND badge — yuqori o'ng burchak */}
+      {isActive && (
+        <div style={{
+          position: 'absolute', top: 12, right: 12,
+          background: ACTIVE_COLOR, color: 'white',
+          borderRadius: 8, padding: '3px 10px',
+          fontSize: 10, fontWeight: 800, letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+        }}>
+          BAND
+        </div>
+      )}
+
+      {/* Icon + Stol nomi */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 }}>
+        <div style={{
+          width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+          background: `${accentColor}18`,
+          display: 'grid', placeItems: 'center',
+        }}>
+          <UtensilsCrossed size={18} style={{ color: accentColor }} />
+        </div>
+        <span style={{ fontSize: 16, fontWeight: 800, color: '#111', letterSpacing: '-0.3px' }}>
+          {tw.table.name}
         </span>
       </div>
 
+      {/* Separator */}
+      <div style={{ height: 1, background: '#f0f0f0', marginBottom: 8 }} />
+
       {/* Ma'lumotlar */}
-      {status === 'empty' ? (
-        <p className="mt-2 text-xs text-stone-400">Bosing ochish uchun</p>
+      {isEmpty ? (
+        <p style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>Bosing ochish uchun</p>
       ) : (
-        <div className="mt-2 space-y-1">
-          <p className="text-xs font-medium" style={{ color: '#000000' }}>{itemCount} ta mahsulot</p>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 16, height: 16, borderRadius: 4, background: `${ACTIVE_COLOR}18`, display: 'grid', placeItems: 'center' }}>
+              <span style={{ fontSize: 9, color: ACTIVE_COLOR }}>📦</span>
+            </div>
+            <span style={{ fontSize: 12, color: '#333', fontWeight: 600 }}>{itemCount} ta mahsulot</span>
+          </div>
           {openedAt && (
-            <p className="text-xs" style={{ color: '#444' }}>{fmtTime(openedAt)}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 16, height: 16, borderRadius: 4, background: `${ACTIVE_COLOR}18`, display: 'grid', placeItems: 'center' }}>
+                <span style={{ fontSize: 9, color: ACTIVE_COLOR }}>⏱</span>
+              </div>
+              <span style={{ fontSize: 12, color: '#555' }}>{fmtTime(openedAt)}</span>
+            </div>
           )}
-          <p className="mt-1 font-mono text-lg font-extrabold" style={{ color: '#000000' }}>
-            {fmtMoney(total)}{' '}
-            <span className="text-xs font-medium" style={{ color: '#333' }}>so'm</span>
-          </p>
+          {/* Summa + o'q tugma */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+            <span style={{ fontSize: 20, fontWeight: 900, color: '#111', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+              {fmtMoney(total)}{' '}
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#666' }}>so'm</span>
+            </span>
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: ACTIVE_COLOR,
+              display: 'grid', placeItems: 'center',
+              boxShadow: `0 4px 12px ${ACTIVE_COLOR}50`,
+            }}>
+              <span style={{ color: 'white', fontSize: 16, fontWeight: 700, lineHeight: 1 }}>→</span>
+            </div>
+          </div>
         </div>
       )}
     </motion.button>
