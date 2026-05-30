@@ -191,9 +191,8 @@ export async function syncAllItems(input: {
     waiterId = payload.id ?? payload.userId ?? null
   } catch {}
 
-  // branchId null bo'lsa yubormaymiz — server null qiymatni rad etadi
+  // branchId HECH QACHON yuborilmaydi — server "property branchId should not exist" deydi
   const body: Record<string, any> = {
-    ...(s.branchId ? { branchId: s.branchId } : {}),
     roomId: roomServerId,
     orderItems: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
   }
