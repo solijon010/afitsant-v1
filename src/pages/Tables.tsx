@@ -273,14 +273,14 @@ function TableCard({
       badgeText: 'text-stone-500',
     },
     active: {
-      bg: 'bg-amber-50',
-      border: 'border-amber-200 hover:border-amber-400',
-      bar: 'bg-amber-400',
-      dot: 'bg-amber-400',
+      bg: 'bg-white',
+      border: 'border-[#32b80d] hover:border-[#28a00a]',
+      bar: 'bg-[#32b80d]',
+      dot: 'bg-[#32b80d]',
       label: 'Band',
-      labelColor: 'text-amber-700',
-      badgeBg: 'bg-amber-100',
-      badgeText: 'text-amber-700',
+      labelColor: 'text-[#1a6b07]',
+      badgeBg: 'bg-[#32b80d]',
+      badgeText: 'text-white',
     },
     waiting: {
       bg: 'bg-red-50',
@@ -304,18 +304,23 @@ function TableCard({
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={cn(
-        'relative flex flex-col justify-between rounded-xl border-2 p-4 text-left shadow-card transition-all hover:shadow-card-hover',
+        'relative flex flex-col justify-between rounded-2xl border-2 p-4 text-left transition-all',
         cfg.bg,
         cfg.border,
       )}
-      style={{ minHeight: 128 }}
+      style={{
+        minHeight: 136,
+        boxShadow: status === 'active'
+          ? '0 4px 20px rgba(50,184,13,0.25), 0 1px 4px rgba(0,0,0,0.08)'
+          : '0 2px 8px rgba(0,0,0,0.06)',
+      }}
     >
       {/* Status bar — tepada */}
       <div className={cn('absolute left-0 right-0 top-0 h-[3px] rounded-t-xl', cfg.bar)} />
 
       {/* Sarlavha + badge */}
       <div className="mt-1 flex items-start justify-between gap-2">
-        <span className="text-[15px] font-bold text-stone-800">{tw.table.name}</span>
+        <span className="text-[15px] font-bold" style={{ color: '#000000' }}>{tw.table.name}</span>
         <span className={cn(
           'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
           cfg.badgeBg, cfg.badgeText,
@@ -330,13 +335,13 @@ function TableCard({
         <p className="mt-2 text-xs text-stone-400">Bosing ochish uchun</p>
       ) : (
         <div className="mt-2 space-y-1">
-          <p className="text-xs text-stone-500">{itemCount} ta mahsulot</p>
+          <p className="text-xs font-medium" style={{ color: '#000000' }}>{itemCount} ta mahsulot</p>
           {openedAt && (
-            <p className="text-xs text-stone-400">{fmtTime(openedAt)}</p>
+            <p className="text-xs" style={{ color: '#444' }}>{fmtTime(openedAt)}</p>
           )}
-          <p className="mt-1 font-mono text-base font-bold text-[#C2410C]">
+          <p className="mt-1 font-mono text-lg font-extrabold" style={{ color: '#000000' }}>
             {fmtMoney(total)}{' '}
-            <span className="text-xs font-medium text-stone-400">so'm</span>
+            <span className="text-xs font-medium" style={{ color: '#333' }}>so'm</span>
           </p>
         </div>
       )}
