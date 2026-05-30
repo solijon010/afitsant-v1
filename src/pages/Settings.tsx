@@ -25,6 +25,8 @@ export default function SettingsPage(): JSX.Element {
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [dbStatus, setDbStatus] = useState<{ waiters: { total: number; withServerId: number; list: string[] }; products: { total: number; withServerId: number }; tables: { total: number; withServerId: number; list: string[] }; token: string | null; branchId: string | null } | null>(null)
   const [loadingDb, setLoadingDb] = useState(false)
+  const [roomsTest, setRoomsTest] = useState<Record<string, any> | null>(null)
+  const [loadingRooms, setLoadingRooms] = useState(false)
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
@@ -640,6 +642,55 @@ export default function SettingsPage(): JSX.Element {
                   </p>
                 </div>
               )
+            )}
+
+            <div className="border-t border-line pt-3" />
+            <button
+              onClick={async () => {
+                setLoadingRooms(true)
+                try {
+                  const data = await window.afisant.diag.testRooms()
+                  setRoomsTest(data)
+                } finally {
+                  setLoadingRooms(false)
+                }
+              }}
+              disabled={loadingRooms}
+              className="btn-ghost w-full"
+            >
+              <RefreshCw size={13} className={loadingRooms ? 'animate-spin' : ''} />
+              {loadingRooms ? 'Tekshirilmoqda…' : 'Xonalar API ni tekshirish'}
+            </button>
+
+            {roomsTest !== null && (
+              <div className="mt-1 rounded-xl border border-line bg-bg-elevated p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
+                <p className="font-bold text-ink">branchId: {roomsTest.branchId ?? '—'}</p>
+                {Object.entries(roomsTest).filter(([k]) => k.startsWith('/')).map(([url, val]: [string, any]) => (
+                  <div key={url} className="border-t border-line pt-2">
+                    <p className="font-mono font-bold text-ink-soft break-all">{url}</p>
+                    {val.error !== undefined ? (
+                      <p className="text-brand-danger">❌ {String(val.error)}</p>
+                    ) : (
+                      <>
+                        <p className="text-ink">Soni: <span className="font-bold">{val.count}</span></p>
+                        {val.firstItemKeys?.length > 0 && (
+                          <p className="text-ink-soft">Fields: {(val.firstItemKeys as string[]).join(', ')}</p>
+                        )}
+                        {(val.sample as any[])?.map((item: any, i: number) => (
+                          <div key={i} className="mt-1 bg-stone-50 rounded p-1.5 text-[10px] font-mono">
+                            <p><span className="text-ink-soft">id:</span> {item.id}</p>
+                            <p><span className="text-ink-soft">name:</span> {item.name}</p>
+                            <p><span className="text-ink-soft">status:</span> {item.status ?? 'yo\'q'}</p>
+                            {item.roomCategoryId && <p><span className="text-ink-soft">roomCategoryId:</span> {item.roomCategoryId}</p>}
+                            {item.roomCategory && <p><span className="text-ink-soft">roomCategory.id:</span> {item.roomCategory.id}</p>}
+                            {item.categoryId && <p><span className="text-ink-soft">categoryId:</span> {item.categoryId}</p>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </Section>
         )}

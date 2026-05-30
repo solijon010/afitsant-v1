@@ -190,6 +190,48 @@ export function registerIpc(): void {
     }
   })
 
+  // ── Xonalar va room-category diagnostika ──
+  ipcMain.handle(IPC.diagTestRooms, async () => {
+    const { getApi } = await import('./services/apiClient')
+    const s = settings.getSettings()
+    const api = getApi()
+    const b = s.branchId
+    const results: Record<string, any> = { branchId: b, serverUrl: s.serverUrl }
+
+    const roomCatUrls = b
+      ? [`/api/room-category/all/${b}`, `/api/room-category/all`]
+      : [`/api/room-category/all`]
+    const roomUrls = b
+      ? [`/api/room/all/${b}`, `/api/room/all`]
+      : [`/api/room/all`]
+
+    for (const url of [...roomCatUrls, ...roomUrls]) {
+      try {
+        const res = await api.get(url)
+        const data = res.data as any
+        const list: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+        // Birinchi element barcha field nomlarini ko'rsatish uchun
+        const firstItem = list[0] ?? null
+        results[url] = {
+          status: res.status,
+          count: list.length,
+          firstItemKeys: firstItem ? Object.keys(firstItem) : [],
+          sample: list.slice(0, 3).map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            status: item.status,
+            roomCategoryId: item.roomCategoryId,
+            roomCategory: item.roomCategory ? { id: item.roomCategory.id, name: item.roomCategory.name } : undefined,
+            categoryId: item.categoryId,
+          }))
+        }
+      } catch (e: any) {
+        results[url] = { error: e?.response?.status ?? e?.message }
+      }
+    }
+    return results
+  })
+
   // ── Test order create: haqiqiy POST /api/order yuborish ──
   ipcMain.handle(IPC.diagTestOrderCreate, async (_e, roomServerId: string, waiterServerId: string, productServerId: string) => {
     const { getApi } = await import('./services/apiClient')
