@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 import type { Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
+import { useMenu } from '@/stores/menu'
+import { useTables } from '@/stores/tables'
 import { initials } from '@/lib/format'
 import StatusBar from '@/components/StatusBar'
 import { cn } from '@/lib/cn'
@@ -33,13 +35,19 @@ function sortWaiters(list: Waiter[]): Waiter[] {
   })
 }
 
+// Session da bir marta avtomatik sync qilganligini saqlaymiz
+let autoSyncDone = false
+
 export default function WaiterSelect(): JSX.Element {
   const [waiters, setWaiters] = useState<Waiter[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle')
   const navigate = useNavigate()
   const settings = useSettings((s) => s.settings)
   const logout = useAuth((s) => s.logout)
+  const loadMenu = useMenu((s) => s.load)
+  const loadTables = useTables((s) => s.load)
 
   const loadWaiters = (): void => {
     setLoading(true)
@@ -49,16 +57,38 @@ export default function WaiterSelect(): JSX.Element {
     })
   }
 
-  useEffect(() => { loadWaiters() }, [])
-
   const handleSync = async (): Promise<void> => {
     setSyncing(true)
+    setSyncStatus('syncing')
     try {
       const res = await window.afisant.sync.fullPull()
-      if (res.ok) { toast.success("Ma'lumotlar yangilandi"); loadWaiters() }
-      else toast.error("Serverga ulanib bo'lmadi")
-    } finally { setSyncing(false) }
+      if (res.ok) {
+        autoSyncDone = true
+        setSyncStatus('done')
+        toast.success(`Sinxronlandi ✓ — kategoriyalar: ${res.counts?.categories ?? 0}, mahsulotlar: ${res.counts?.products ?? 0}, xonalar: ${res.counts?.tables ?? 0}`)
+        loadWaiters()
+        void loadMenu()
+        void loadTables()
+      } else {
+        setSyncStatus('error')
+        toast.error("Serverga ulanib bo'lmadi")
+      }
+    } catch (e: any) {
+      setSyncStatus('error')
+      toast.error('Sinxronlash xatosi', { description: e?.message })
+    } finally {
+      setSyncing(false)
+    }
   }
+
+  // Ochilganda bir marta avtomatik sinxronlaymiz (session boshida)
+  useEffect(() => {
+    loadWaiters()
+    if (!autoSyncDone) {
+      void handleSync()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleLogout = async (): Promise<void> => {
     await window.afisant.auth.logout()   // DB dagi tokenni o'chiradi
@@ -68,6 +98,14 @@ export default function WaiterSelect(): JSX.Element {
 
   return (
     <div className="flex h-full flex-col bg-[#F5F5F4]">
+
+      {/* ── Sinxronlash banneri ── */}
+      {syncStatus === 'syncing' && (
+        <div className="flex items-center justify-center gap-2 bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-700 font-medium">
+          <RefreshCw size={14} className="animate-spin shrink-0" />
+          Ma'lumotlar serverdan yuklanmoqda — xonalar va mahsulotlar yangilanmoqda…
+        </div>
+      )}
 
       {/* ── HEADER ── */}
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-6 shadow-sm">

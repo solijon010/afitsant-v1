@@ -85,8 +85,13 @@ export async function selectBranch(branchId: string, branchName: string): Promis
   try {
     setSettings({ branchId, organizationName: branchName })
     await syncWaitersForBranch(branchId)
+    // Branch tanlanganida barcha ma'lumotlarni (xonalar, mahsulotlar, kategoriyalar) sinxronlaymiz
+    const { fullPull } = await import('./syncEngine')
+    await fullPull()
+    console.log('[AUTH] selectBranch: fullPull completed')
     return { ok: true }
-  } catch {
+  } catch (e: any) {
+    console.error('[AUTH] selectBranch error:', e?.message)
     return { ok: false }
   }
 }
