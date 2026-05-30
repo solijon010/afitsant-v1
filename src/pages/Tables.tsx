@@ -166,7 +166,7 @@ export default function TablesPage(): JSX.Element {
 
       {/* ── Area tabs ── */}
       {areas.length > 1 && (
-        <nav className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-stone-100 bg-white px-6 py-3">
+        <nav className="flex shrink-0 items-center gap-2 overflow-x-auto px-6 py-3" style={{ background: '#2f54a6', borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
@@ -177,10 +177,10 @@ export default function TablesPage(): JSX.Element {
                 className={cn(
                   'inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-all',
                   active
-                    ? 'text-white shadow-sm'
-                    : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700',
+                    ? 'font-semibold shadow-sm'
+                    : 'text-white/70 hover:text-white hover:bg-white/10',
                 )}
-                style={active ? { background: '#27ff44' } : undefined}
+                style={active ? { background: '#27ff44', color: '#0a1a0a' } : undefined}
               >
                 {area.name}
                 {occ > 0 && (
