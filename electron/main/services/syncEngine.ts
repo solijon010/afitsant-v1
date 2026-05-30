@@ -117,11 +117,27 @@ export async function fullPull(): Promise<{
 
   const toArray = (raw: any): any[] => (Array.isArray(raw) ? raw : (raw?.data ?? []))
 
+  // branchId bilan so'rov 403/404 bersa, branchId siz fallback qilamiz
+  async function fetchWithFallback(urlWithBranch: string | null, urlWithout: string): Promise<any> {
+    if (urlWithBranch) {
+      try {
+        const res = await api.get(urlWithBranch)
+        console.log(`[SYNC] ${urlWithBranch} → OK (${toArray(res.data).length} ta)`)
+        return res
+      } catch (e: any) {
+        console.warn(`[SYNC] ${urlWithBranch} xato (${e?.response?.status ?? e?.code}) — fallback: ${urlWithout}`)
+      }
+    }
+    const res = await api.get(urlWithout)
+    console.log(`[SYNC] ${urlWithout} → OK (${toArray(res.data).length} ta)`)
+    return res
+  }
+
   try {
     // 1-qadam: kategoriyalar va xona kategoriyalari (parallel)
     const [catsRes, roomCatsRes] = await Promise.allSettled([
-      branchId ? api.get(`/api/category/all/${branchId}`) : api.get(`/api/category/all`),
-      branchId ? api.get(`/api/room-category/all/${branchId}`) : api.get(`/api/room-category/all`)
+      fetchWithFallback(branchId ? `/api/category/all/${branchId}` : null, `/api/category/all`),
+      fetchWithFallback(branchId ? `/api/room-category/all/${branchId}` : null, `/api/room-category/all`)
     ])
 
     let areaCount = 0
@@ -204,10 +220,14 @@ export async function fullPull(): Promise<{
 
     // 2-qadam: mahsulotlar va xonalar (kategoriyalar/arealar DB'da bo'lgandan keyin)
     const [prodsRes, roomsRes] = await Promise.allSettled([
-      branchId
-        ? api.get(`/api/product/all/${branchId}?page=1&limit=500`)
-        : api.get(`/api/product/all?page=1&limit=500`),
-      branchId ? api.get(`/api/room/all/${branchId}`) : api.get(`/api/room/all`)
+      fetchWithFallback(
+        branchId ? `/api/product/all/${branchId}?page=1&limit=500` : null,
+        `/api/product/all?page=1&limit=500`
+      ),
+      fetchWithFallback(
+        branchId ? `/api/room/all/${branchId}` : null,
+        `/api/room/all`
+      )
     ])
 
     // Mahsulotlarni saqlash
