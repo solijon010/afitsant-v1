@@ -568,8 +568,8 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl transition-all select-none"
         style={{
           background: '#151728',
-          border: qty > 0 ? '3px solid #27ff44' : '1.5px solid rgba(255,255,255,0.2)',
-          boxShadow: qty > 0 ? '0 0 18px rgba(39,255,68,0.5), 0 0 6px rgba(39,255,68,0.3)' : '0 2px 8px rgba(0,0,0,0.3)',
+          border: '1.5px solid rgba(255,255,255,0.2)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
         }}
       >
         {/* Miqdor badge */}
