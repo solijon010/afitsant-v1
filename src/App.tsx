@@ -107,6 +107,15 @@ export default function App(): JSX.Element {
     return () => off()
   }, [loadMenu, loadTables])
 
+  // Token muddati tugaganda (401) → server-login ga yo'naltiramiz
+  useEffect(() => {
+    const off = window.afisant.on.sessionExpired(() => {
+      useAuth.getState().logout()
+      navigate('/server-login', { replace: true })
+    })
+    return () => off()
+  }, [navigate])
+
   useEffect(() => {
     if (waiter && (location.pathname === '/select-waiter' || location.pathname === '/server-login')) {
       navigate('/tables', { replace: true })

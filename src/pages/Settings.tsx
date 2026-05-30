@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Printer, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ClipboardList, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Printer, RefreshCw, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Category, Lang, Settings, Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -21,6 +21,8 @@ export default function SettingsPage(): JSX.Element {
   const [waiters, setWaiters] = useState<Waiter[]>([])
   const [pinTarget, setPinTarget] = useState<Waiter | null>(null)
   const [diagInfo, setDiagInfo] = useState<{ hasToken: boolean; branchId: string | null; serverUrl: string; logPath: string } | null>(null)
+  const [recentOrders, setRecentOrders] = useState<Array<{ id: string; status: string; room: string; waiter: string; total: number; itemCount: number; createdAt: string }> | null>(null)
+  const [loadingOrders, setLoadingOrders] = useState(false)
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
@@ -180,6 +182,24 @@ export default function SettingsPage(): JSX.Element {
                   >
                     <FolderOpen size={12} />
                     Log papkasini och
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const res = await window.afisant.diag.testWaiters()
+                      const msg = Object.entries(res)
+                        .map(([k, v]: [string, any]) =>
+                          v?.error !== undefined
+                            ? `❌ ${k}: HTTP ${v.error}`
+                            : v?.count !== undefined
+                              ? `✅ ${k}: ${v.count} ta\n   ${(v.users as string[] ?? []).join('\n   ') || "(bo'sh)"}`
+                              : `${k}: ${String(v)}`
+                        ).join('\n\n')
+                      alert(`Afitsant API natijasi:\n\n${msg}`)
+                    }}
+                    className="mt-1 flex items-center gap-1.5 text-brand-info hover:text-ink transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                    Afitsantlarni server dan tekshir
                   </button>
                 </div>
               )}
@@ -459,6 +479,70 @@ export default function SettingsPage(): JSX.Element {
             </div>
           )}
         </Section>
+
+        {isAdmin && (
+          <Section title="Server Zakazlar" icon={<ClipboardList size={16} />}>
+            <button
+              onClick={async () => {
+                setLoadingOrders(true)
+                try {
+                  const orders = await window.afisant.diag.recentOrders()
+                  setRecentOrders(orders)
+                } finally {
+                  setLoadingOrders(false)
+                }
+              }}
+              disabled={loadingOrders}
+              className="btn-ghost w-full"
+            >
+              <RefreshCw size={13} className={loadingOrders ? 'animate-spin' : ''} />
+              {loadingOrders ? 'Yuklanmoqda…' : "Server dan so'nggi zakazlarni ko'rish"}
+            </button>
+
+            {recentOrders !== null && (
+              recentOrders.length === 0 ? (
+                <p className="text-center text-sm text-ink-soft py-2">
+                  Server da zakas topilmadi — hali birorta yuborilmagan
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5 max-h-72 overflow-y-auto">
+                  {recentOrders.map((o) => {
+                    const statusColor = o.status === 'SUCCESS'
+                      ? 'text-brand-success'
+                      : o.status === 'CANCELED'
+                        ? 'text-brand-danger'
+                        : 'text-brand-warn'
+                    const statusLabel = o.status === 'SUCCESS'
+                      ? 'Yopildi' : o.status === 'CANCELED'
+                        ? 'Bekor' : o.status === 'PENDING'
+                          ? 'Kutilmoqda' : o.status
+                    const dateStr = o.createdAt
+                      ? new Date(o.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                      : ''
+                    return (
+                      <div key={o.id} className="flex items-center justify-between rounded-xl border border-line bg-bg-elevated px-3 py-2 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-semibold ${statusColor}`}>{statusLabel}</span>
+                            <span className="text-ink-dim">·</span>
+                            <span className="font-medium text-ink truncate">{o.room}</span>
+                          </div>
+                          <div className="mt-0.5 text-ink-soft truncate">
+                            {o.waiter} · {o.itemCount} ta mahsulot · {dateStr}
+                          </div>
+                        </div>
+                        <div className="ml-2 shrink-0 font-bold text-ink">{o.total.toLocaleString()} so'm</div>
+                      </div>
+                    )
+                  })}
+                  <p className="text-center text-[10px] text-ink-dim pt-1">
+                    ✅ Zakazlar server da — admin panel da ko'rinadi
+                  </p>
+                </div>
+              )
+            )}
+          </Section>
+        )}
 
         <Section title="Afitsantlar" icon={<Users size={16} />}>
           {waiters.length === 0 ? (

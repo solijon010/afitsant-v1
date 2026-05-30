@@ -5,6 +5,8 @@ import { registerIpc } from './ipc'
 import { getDb, closeDb } from './db/connection'
 import { seedIfEmpty } from './db/seed'
 import { startSync, stopSync } from './services/syncEngine'
+import { setUnauthorizedHandler } from './services/apiClient'
+import { IPC } from '@shared/ipc'
 
 /* ─── File logger ─────────────────────────────────────── */
 function setupFileLogger(): void {
@@ -83,6 +85,14 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   startSync(getMainWindow)
+
+  // 401 bo'lganda renderer ga session tugaganligi haqida xabar yuboramiz
+  setUnauthorizedHandler(() => {
+    const win = getMainWindow()
+    if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send(IPC.onSessionExpired)
+    }
+  })
 
   // F12 → DevTools (debug uchun, production da ham)
   globalShortcut.register('F12', () => {
