@@ -166,27 +166,39 @@ export default function TablesPage(): JSX.Element {
 
       {/* ── Area tabs ── */}
       {areas.length > 1 && (
-        <nav className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-stone-100 bg-white px-6 py-3">
-          {areas.map((area) => {
+        <nav className="flex shrink-0 items-center gap-[8px] overflow-x-auto border-b border-stone-100 bg-white px-6 py-3">
+          {areas.map((area, idx) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
+            const COLORS = [
+              { bg: '#C2410C', light: '#FEF3EE', text: '#C2410C' }, // to'q sariq-qizil
+              { bg: '#2563EB', light: '#EFF6FF', text: '#2563EB' }, // ko'k
+              { bg: '#7C3AED', light: '#F5F3FF', text: '#7C3AED' }, // binafsha
+              { bg: '#059669', light: '#ECFDF5', text: '#059669' }, // yashil
+              { bg: '#D97706', light: '#FFFBEB', text: '#D97706' }, // sariq
+            ]
+            const c = COLORS[idx % COLORS.length]
             return (
               <button
                 key={area.id}
                 onClick={() => setActiveAreaId(area.id)}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-all',
-                  active
-                    ? 'bg-[#C2410C] text-white shadow-sm'
-                    : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700',
-                )}
+                style={{
+                  background: active ? c.bg : c.light,
+                  color: active ? '#fff' : c.text,
+                  border: `1.5px solid ${active ? c.bg : c.bg + '40'}`,
+                  boxShadow: active ? `0 2px 8px ${c.bg}40` : 'none',
+                }}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-all"
               >
                 {area.name}
                 {occ > 0 && (
-                  <span className={cn(
-                    'inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                    active ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-700',
-                  )}>
+                  <span
+                    style={{
+                      background: active ? 'rgba(255,255,255,0.25)' : c.bg,
+                      color: active ? '#fff' : '#fff',
+                    }}
+                    className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
+                  >
                     {occ}
                   </span>
                 )}

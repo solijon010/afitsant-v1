@@ -436,7 +436,7 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 300px' }}>
+    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 380px' }}>
       <section className="flex flex-col overflow-hidden bg-[#F5F5F4]">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
           <button
@@ -949,22 +949,23 @@ function CartPanel({
           </div>
         </div>
 
-        {/* Tugmalar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {/* Tugmalar — 3 xil rang */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Saqlash — ko'k */}
+          <button onClick={() => void onSave()} disabled={saving || printing}
+            style={{ width: '100%', height: 46, borderRadius: 12, border: 'none', background: saving || printing ? '#93C5FD' : 'linear-gradient(135deg,#3B82F6,#2563EB)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(59,130,246,0.4)', letterSpacing: '0.02em' }}>
+            <Save size={15} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
+          </button>
+          {/* Chek — yashil */}
+          <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
+            style={{ width: '100%', height: 46, borderRadius: 12, border: 'none', background: lines.length === 0 ? '#D1FAE5' : 'linear-gradient(135deg,#22C55E,#16A34A)', color: lines.length === 0 ? '#6EE7B7' : 'white', fontSize: 14, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: lines.length > 0 ? '0 4px 14px rgba(34,197,94,0.4)' : 'none', letterSpacing: '0.02em' }}>
+            <Printer size={15} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
+          </button>
+          {/* Bekor — qizil */}
           <button onClick={onCancel} disabled={saving || printing || lines.length === 0}
-            style={{ width: '100%', height: 40, borderRadius: 10, border: '1.5px solid #fca5a5', background: lines.length === 0 ? '#f8fafc' : '#fff1f2', color: lines.length === 0 ? '#94a3b8' : '#ef4444', fontSize: 12, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            style={{ width: '100%', height: 42, borderRadius: 12, border: '1.5px solid #FECACA', background: lines.length === 0 ? '#FEF2F2' : '#FEF2F2', color: lines.length === 0 ? '#FCA5A5' : '#EF4444', fontSize: 13, fontWeight: 600, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <Ban size={13} /> Zakazni bekor qilish
           </button>
-          <div style={{ display: 'flex', gap: 7 }}>
-            <button onClick={() => void onSave()} disabled={saving || printing}
-              style={{ flex: 1, height: 42, borderRadius: 10, border: '1.5px solid #D6D3D1', background: 'white', color: '#1C1917', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving || printing ? 0.6 : 1 }}>
-              <Save size={13} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
-            </button>
-            <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
-              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: lines.length === 0 ? '#e2e8f0' : 'linear-gradient(145deg,#22c55e,#15803d)', color: lines.length === 0 ? '#94a3b8' : 'white', fontSize: 13, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: lines.length > 0 ? '0 4px 12px rgba(34,197,94,0.35)' : 'none', opacity: printing || saving ? 0.6 : 1 }}>
-              <Printer size={13} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
-            </button>
-          </div>
         </div>
       </div>
     </aside>
