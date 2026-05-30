@@ -437,7 +437,7 @@ export default function OrderPage(): JSX.Element {
 
   return (
     <div className="grid h-full" style={{ gridTemplateColumns: '1fr 300px' }}>
-      <section className="flex flex-col overflow-hidden" style={{ background: '#2f54a6' }}>
+      <section className="flex flex-col overflow-hidden" style={{ background: '#585a60' }}>
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
           <button
             onClick={() => void handleSave()}
@@ -524,12 +524,12 @@ function CategoryPill({
       className={cn(
         'inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all',
         active
-          ? 'border-[#C2410C] bg-[#C2410C] text-white shadow-sm'
+          ? 'text-white shadow-sm'
           : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-700'
       )}
       style={
-        active && cat.color
-          ? { borderColor: cat.color, background: cat.color }
+        active
+          ? { background: cat.color || '#359d64', borderColor: cat.color || '#359d64' }
           : undefined
       }
     >
@@ -912,11 +912,11 @@ function CartPanel({
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F5F5F4', borderRadius: 8, padding: '2px 4px', border: '1px solid #E7E5E4' }}>
-                          <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={10} /></QtyBtn>
+                          <QtyBtn onClick={() => dec(l.localUuid)} color="red"><Minus size={10} /></QtyBtn>
                           <span style={{ minWidth: 28, textAlign: 'center', fontSize: 16, fontWeight: 800, color: '#1C1917' }}>{fmtQty(l.quantity)}</span>
-                          <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={10} /></QtyBtn>
+                          <QtyBtn onClick={() => inc(l.localUuid)} color="green"><Plus size={10} /></QtyBtn>
                         </div>
-                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>
+                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#000000', fontFamily: 'JetBrains Mono, monospace' }}>
                           {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
                         </p>
                       </div>
@@ -946,7 +946,7 @@ function CartPanel({
           <div style={{ height: 1, background: '#E7E5E4', margin: '6px 0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1917' }}>Jami</span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>{fmtMoney(total)} so'm</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: '#000000', fontFamily: 'JetBrains Mono, monospace' }}>{fmtMoney(total)} so'm</span>
           </div>
         </div>
 
@@ -1016,12 +1016,13 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }): JSX.Element {
   )
 }
 
-function QtyBtn({ children, onClick }: { children: React.ReactNode; onClick: () => void }): JSX.Element {
+function QtyBtn({ children, onClick, color }: { children: React.ReactNode; onClick: () => void; color?: 'red'|'green' }): JSX.Element {
+  const bg = color === 'red' ? '#dc2626' : color === 'green' ? '#16a34a' : '#000000'
   return (
     <button
       onClick={onClick}
       className="grid h-6 w-6 place-items-center rounded-lg font-bold"
-      style={{ background: '#000000', color: '#ffffff', border: '1.5px solid rgba(255,255,255,0.25)', fontSize: 14 }}
+      style={{ background: bg, color: '#ffffff', border: 'none', fontSize: 14, flexShrink: 0 }}
     >
       {children}
     </button>
