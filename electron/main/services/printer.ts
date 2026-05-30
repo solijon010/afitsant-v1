@@ -278,6 +278,25 @@ export async function testPrint(): Promise<{ ok: true } | { ok: false; error: st
 export async function listUsbPrinters(): Promise<
   Array<{ vendorId: string; productId: string; manufacturer?: string; product?: string }>
 > {
+  // Windows: wmic orqali o'rnatilgan printerlarni ro'yxatlaymiz
+  if (process.platform === 'win32') {
+    try {
+      const out = execSync('wmic printer get Name /format:list', { encoding: 'utf8', timeout: 5000 })
+      const names = out.split('\n')
+        .map((l) => l.replace(/^Name=/, '').trim())
+        .filter((l) => l.length > 0)
+      return names.map((name) => ({
+        vendorId: 'windows',
+        productId: 'printer',
+        manufacturer: 'Windows',
+        product: name
+      }))
+    } catch {
+      return []
+    }
+  }
+
+  // Linux: /dev/usb/lp* device fayllarini tekshiramiz
   const devices: Array<{ vendorId: string; productId: string; product: string }> = []
   const paths = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/lp0', '/dev/lp1']
   for (const p of paths) {
