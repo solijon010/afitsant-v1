@@ -118,7 +118,6 @@ export interface BridgeAPI {
     }) => Promise<Order>
     syncAll: (input: {
       roomServerId: string
-      waiterServerId: string
       items: Array<{ productServerId: string; count: number }>
     }) => Promise<{ serverId: string }>
     addItems: (

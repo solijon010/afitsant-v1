@@ -194,7 +194,6 @@ export default function OrderPage(): JSX.Element {
     setSaving(true)
     try {
       const roomServerId = useCart.getState().roomServerId
-      const waiterServerId = waiter.serverId
       const fee = settings?.serviceFeePercent ?? 0
 
       // Lazy order creation — mahsulot qo'shilganda birinchi marta SQLite buyurtma yaratiladi
@@ -222,8 +221,8 @@ export default function OrderPage(): JSX.Element {
         }))
       )
 
-      // Server sync — ulanish yo'q bo'lsa ogohlantirib o'tkazib yuboriladi
-      if (roomServerId && waiterServerId) {
+      // Server sync — roomServerId bo'lsa yuboramiz (waiterServerId shart emas — JWT tokendan olinadi)
+      if (roomServerId) {
         const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
         // Server dan yuklangan va endi savatchada yo'q mahsulotlar — count:0 bilan yuboriladi
         const removedFromServer = initialServerItemsRef.current.filter(
@@ -244,18 +243,20 @@ export default function OrderPage(): JSX.Element {
           try {
             const res = await window.afisant.orders.syncAll({
               roomServerId,
-              waiterServerId,
               items: syncItems
             })
             useCart.setState({ serverOrderId: res.serverId })
             useCart.setState({
               lines: cart.lines.map((l) => ({ ...l, flushed: true }))
             })
-            // Saqlangandan keyin initialServerItems ni yangilaymiz
             initialServerItemsRef.current = cart.lines.filter((l) => l.productServerId)
-          } catch {
-            toast.warning("Server bilan ulanish yo'q — mahalliy saqlandi")
+            toast.success('Buyurtma saqlandi ✓')
+          } catch (e: any) {
+            toast.warning(`Server sync xatosi: ${e?.message ?? 'ulanish yo\'q'}`)
           }
+        } else if (cart.lines.length > 0) {
+          // Mahsulotlarda server_id yo'q — fullPull kerak
+          toast.warning("Mahsulotlar sinxronlanmagan — Sozlamalar → To'liq sinxronlash")
         }
       }
 
@@ -320,7 +321,6 @@ export default function OrderPage(): JSX.Element {
     setPrinting(true)
     try {
       const roomServerId = useCart.getState().roomServerId
-      const waiterServerId = waiter.serverId
       let serverOrderId = useCart.getState().serverOrderId
       const fee = settings?.serviceFeePercent ?? 0
 
@@ -336,22 +336,24 @@ export default function OrderPage(): JSX.Element {
         useCart.setState({ orderId: baseOrder.id })
       }
 
-      if (roomServerId && waiterServerId && cart.lines.length > 0) {
+      if (roomServerId && cart.lines.length > 0) {
         const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
         if (itemsWithServerId.length > 0) {
           try {
             const res = await window.afisant.orders.syncAll({
               roomServerId,
-              waiterServerId,
               items: itemsWithServerId.map((l) => ({
                 productServerId: l.productServerId!,
                 count: Math.round(l.quantity)
               }))
             })
             serverOrderId = res.serverId
-          } catch {
-            toast.warning("Server bilan ulanish yo'q — faqat chek chiqariladi")
+            console.log('[ORDER] Close sync OK, serverId:', serverOrderId)
+          } catch (e: any) {
+            toast.warning(`Server sync xatosi: ${e?.message ?? 'ulanish yo\'q'}`)
           }
+        } else {
+          toast.warning("Mahsulotlarda server ID yo'q — Sozlamalar → To'liq sinxronlash")
         }
       }
 
