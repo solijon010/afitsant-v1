@@ -96,66 +96,80 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
 
 export async function syncAllItems(input: {
   roomServerId: string
-  waiterServerId: string
   items: Array<{ productServerId: string; count: number }>
 }): Promise<{ serverId: string }> {
   const s = getSettings()
   if (!s.apiToken) throw new Error('Token yo\'q')
 
   const api = getApi()
-  const { roomServerId, waiterServerId, items } = input
+  const { roomServerId, items } = input
 
-  // Mavjud orderni topishga urinib ko'ramiz (403 bo'lsa o'tkazib yuboramiz)
+  // Mavjud PENDING/READY orderni topishga urinib ko'ramiz
   let existing: any = null
   try {
     if (s.branchId) {
       const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
       const data = res.data as any
       const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
-      existing = orders.find(
-        (o: any) => o.room?.id === roomServerId && (o.status === 'PENDING' || o.status === 'READY')
+      // room.id yoki roomId orqali moslikni topamiz
+      existing = orders.find((o: any) =>
+        (o.room?.id === roomServerId || o.roomId === roomServerId) &&
+        (o.status === 'PENDING' || o.status === 'READY')
       ) ?? null
+      console.log(`[ORDER] Existing order check — found: ${existing?.id ?? 'none'}`)
     }
-  } catch {
-    // 403 yoki boshqa xato — mavjud order yo'q deb hisoblaymiz
+  } catch (e: any) {
+    console.warn('[ORDER] Existing order fetch failed:', e?.message)
     existing = null
   }
 
   if (existing) {
     if (items.length === 0) {
-      await api.patch(`/api/order/status/${existing.id}`, null, { params: { status: 'CANCELED' } })
+      // Savat bo'sh — mavjud orderni bekor qilamiz
+      await api.patch(`/api/order/${existing.id}/status`, { status: 'CANCELED' })
       return { serverId: existing.id }
     }
-    await api.patch(`/api/order/sync-items/${existing.id}`, { items })
+    // Mavjud orderni yangilash — sync-items endpointi
+    await api.patch(`/api/order/sync-items/${existing.id}`, {
+      items: items.map((it) => ({ productId: it.productServerId, count: it.count }))
+    })
+    console.log(`[ORDER] Updated existing order ${existing.id}`)
     return { serverId: existing.id }
   }
 
   if (items.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
 
-  // JWT tokendan real user ID ni olamiz — server shu IDni tekshiradi
-  let realWaiterId = waiterServerId
+  // Yangi order yaratish
+  // waiterId ni JWT tokendan olamiz — server authorization header orqali user ni biladi
+  let waiterId: string | null = null
   try {
     const payload = JSON.parse(Buffer.from(s.apiToken.split('.')[1], 'base64').toString())
-    if (payload.id) realWaiterId = payload.id
+    waiterId = payload.id ?? payload.userId ?? null
   } catch {}
 
-  const createRes = await api.post('/api/order', {
-    ...(s.branchId ? { branchId: s.branchId } : {}),
+  const body: Record<string, any> = {
+    branchId: s.branchId,
     roomId: roomServerId,
-    waiterId: realWaiterId,
     orderItems: items.map((it) => ({ productId: it.productServerId, count: it.count }))
-  })
-  return { serverId: createRes.data.id }
+  }
+  if (waiterId) body.waiterId = waiterId
+
+  console.log('[ORDER] POST /api/order body:', JSON.stringify(body))
+  const createRes = await api.post('/api/order', body)
+  const newId = createRes.data?.id ?? createRes.data?.serverId
+  console.log('[ORDER] Created order:', newId)
+  return { serverId: newId }
 }
 
 export async function closeOrderOnServer(serverOrderId: string): Promise<void> {
   const api = getApi()
-  await api.patch(`/api/order/status/${serverOrderId}`, null, { params: { status: 'SUCCESS' } })
+  // PATCH /api/order/{id}/status  bilan SUCCESS ga o'tkazish
+  await api.patch(`/api/order/${serverOrderId}/status`, { status: 'SUCCESS' })
 }
 
 export async function cancelOrderOnServer(serverOrderId: string): Promise<void> {
   const api = getApi()
-  await api.patch(`/api/order/status/${serverOrderId}`, null, { params: { status: 'CANCELED' } })
+  await api.patch(`/api/order/${serverOrderId}/status`, { status: 'CANCELED' })
 }
 
 export function upsertOpenOrder(input: {

@@ -158,4 +158,65 @@ export function registerIpc(): void {
       return []
     }
   })
+
+  // ── DB holati: server_id bor/yo'q statistika ──
+  ipcMain.handle(IPC.diagDbStatus, () => {
+    const { getDb } = require('./db/connection') as typeof import('./db/connection')
+    const db = getDb()
+    const s = settings.getSettings()
+
+    const waitersAll = db.prepare(`SELECT first_name, last_name, server_id, role FROM waiters WHERE is_active = 1`).all() as any[]
+    const productsAll = db.prepare(`SELECT COUNT(*) AS total FROM products`).get() as { total: number }
+    const productsWithId = db.prepare(`SELECT COUNT(*) AS c FROM products WHERE server_id IS NOT NULL AND server_id != ''`).get() as { c: number }
+    const tablesAll = db.prepare(`SELECT name, server_id FROM tables`).all() as any[]
+
+    return {
+      waiters: {
+        total: waitersAll.length,
+        withServerId: waitersAll.filter((w: any) => w.server_id).length,
+        list: waitersAll.map((w: any) => `${w.first_name} ${w.last_name ?? ''} (${w.role}) → serverId: ${w.server_id ?? 'YO\'Q ❌'}`)
+      },
+      products: {
+        total: productsAll.total,
+        withServerId: productsWithId.c
+      },
+      tables: {
+        total: tablesAll.length,
+        withServerId: tablesAll.filter((t: any) => t.server_id).length,
+        list: tablesAll.map((t: any) => `${t.name} → ${t.server_id ?? 'YO\'Q ❌'}`)
+      },
+      token: s.apiToken ? `${s.apiToken.slice(0, 20)}…` : null,
+      branchId: s.branchId
+    }
+  })
+
+  // ── Test order create: haqiqiy POST /api/order yuborish ──
+  ipcMain.handle(IPC.diagTestOrderCreate, async (_e, roomServerId: string, waiterServerId: string, productServerId: string) => {
+    const { getApi } = await import('./services/apiClient')
+    const s = settings.getSettings()
+    if (!s.apiToken) return { ok: false, error: 'Token yo\'q' }
+    const api = getApi()
+    try {
+      // JWT dan real user ID
+      let realWaiterId = waiterServerId
+      try {
+        const payload = JSON.parse(Buffer.from(s.apiToken.split('.')[1], 'base64').toString())
+        if (payload.id) realWaiterId = payload.id
+      } catch {}
+
+      const body = {
+        ...(s.branchId ? { branchId: s.branchId } : {}),
+        roomId: roomServerId,
+        waiterId: realWaiterId,
+        orderItems: [{ productId: productServerId, count: 1 }]
+      }
+      console.log('[DIAG] testOrderCreate body:', JSON.stringify(body))
+      const res = await api.post('/api/order', body)
+      const raw = res.data as any
+      return { ok: true, orderId: String(raw?.id ?? raw?.serverId ?? ''), raw }
+    } catch (e: any) {
+      const errData = e?.response?.data
+      return { ok: false, error: `HTTP ${e?.response?.status ?? e?.code}: ${JSON.stringify(errData ?? e?.message)}` }
+    }
+  })
 }
