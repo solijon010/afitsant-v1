@@ -565,12 +565,12 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: idx * 0.015 }}
         whileTap={{ scale: 0.97 }}
-        className={cn(
-          'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border-2 transition-all select-none',
-          qty > 0
-            ? 'border-[#C2410C]/50 bg-white shadow-glow-primary'
-            : 'border-stone-100 bg-white shadow-card hover:shadow-card-hover hover:border-stone-300'
-        )}
+        className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl transition-all select-none"
+        style={{
+          background: '#151728',
+          border: qty > 0 ? '2px solid #27ff44' : '2px solid rgba(255,255,255,0.18)',
+          boxShadow: qty > 0 ? '0 0 12px rgba(39,255,68,0.25)' : '0 2px 8px rgba(0,0,0,0.3)',
+        }}
       >
         {/* Miqdor badge */}
         {qtyLabel && (
@@ -597,13 +597,13 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-[#C2410C]" />}
           </div>
         ) : (
-          <div className={cn('flex aspect-square items-center justify-center text-5xl', qty > 0 ? 'bg-[#C2410C]/5' : 'bg-stone-50')}>
+          <div className="flex aspect-square items-center justify-center text-5xl" style={{ background: 'rgba(255,255,255,0.05)' }}>
             {product.emoji ?? '📦'}
           </div>
         )}
-        <div className="flex flex-col gap-0.5 p-2.5">
-          <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{product.nameUzLatn}</p>
-          <p className="font-mono text-xs font-bold text-[#C2410C]">
+        <div className="flex flex-col gap-1.5 p-3">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug" style={{ color: '#ffffff', fontSize: 14 }}>{product.nameUzLatn}</p>
+          <p className="font-mono font-bold" style={{ color: '#ffffff', fontSize: 14 }}>
             {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
           </p>
         </div>
