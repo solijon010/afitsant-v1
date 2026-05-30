@@ -222,7 +222,10 @@ export default function OrderPage(): JSX.Element {
       )
 
       // Server sync — roomServerId bo'lsa yuboramiz (waiterServerId shart emas — JWT tokendan olinadi)
-      if (roomServerId) {
+      if (!roomServerId) {
+        // Xona server_id yo'q — sinxronlash kerak
+        toast.error("Xona server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
+      } else {
         const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
         // Server dan yuklangan va endi savatchada yo'q mahsulotlar — count:0 bilan yuboriladi
         const removedFromServer = initialServerItemsRef.current.filter(
@@ -250,13 +253,13 @@ export default function OrderPage(): JSX.Element {
               lines: cart.lines.map((l) => ({ ...l, flushed: true }))
             })
             initialServerItemsRef.current = cart.lines.filter((l) => l.productServerId)
-            toast.success('Buyurtma saqlandi ✓')
+            toast.success('Buyurtma serverga yuborildi ✓')
           } catch (e: any) {
-            toast.warning(`Server sync xatosi: ${e?.message ?? 'ulanish yo\'q'}`)
+            toast.error(`Server xatosi: ${e?.message ?? 'ulanish yo\'q'}`)
           }
         } else if (cart.lines.length > 0) {
           // Mahsulotlarda server_id yo'q — fullPull kerak
-          toast.warning("Mahsulotlar sinxronlanmagan — Sozlamalar → To'liq sinxronlash")
+          toast.error("Mahsulotlarda server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
         }
       }
 
@@ -280,7 +283,6 @@ export default function OrderPage(): JSX.Element {
       }
 
       await refreshTable(tId)
-      toast.success('Buyurtma saqlandi')
       cart.clear()
       cart.setOrder(null, null)
       navigate('/tables')
@@ -707,8 +709,13 @@ function CartPanel({
   const fee = useCart((s) => s.serviceFee())
   const total = useCart((s) => s.total())
   const feePct = useCart((s) => s.serviceFeePercent)
+  const roomServerId = useCart((s) => s.roomServerId)
   const [showHistory, setShowHistory] = useState(false)
   const prevLinesLen = useRef(lines.length)
+
+  // Mahsulotlardan hech biri server_id ga ega emas — fullPull kerak
+  const noProductServerIds = lines.length > 0 && lines.every((l) => !l.productServerId)
+  const syncWarning = !roomServerId || noProductServerIds
 
   const allEntries = useOrderHistory((s) => s.entries)
   const historyEntries = allEntries
@@ -724,6 +731,18 @@ function CartPanel({
 
   return (
     <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#FAFAF9' }}>
+
+      {/* Sinxronlash ogorish banneri */}
+      {syncWarning && lines.length > 0 && (
+        <div style={{ background: '#FEF3C7', borderBottom: '1px solid #FDE68A', padding: '8px 14px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
+          <p style={{ margin: 0, fontSize: 11, color: '#92400E', fontWeight: 600, lineHeight: 1.45 }}>
+            {!roomServerId
+              ? "Xona server bilan bog'lanmagan. Sozlamalar → To'liq sinxronlash bosing."
+              : "Mahsulotlar server bilan bog'lanmagan. Sozlamalar → To'liq sinxronlash bosing."}
+          </p>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ padding: '14px 16px', background: 'white', borderBottom: '1px solid #E7E5E4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

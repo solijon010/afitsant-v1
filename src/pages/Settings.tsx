@@ -25,6 +25,8 @@ export default function SettingsPage(): JSX.Element {
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [dbStatus, setDbStatus] = useState<{ waiters: { total: number; withServerId: number; list: string[] }; products: { total: number; withServerId: number }; tables: { total: number; withServerId: number; list: string[] }; token: string | null; branchId: string | null } | null>(null)
   const [loadingDb, setLoadingDb] = useState(false)
+  const [roomsTest, setRoomsTest] = useState<Record<string, any> | null>(null)
+  const [loadingRooms, setLoadingRooms] = useState(false)
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
@@ -106,6 +108,8 @@ export default function SettingsPage(): JSX.Element {
     }
   }
 
+  const isWindows = navigator.userAgent.toLowerCase().includes('windows')
+
   const detectUsb = async (): Promise<void> => {
     setDetecting(true)
     try {
@@ -113,10 +117,29 @@ export default function SettingsPage(): JSX.Element {
       const found = devices.filter((d) => d.product).map((d) => ({ product: d.product! }))
       setUsbDevices(found)
       if (found.length === 1) {
-        setForm((f) => f ? { ...f, printerDevicePath: found[0].product } : f)
-        toast.success(`Qurilma aniqlandi: ${found[0].product}`)
+        const d = found[0]
+        if (isWindows) {
+          // USB port (USB001) yoki Windows printer nomi
+          const isUsbPort = (devices.find(dev => dev.product === d.product)?.vendorId === 'usb-port')
+          if (isUsbPort) {
+            setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
+            toast.success(`USB port aniqlandi: ${d.product} — Test chek bosing`)
+          } else {
+            setForm((f) => f ? { ...f, printerName: d.product } : f)
+            toast.success(`Printer aniqlandi: ${d.product}`)
+          }
+        } else {
+          setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
+          toast.success(`Printer aniqlandi: ${d.product}`)
+        }
+      } else if (found.length > 1) {
+        toast.info(`${found.length} ta printer topildi — birini tanlang`)
       } else if (found.length === 0) {
-        toast.warning('USB printer topilmadi. /dev/usb/lp0 yo\'lini tekshiring')
+        if (isWindows) {
+          toast.warning("Windows printerlar topilmadi. Printer drayveri o'rnatilganligini tekshiring")
+        } else {
+          toast.warning("USB printer topilmadi. Printerni ulab qayta urining")
+        }
       }
     } finally {
       setDetecting(false)
@@ -301,19 +324,110 @@ export default function SettingsPage(): JSX.Element {
             </Field>
           )}
           {form.printerType === 'usb' && (
-            <Field label="USB qurilma yo'li">
+            isWindows ? (
+              /* Windows: USB port orqali driver siz chop etish */
+              <Field label="USB Port">
+                <p className="mb-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+                  ✅ Driver kerak emas! Windows USB port orqali to'g'ridan chop etiladi.
+                  Printer ulangan bo'lsa "Aniqlash" tugmasini bosing.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 font-mono text-sm"
+                    placeholder="USB001"
+                    value={form.printerDevicePath ?? 'USB001'}
+                    onChange={(e) => update('printerDevicePath', e.target.value || 'USB001')}
+                  />
+                  <button
+                    onClick={() => void detectUsb()}
+                    disabled={detecting}
+                    className="btn-ghost shrink-0"
+                    title="USB printerlarni avtomatik aniqlash"
+                  >
+                    <ScanLine size={14} /> {detecting ? '…' : 'Aniqlash'}
+                  </button>
+                </div>
+                {usbDevices.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {usbDevices.map((d) => (
+                      <button
+                        key={d.product}
+                        onClick={() => {
+                          const isUsbPort = d.vendorId === 'usb-port'
+                          if (isUsbPort) {
+                            update('printerDevicePath', d.product ?? 'USB001')
+                          } else {
+                            update('printerName', d.product ?? '')
+                          }
+                        }}
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-1.5 text-left text-xs transition-all',
+                          (form.printerDevicePath === d.product || form.printerName === d.product)
+                            ? 'border-brand-success bg-brand-success/10 text-brand-success'
+                            : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
+                        )}
+                      >
+                        {d.vendorId === 'usb-port' ? '🔌' : '🖨'} {d.product}
+                        {d.manufacturer && <span className="ml-1 opacity-60">({d.manufacturer})</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            ) : (
+              /* Linux: device path */
+              <Field label="USB qurilma yo'li">
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 font-mono text-sm"
+                    placeholder="/dev/usb/lp0"
+                    value={form.printerDevicePath ?? '/dev/usb/lp0'}
+                    onChange={(e) => update('printerDevicePath', e.target.value || '/dev/usb/lp0')}
+                  />
+                  <button
+                    onClick={() => void detectUsb()}
+                    disabled={detecting}
+                    className="btn-ghost shrink-0"
+                    title="USB qurilmalarni avtomatik aniqlash"
+                  >
+                    <ScanLine size={14} /> {detecting ? '…' : 'Aniqlash'}
+                  </button>
+                </div>
+                {usbDevices.length > 1 && (
+                  <div className="mt-2 space-y-1">
+                    {usbDevices.map((d) => (
+                      <button
+                        key={d.product}
+                        onClick={() => update('printerDevicePath', d.product)}
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-1.5 text-left font-mono text-xs transition-all',
+                          form.printerDevicePath === d.product
+                            ? 'border-brand-success bg-brand-success/10 text-brand-success'
+                            : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
+                        )}
+                      >
+                        {d.product}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            )
+          )}
+          {form.printerType === 'windows' && (
+            <Field label="Printer nomi (Windows)">
               <div className="flex gap-2">
                 <input
-                  className="input flex-1 font-mono text-sm"
-                  placeholder="/dev/usb/lp0"
-                  value={form.printerDevicePath ?? '/dev/usb/lp0'}
-                  onChange={(e) => update('printerDevicePath', e.target.value || '/dev/usb/lp0')}
+                  className="input flex-1"
+                  placeholder="XPrinter XP-58 yoki Windows printer nomi"
+                  value={form.printerName ?? ''}
+                  onChange={(e) => update('printerName', e.target.value || null)}
                 />
                 <button
                   onClick={() => void detectUsb()}
                   disabled={detecting}
                   className="btn-ghost shrink-0"
-                  title="USB qurilmalarni avtomatik aniqlash"
+                  title="Windows printerlarni avtomatik aniqlash"
                 >
                   <ScanLine size={14} /> {detecting ? '…' : 'Aniqlash'}
                 </button>
@@ -323,29 +437,19 @@ export default function SettingsPage(): JSX.Element {
                   {usbDevices.map((d) => (
                     <button
                       key={d.product}
-                      onClick={() => update('printerDevicePath', d.product)}
+                      onClick={() => update('printerName', d.product)}
                       className={cn(
-                        'w-full rounded-xl border px-3 py-1.5 text-left font-mono text-xs transition-all',
-                        form.printerDevicePath === d.product
+                        'w-full rounded-xl border px-3 py-1.5 text-left text-xs transition-all',
+                        form.printerName === d.product
                           ? 'border-brand-success bg-brand-success/10 text-brand-success'
                           : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
                       )}
                     >
-                      {d.product}
+                      🖨 {d.product}
                     </button>
                   ))}
                 </div>
               )}
-            </Field>
-          )}
-          {form.printerType === 'windows' && (
-            <Field label="Printer nomi (Windows)">
-              <input
-                className="input"
-                placeholder="XPrinter XP-58 yoki Windows printer nomi"
-                value={form.printerName ?? ''}
-                onChange={(e) => update('printerName', e.target.value || null)}
-              />
             </Field>
           )}
           <Field label="Chek sarlavhasi">
@@ -366,7 +470,7 @@ export default function SettingsPage(): JSX.Element {
             <button onClick={() => void testPrint()} className="btn-ghost flex-1">
               <TestTube2 size={14} /> Test chek
             </button>
-            {form.printerType === 'usb' && (
+            {form.printerType === 'usb' && !isWindows && (
               <button
                 onClick={() => void (async () => {
                   const r = await window.afisant.printer.fixPerms()
@@ -640,6 +744,55 @@ export default function SettingsPage(): JSX.Element {
                   </p>
                 </div>
               )
+            )}
+
+            <div className="border-t border-line pt-3" />
+            <button
+              onClick={async () => {
+                setLoadingRooms(true)
+                try {
+                  const data = await window.afisant.diag.testRooms()
+                  setRoomsTest(data)
+                } finally {
+                  setLoadingRooms(false)
+                }
+              }}
+              disabled={loadingRooms}
+              className="btn-ghost w-full"
+            >
+              <RefreshCw size={13} className={loadingRooms ? 'animate-spin' : ''} />
+              {loadingRooms ? 'Tekshirilmoqda…' : 'Xonalar API ni tekshirish'}
+            </button>
+
+            {roomsTest !== null && (
+              <div className="mt-1 rounded-xl border border-line bg-bg-elevated p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
+                <p className="font-bold text-ink">branchId: {roomsTest.branchId ?? '—'}</p>
+                {Object.entries(roomsTest).filter(([k]) => k.startsWith('/')).map(([url, val]: [string, any]) => (
+                  <div key={url} className="border-t border-line pt-2">
+                    <p className="font-mono font-bold text-ink-soft break-all">{url}</p>
+                    {val.error !== undefined ? (
+                      <p className="text-brand-danger">❌ {String(val.error)}</p>
+                    ) : (
+                      <>
+                        <p className="text-ink">Soni: <span className="font-bold">{val.count}</span></p>
+                        {val.firstItemKeys?.length > 0 && (
+                          <p className="text-ink-soft">Fields: {(val.firstItemKeys as string[]).join(', ')}</p>
+                        )}
+                        {(val.sample as any[])?.map((item: any, i: number) => (
+                          <div key={i} className="mt-1 bg-stone-50 rounded p-1.5 text-[10px] font-mono">
+                            <p><span className="text-ink-soft">id:</span> {item.id}</p>
+                            <p><span className="text-ink-soft">name:</span> {item.name}</p>
+                            <p><span className="text-ink-soft">status:</span> {item.status ?? 'yo\'q'}</p>
+                            {item.roomCategoryId && <p><span className="text-ink-soft">roomCategoryId:</span> {item.roomCategoryId}</p>}
+                            {item.roomCategory && <p><span className="text-ink-soft">roomCategory.id:</span> {item.roomCategory.id}</p>}
+                            {item.categoryId && <p><span className="text-ink-soft">categoryId:</span> {item.categoryId}</p>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </Section>
         )}

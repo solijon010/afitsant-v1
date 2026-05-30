@@ -22,12 +22,26 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
 
   const api = getApi()
   try {
-    const endpoint = s.branchId
-      ? `/api/order/branch/${s.branchId}?limit=50`
-      : `/api/order/room/${roomServerId}`
-    const res = await api.get(endpoint)
-    const data = res.data as any
-    const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+    // branchId bilan so'rov 403 bersa, xona endpointiga fallback
+    let orders: any[] = []
+    if (s.branchId) {
+      try {
+        const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+        const data = res.data as any
+        orders = Array.isArray(data) ? data : (data?.data ?? [])
+      } catch (e: any) {
+        console.warn(`[ORDER] /api/order/branch/${s.branchId} xato (${e?.response?.status}), room endpointga fallback`)
+        try {
+          const res = await api.get(`/api/order/room/${roomServerId}`)
+          const data = res.data as any
+          orders = Array.isArray(data) ? data : (data?.data ?? [])
+        } catch { orders = [] }
+      }
+    } else {
+      const res = await api.get(`/api/order/room/${roomServerId}`)
+      const data = res.data as any
+      orders = Array.isArray(data) ? data : (data?.data ?? [])
+    }
     const active = orders.find(
       (o: any) =>
         o.room?.id === roomServerId &&
@@ -107,17 +121,32 @@ export async function syncAllItems(input: {
   // Mavjud PENDING/READY orderni topishga urinib ko'ramiz
   let existing: any = null
   try {
+    let orders: any[] = []
     if (s.branchId) {
-      const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
-      const data = res.data as any
-      const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
-      // room.id yoki roomId orqali moslikni topamiz
-      existing = orders.find((o: any) =>
-        (o.room?.id === roomServerId || o.roomId === roomServerId) &&
-        (o.status === 'PENDING' || o.status === 'READY')
-      ) ?? null
-      console.log(`[ORDER] Existing order check — found: ${existing?.id ?? 'none'}`)
+      try {
+        const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+        const data = res.data as any
+        orders = Array.isArray(data) ? data : (data?.data ?? [])
+      } catch (e: any) {
+        console.warn(`[ORDER] /api/order/branch/${s.branchId} xato (${e?.response?.status}), room fallback`)
+        try {
+          const res = await api.get(`/api/order/room/${roomServerId}`)
+          const data = res.data as any
+          orders = Array.isArray(data) ? data : (data?.data ?? [])
+        } catch { orders = [] }
+      }
+    } else {
+      try {
+        const res = await api.get(`/api/order/room/${roomServerId}`)
+        const data = res.data as any
+        orders = Array.isArray(data) ? data : (data?.data ?? [])
+      } catch { orders = [] }
     }
+    existing = orders.find((o: any) =>
+      (o.room?.id === roomServerId || o.roomId === roomServerId) &&
+      (o.status === 'PENDING' || o.status === 'READY')
+    ) ?? null
+    console.log(`[ORDER] Existing order check — found: ${existing?.id ?? 'none'}`)
   } catch (e: any) {
     console.warn('[ORDER] Existing order fetch failed:', e?.message)
     existing = null
