@@ -247,7 +247,6 @@ export function registerIpc(): void {
       } catch {}
 
       const body = {
-        ...(s.branchId ? { branchId: s.branchId } : {}),
         roomId: roomServerId,
         waiterId: realWaiterId,
         orderItems: [{ productId: productServerId, count: 1 }]
