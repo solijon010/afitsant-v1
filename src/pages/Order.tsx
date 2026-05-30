@@ -601,9 +601,9 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             {product.emoji ?? '📦'}
           </div>
         )}
-        <div className="flex flex-col gap-0.5 p-2.5">
-          <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{product.nameUzLatn}</p>
-          <p className="font-mono text-xs font-bold text-[#C2410C]">
+        <div className="flex flex-col gap-1.5 p-3">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug" style={{ color: '#1C1917', fontSize: 13 }}>{product.nameUzLatn}</p>
+          <p className="font-mono font-bold" style={{ color: '#292524', fontSize: 13 }}>
             {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
           </p>
         </div>
