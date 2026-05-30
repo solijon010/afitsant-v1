@@ -67,7 +67,9 @@ const api: BridgeAPI = {
 
   diag: {
     getInfo: () => ipcRenderer.invoke(IPC.diagGetInfo),
-    openLogs: () => ipcRenderer.invoke(IPC.diagOpenLogs)
+    openLogs: () => ipcRenderer.invoke(IPC.diagOpenLogs),
+    testWaiters: (): Promise<Record<string, any>> => ipcRenderer.invoke(IPC.diagTestWaiters),
+    recentOrders: () => ipcRenderer.invoke(IPC.diagRecentOrders)
   },
 
   on: {
@@ -80,6 +82,11 @@ const api: BridgeAPI = {
       const handler = (_e: unknown, payload: any) => cb(payload)
       ipcRenderer.on(IPC.onSyncStatus, handler)
       return () => ipcRenderer.removeListener(IPC.onSyncStatus, handler)
+    },
+    sessionExpired: (cb) => {
+      const handler = () => cb()
+      ipcRenderer.on(IPC.onSessionExpired, handler)
+      return () => ipcRenderer.removeListener(IPC.onSessionExpired, handler)
     }
   },
 

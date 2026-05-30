@@ -140,6 +140,7 @@ export async function syncAllItems(input: {
   } catch {}
 
   const createRes = await api.post('/api/order', {
+    ...(s.branchId ? { branchId: s.branchId } : {}),
     roomId: roomServerId,
     waiterId: realWaiterId,
     orderItems: items.map((it) => ({ productId: it.productServerId, count: it.count }))

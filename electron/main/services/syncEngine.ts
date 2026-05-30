@@ -56,7 +56,8 @@ function setupSocket(getMainWindow: () => BrowserWindow | null): void {
   ]) {
     socket.on(channel, (data: unknown) => {
       const win = getMainWindow()
-      win?.webContents.send('event:sync', { channel, data })
+      if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
+      win.webContents.send('event:sync', { channel, data })
     })
   }
 }
@@ -70,7 +71,8 @@ function startTicker(): void {
 
 function broadcastStatus(getMainWindow: () => BrowserWindow | null): void {
   const win = getMainWindow()
-  win?.webContents.send('event:syncStatus', {
+  if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
+  win.webContents.send('event:syncStatus', {
     online,
     queued: queuedCount(),
     lastSyncAt
@@ -284,7 +286,10 @@ export function status(): { online: boolean; queued: number; lastSyncAt: number 
 
 export function stopSync(): void {
   if (flushTimer) clearInterval(flushTimer)
-  if (socket) socket.disconnect()
+  if (socket) {
+    socket.removeAllListeners()  // disconnect eventini oldini olish uchun
+    socket.disconnect()
+  }
   flushTimer = null
   socket = null
 }

@@ -30,8 +30,8 @@ export function getSettings(): Settings {
   return {
     serverUrl: get('serverUrl', (v) => v ?? DEFAULTS.serverUrl),
     serverWsUrl: get('serverWsUrl', (v) => v ?? DEFAULTS.serverWsUrl),
-    apiToken: get('apiToken', (v) => (v ? v : null)),
-    branchId: get('branchId', (v) => (v ? v : null)),
+    apiToken: get('apiToken', (v) => (v && v !== 'null' && v.trim() !== '' ? v.trim() : null)),
+    branchId: get('branchId', (v) => (v && v !== 'null' && v.trim() !== '' ? v.trim() : null)),
     language: get('language', (v) => ((v as Lang) ?? DEFAULTS.language)),
     printerType: get('printerType', (v) => (v ? (v as Settings['printerType']) : null)),
     printerVid: get('printerVid', (v) => (v ? v : null)),

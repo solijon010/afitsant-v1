@@ -89,18 +89,22 @@ export default function OrderPage(): JSX.Element {
             // Server order ID ni saqlab qolamiz, future sync uchun
             cart.setOrder(localOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
             cart.hydrateFromOrder(
-              localOrder.items.map<CartLine>((it) => ({
-                localUuid: it.localUuid,
-                productId: it.productId,
-                productServerId: null,
-                productName: it.productName,
-                unitPrice: it.unitPrice,
-                quantity: it.quantity,
-                notes: it.notes,
-                flushed: true,
-                itemId: it.id,
-                addedAt: it.createdAt
-              }))
+              localOrder.items.map<CartLine>((it) => {
+                // productServerId ni products store'dan qidiramiz — server sync uchun zarur
+                const prod = products.find((p) => p.id === it.productId)
+                return {
+                  localUuid: it.localUuid,
+                  productId: it.productId,
+                  productServerId: prod?.serverId ?? null,
+                  productName: it.productName,
+                  unitPrice: it.unitPrice,
+                  quantity: it.quantity,
+                  notes: it.notes,
+                  flushed: true,
+                  itemId: it.id,
+                  addedAt: it.createdAt
+                }
+              })
             )
             return
           }
@@ -143,18 +147,22 @@ export default function OrderPage(): JSX.Element {
         // Mahsulotlari bor local buyurtma — yuklaymiz (yangi buyurtma yaratmaymiz)
         cart.setOrder(localOrder.id, tId, null, roomServerId ?? null)
         cart.hydrateFromOrder(
-          localOrder.items.map<CartLine>((it) => ({
-            localUuid: it.localUuid,
-            productId: it.productId,
-            productServerId: null,
-            productName: it.productName,
-            unitPrice: it.unitPrice,
-            quantity: it.quantity,
-            notes: it.notes,
-            flushed: true,
-            itemId: it.id,
-            addedAt: it.createdAt
-          }))
+          localOrder.items.map<CartLine>((it) => {
+            // productServerId ni products store'dan qidiramiz — server sync uchun zarur
+            const prod = products.find((p) => p.id === it.productId)
+            return {
+              localUuid: it.localUuid,
+              productId: it.productId,
+              productServerId: prod?.serverId ?? null,
+              productName: it.productName,
+              unitPrice: it.unitPrice,
+              quantity: it.quantity,
+              notes: it.notes,
+              flushed: true,
+              itemId: it.id,
+              addedAt: it.createdAt
+            }
+          })
         )
       } else {
         // Hech qanday buyurtma yo'q — lazy rejim: mahsulot qo'shilganda yaratiladi
@@ -434,7 +442,7 @@ export default function OrderPage(): JSX.Element {
           <div className="w-[80px]" />
         </header>
 
-        <nav className="flex gap-1.5 overflow-x-auto border-b border-stone-100 bg-white px-4 py-2.5 shrink-0">
+        <nav className="flex gap-2 overflow-x-auto border-b border-stone-100 bg-white px-5 py-3 shrink-0">
           {categories.map((c) => (
             <CategoryPill
               key={c.id}
@@ -504,7 +512,7 @@ function CategoryPill({
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all',
+        'inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all',
         active
           ? 'border-[#C2410C] bg-[#C2410C] text-white shadow-sm'
           : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-700'
@@ -550,11 +558,6 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             : 'border-stone-100 bg-white shadow-card hover:shadow-card-hover hover:border-stone-300'
         )}
       >
-        {qty > 0 && (
-          <div className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-[#C2410C] text-xs font-bold text-white shadow-md ring-2 ring-white">
-            {qty}
-          </div>
-        )}
         {imgSrc ? (
           <div className="relative aspect-square w-full overflow-hidden bg-white">
             <img
@@ -703,12 +706,19 @@ function CartPanel({
   const total = useCart((s) => s.total())
   const feePct = useCart((s) => s.serviceFeePercent)
   const [showHistory, setShowHistory] = useState(false)
+  const prevLinesLen = useRef(lines.length)
 
   const allEntries = useOrderHistory((s) => s.entries)
   const historyEntries = allEntries
     .filter((e) => e.tableId === tableId)
     .sort((a, b) => b.savedAt - a.savedAt)
     .slice(0, 30)
+
+  /* Savatga mahsulot qo'shilsa tarixni yopamiz */
+  useEffect(() => {
+    if (lines.length > prevLinesLen.current && showHistory) setShowHistory(false)
+    prevLinesLen.current = lines.length
+  }, [lines.length, showHistory])
 
   return (
     <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#FAFAF9' }}>
@@ -730,9 +740,9 @@ function CartPanel({
               onClick={() => setShowHistory((v) => !v)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: showHistory ? '#fff1f2' : '#f1f5f9',
-                border: `1px solid ${showHistory ? '#fca5a5' : '#e2e8f0'}`,
-                color: showHistory ? '#ef4444' : '#64748b',
+                background: showHistory ? '#fff7ed' : '#f1f5f9',
+                border: `1px solid ${showHistory ? '#C2410C' : '#e2e8f0'}`,
+                color: showHistory ? '#C2410C' : '#64748b',
                 borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer'
               }}
             >
@@ -746,63 +756,66 @@ function CartPanel({
         </div>
       </div>
 
-      {/* Mahsulotlar ro'yxati — minHeight:0 flex child overflow fix */}
+      {/* Asosiy kontent — savat yoki tarix (almashinadi, footer doim ko'rinadi) */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px' }}>
-        {lines.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A8A29E', gap: 8 }}>
-            <ShoppingCart size={32} style={{ opacity: 0.25 }} />
-            <span style={{ fontSize: 13 }}>Mahsulotlarni tanlang</span>
-          </div>
-        ) : (
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {lines.map((l, idx) => (
-                <li key={l.localUuid}
-                  style={{ background: 'white', borderRadius: 10, padding: '8px 10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #E7E5E4' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#1C1917', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {idx + 1}. {l.productName}
-                    </p>
-                    <button onClick={() => rem(l.localUuid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', padding: '2px 4px', borderRadius: 6, display: 'grid', placeItems: 'center', flexShrink: 0 }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#FEF2F2'; (e.currentTarget as HTMLButtonElement).style.color = '#DC2626' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#FCA5A5' }}>
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F5F5F4', borderRadius: 8, padding: '2px 4px', border: '1px solid #E7E5E4' }}>
-                      <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={10} /></QtyBtn>
-                      <span style={{ minWidth: 22, textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#1C1917' }}>{fmtQty(l.quantity)}</span>
-                      <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={10} /></QtyBtn>
-                    </div>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>
-                      {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
-                    </p>
-                  </div>
-                </li>
-              ))}
-          </ul>
-        )}
-
-        {/* Tarix paneli */}
-        <AnimatePresence>
-          {showHistory && historyEntries.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              style={{ overflow: 'hidden', borderTop: '1px solid #e2e8f0', marginTop: 8 }}
+        <AnimatePresence mode="wait">
+          {showHistory ? (
+            /* ── Tarix paneli ── */
+            <motion.div key="history"
+              initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }}
+              transition={{ duration: 0.18 }}
             >
-              <div style={{ padding: '10px 4px' }}>
-                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {table.name} — Zakazlar tarixi
-                </p>
+              <p style={{ margin: '4px 0 10px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                {table.name} — Zakazlar tarixi
+              </p>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {historyEntries.map((entry) => (
+                  <HistoryEntryRow key={entry.id} entry={entry} />
+                ))}
+              </ul>
+            </motion.div>
+          ) : (
+            /* ── Savat ── */
+            <motion.div key="cart"
+              initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }}
+              transition={{ duration: 0.18 }}
+              style={{ height: lines.length === 0 ? '100%' : undefined }}
+            >
+              {lines.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A8A29E', gap: 8 }}>
+                  <ShoppingCart size={32} style={{ opacity: 0.25 }} />
+                  <span style={{ fontSize: 13 }}>Mahsulotlarni tanlang</span>
+                </div>
+              ) : (
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {historyEntries.map((entry) => (
-                    <HistoryEntryRow key={entry.id} entry={entry} />
+                  {lines.map((l, idx) => (
+                    <li key={l.localUuid}
+                      style={{ background: 'white', borderRadius: 10, padding: '10px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #E7E5E4' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1C1917', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {idx + 1}. {l.productName}
+                        </p>
+                        <button onClick={() => rem(l.localUuid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', padding: '2px 4px', borderRadius: 6, display: 'grid', placeItems: 'center', flexShrink: 0 }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#FEF2F2'; (e.currentTarget as HTMLButtonElement).style.color = '#DC2626' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#FCA5A5' }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F5F5F4', borderRadius: 8, padding: '2px 4px', border: '1px solid #E7E5E4' }}>
+                          <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={10} /></QtyBtn>
+                          <span style={{ minWidth: 28, textAlign: 'center', fontSize: 16, fontWeight: 800, color: '#1C1917' }}>{fmtQty(l.quantity)}</span>
+                          <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={10} /></QtyBtn>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>
+                          {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
+                        </p>
+                      </div>
+                    </li>
                   ))}
                 </ul>
-              </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

@@ -90,7 +90,72 @@ export function registerIpc(): void {
     }
   })
 
+  ipcMain.handle(IPC.diagTestWaiters, async () => {
+    const { getApi } = await import('./services/apiClient')
+    const s = settings.getSettings()
+    const api = getApi()
+    const b = s.branchId
+    const results: Record<string, any> = { branchId: b, serverUrl: s.serverUrl }
+    const endpoints = [
+      // Avvalgi sinashlar
+      ...(b ? [`/api/user/my/${b}`, `/api/user/branch/${b}`] : []),
+      `/api/user/waiters`,
+      // /all/${branchId} pattern — boshqa endpointlar kabi
+      ...(b ? [
+        `/api/user/all/${b}`,
+        `/api/afisant/all/${b}`,
+        `/api/waiter/all/${b}`,
+        `/api/afisant/${b}`,
+        `/api/user/list/${b}`,
+      ] : []),
+      `/api/user/all`,
+      `/api/afisant/all`,
+      `/api/waiter/all`,
+    ]
+    for (const url of endpoints) {
+      try {
+        const res = await api.get(url)
+        const data = res.data as any
+        const list: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+        results[url] = {
+          status: res.status,
+          count: list.length,
+          rawType: Array.isArray(data) ? 'array' : typeof data,
+          rawKeys: typeof data === 'object' && data ? Object.keys(data).slice(0, 8) : [],
+          users: list.slice(0, 5).map((u: any) => `${u.firstName ?? u.name ?? u.login ?? '?'} (${u.role ?? u.type ?? '?'})`)
+        }
+      } catch (e: any) {
+        results[url] = { error: e?.response?.status ?? e?.message }
+      }
+    }
+    return results
+  })
+
   ipcMain.handle(IPC.diagOpenLogs, () => {
     void shell.openPath(app.getPath('logs'))
+  })
+
+  ipcMain.handle(IPC.diagRecentOrders, async () => {
+    const { getApi } = await import('./services/apiClient')
+    const s = settings.getSettings()
+    if (!s.apiToken || !s.branchId) return []
+    const api = getApi()
+    try {
+      const res = await api.get(`/api/order/branch/${s.branchId}?limit=20`)
+      const data = res.data as any
+      const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+      return orders.map((o: any) => ({
+        id: String(o.id ?? ''),
+        status: String(o.status ?? ''),
+        room: String(o.room?.name ?? o.room?.id ?? '—'),
+        waiter: `${o.user?.firstName ?? ''} ${o.user?.lastName ?? ''}`.trim() || '—',
+        total: Number(o.totalPrice ?? o.total ?? 0),
+        itemCount: Array.isArray(o.orderItem) ? o.orderItem.length : 0,
+        createdAt: String(o.createdAt ?? '')
+      }))
+    } catch (e: any) {
+      console.error('[DIAG] recentOrders error:', e?.message)
+      return []
+    }
   })
 }
