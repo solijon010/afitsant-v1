@@ -436,7 +436,7 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 380px' }}>
+    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 420px' }}>
       <section className="flex flex-col overflow-hidden bg-[#F5F5F4]">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
           <button
@@ -452,7 +452,7 @@ export default function OrderPage(): JSX.Element {
           <div className="w-[80px]" />
         </header>
 
-        <nav className="flex gap-2 overflow-x-auto border-b border-stone-100 bg-white px-5 py-3 shrink-0">
+        <nav className="flex gap-2 overflow-x-auto border-b border-stone-100 bg-white px-4 py-2.5 shrink-0" style={{ gap: 8 }}>
           {categories.map((c) => (
             <CategoryPill
               key={c.id}
