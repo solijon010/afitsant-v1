@@ -437,7 +437,7 @@ export default function OrderPage(): JSX.Element {
 
   return (
     <div className="grid h-full" style={{ gridTemplateColumns: '1fr 420px' }}>
-      <section className="flex flex-col overflow-hidden" style={{ background: '#1a2d1c' }}>
+      <section className="flex flex-col overflow-hidden" style={{ background: '#2f54a6' }}>
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
           <button
             onClick={() => void handleSave()}
@@ -816,7 +816,7 @@ function CartPanel({
   }, [lines.length, showHistory])
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#FAFAF9' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#f2ff00' }}>
 
       {/* Sinxronlash ogorish banneri */}
       {syncWarning && lines.length > 0 && (

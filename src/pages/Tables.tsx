@@ -109,7 +109,7 @@ export default function TablesPage(): JSX.Element {
   const clock = useClock()
 
   return (
-    <div className="flex h-full flex-col" style={{ background: '#1a2d1c' }}>
+    <div className="flex h-full flex-col" style={{ background: '#2f54a6' }}>
 
       {/* ── Header ── */}
       <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-stone-100 bg-white px-6 shadow-sm">
@@ -180,7 +180,7 @@ export default function TablesPage(): JSX.Element {
                     ? 'text-white shadow-sm'
                     : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700',
                 )}
-                style={active ? { background: '#1ac02d' } : undefined}
+                style={active ? { background: '#27ff44' } : undefined}
               >
                 {area.name}
                 {occ > 0 && (
@@ -198,7 +198,7 @@ export default function TablesPage(): JSX.Element {
       )}
 
       {/* ── Stollar ── */}
-      <main className="flex-1 overflow-y-auto px-6 py-6" style={{ background: '#1a2d1c' }}>
+      <main className="flex-1 overflow-y-auto px-6 py-6" style={{ background: '#2f54a6' }}>
         {areas.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
