@@ -437,7 +437,7 @@ export default function OrderPage(): JSX.Element {
 
   return (
     <div className="grid h-full" style={{ gridTemplateColumns: '1fr 420px' }}>
-      <section className="flex flex-col overflow-hidden" style={{ background: '#2f54a6' }}>
+      <section className="flex flex-col overflow-hidden" style={{ background: '#151728' }}>
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
           <button
             onClick={() => void handleSave()}
