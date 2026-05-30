@@ -541,6 +541,28 @@ function CategoryPill({
   )
 }
 
+function ProductImage({ imgSrc, name, emoji, qty }: { imgSrc: string | null; name: string; emoji?: string | null; qty: number }): JSX.Element {
+  const [failed, setFailed] = useState(false)
+  if (imgSrc && !failed) {
+    return (
+      <div className="relative aspect-square w-full overflow-hidden bg-white">
+        <img
+          src={imgSrc}
+          alt={name}
+          className="h-full w-full object-contain p-2"
+          onError={() => setFailed(true)}
+        />
+        {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-[#C2410C]" />}
+      </div>
+    )
+  }
+  return (
+    <div className={cn('flex aspect-square items-center justify-center text-5xl', qty > 0 ? 'bg-[#C2410C]/5' : 'bg-stone-50')}>
+      {emoji ?? '📦'}
+    </div>
+  )
+}
+
 function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
@@ -586,21 +608,7 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
           </div>
         )}
 
-        {imgSrc ? (
-          <div className="relative aspect-square w-full overflow-hidden bg-white">
-            <img
-              src={imgSrc}
-              alt={product.nameUzLatn}
-              className="h-full w-full object-contain p-2"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
-            {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-[#C2410C]" />}
-          </div>
-        ) : (
-          <div className={cn('flex aspect-square items-center justify-center text-5xl', qty > 0 ? 'bg-[#C2410C]/5' : 'bg-stone-50')}>
-            {product.emoji ?? '📦'}
-          </div>
-        )}
+        <ProductImage imgSrc={imgSrc} name={product.nameUzLatn} emoji={product.emoji} qty={qty} />
         <div className="flex flex-col gap-0.5 p-2.5">
           <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{product.nameUzLatn}</p>
           <p className="font-mono text-xs font-bold text-[#C2410C]">
