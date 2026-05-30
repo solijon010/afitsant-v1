@@ -118,6 +118,9 @@ export async function syncAllItems(input: {
   const api = getApi()
   const { roomServerId, items } = input
 
+  // count > 0 bo'lgan itemlarni ajratamiz — server 0 li itemlarni rad etadi
+  const activeItems = items.filter((it) => it.count > 0)
+
   // Mavjud PENDING/READY orderni topishga urinib ko'ramiz
   let existing: any = null
   try {
@@ -153,20 +156,32 @@ export async function syncAllItems(input: {
   }
 
   if (existing) {
-    if (items.length === 0) {
+    if (activeItems.length === 0) {
       // Savat bo'sh — mavjud orderni bekor qilamiz
       await api.patch(`/api/order/${existing.id}/status`, { status: 'CANCELED' })
       return { serverId: existing.id }
     }
     // Mavjud orderni yangilash — sync-items endpointi
-    await api.patch(`/api/order/sync-items/${existing.id}`, {
-      items: items.map((it) => ({ productId: it.productServerId, count: it.count }))
-    })
-    console.log(`[ORDER] Updated existing order ${existing.id}`)
-    return { serverId: existing.id }
+    try {
+      await api.patch(`/api/order/sync-items/${existing.id}`, {
+        items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+      })
+      console.log(`[ORDER] Updated existing order ${existing.id}`)
+    } catch (e: any) {
+      // sync-items 400/404 bersa, to'liq yangi order yaratishga urinib ko'ramiz
+      console.warn(`[ORDER] sync-items xato (${e?.response?.status}), yangi order yaratilmoqda...`)
+      const errData = e?.response?.data
+      console.warn('[ORDER] sync-items error body:', JSON.stringify(errData ?? e?.message))
+      // existing orderni o'chirib, yangi yaratamiz
+      try {
+        await api.patch(`/api/order/${existing.id}/status`, { status: 'CANCELED' })
+      } catch { /* ignore */ }
+      existing = null
+    }
+    if (existing) return { serverId: existing.id }
   }
 
-  if (items.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
+  if (activeItems.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
 
   // Yangi order yaratish
   // waiterId ni JWT tokendan olamiz — server authorization header orqali user ni biladi
@@ -176,18 +191,25 @@ export async function syncAllItems(input: {
     waiterId = payload.id ?? payload.userId ?? null
   } catch {}
 
+  // branchId null bo'lsa yubormaymiz — server null qiymatni rad etadi
   const body: Record<string, any> = {
-    branchId: s.branchId,
+    ...(s.branchId ? { branchId: s.branchId } : {}),
     roomId: roomServerId,
-    orderItems: items.map((it) => ({ productId: it.productServerId, count: it.count }))
+    orderItems: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
   }
   if (waiterId) body.waiterId = waiterId
 
   console.log('[ORDER] POST /api/order body:', JSON.stringify(body))
-  const createRes = await api.post('/api/order', body)
-  const newId = createRes.data?.id ?? createRes.data?.serverId
-  console.log('[ORDER] Created order:', newId)
-  return { serverId: newId }
+  try {
+    const createRes = await api.post('/api/order', body)
+    const newId = createRes.data?.id ?? createRes.data?.serverId
+    console.log('[ORDER] Created order:', newId)
+    return { serverId: newId }
+  } catch (e: any) {
+    const errData = e?.response?.data
+    console.error('[ORDER] POST /api/order xato:', JSON.stringify(errData ?? e?.message))
+    throw new Error(`Order yaratishda xato (${e?.response?.status ?? e?.code}): ${JSON.stringify(errData?.message ?? errData ?? e?.message)}`)
+  }
 }
 
 export async function closeOrderOnServer(serverOrderId: string): Promise<void> {
