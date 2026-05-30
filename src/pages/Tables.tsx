@@ -109,7 +109,7 @@ export default function TablesPage(): JSX.Element {
   const clock = useClock()
 
   return (
-    <div className="flex h-full flex-col bg-[#F5F5F4]">
+    <div className="flex h-full flex-col" style={{ background: '#484A4D' }}>
 
       {/* ── Header ── */}
       <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-stone-100 bg-white px-6 shadow-sm">
@@ -197,7 +197,7 @@ export default function TablesPage(): JSX.Element {
       )}
 
       {/* ── Stollar ── */}
-      <main className="flex-1 overflow-y-auto px-6 py-6">
+      <main className="flex-1 overflow-y-auto px-6 py-6" style={{ background: '#484A4D' }}>
         {areas.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -220,12 +220,12 @@ export default function TablesPage(): JSX.Element {
                 <section key={prefix}>
                   {/* Section sarlavha */}
                   <div className="mb-4 flex items-center gap-3">
-                    <div className="h-5 w-1 rounded-full bg-[#C2410C]" />
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-stone-500">
+                    <div className="h-5 w-1 rounded-full bg-[#1EA4E9]" />
+                    <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#C8CACD' }}>
                       {prefix}
                     </h2>
-                    <div className="flex-1 h-px bg-stone-100" />
-                    <span className="text-xs font-medium text-stone-400">
+                    <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
+                    <span className="text-xs font-medium" style={{ color: '#9EA2A6' }}>
                       {activeCount}/{tables.length} band
                     </span>
                   </div>
@@ -275,14 +275,14 @@ function TableCard({
       badgeText: 'text-stone-500',
     },
     active: {
-      bg: 'bg-amber-50',
-      border: 'border-amber-200 hover:border-amber-400',
-      bar: 'bg-amber-400',
-      dot: 'bg-amber-400',
+      bg: 'bg-[#E8F7FD]',
+      border: 'border-[#1EA4E9] hover:border-[#0E8FD4]',
+      bar: 'bg-[#1EA4E9]',
+      dot: 'bg-[#1EA4E9]',
       label: 'Band',
-      labelColor: 'text-amber-700',
-      badgeBg: 'bg-amber-100',
-      badgeText: 'text-amber-700',
+      labelColor: 'text-[#0E8FD4]',
+      badgeBg: 'bg-[#D0EEFA]',
+      badgeText: 'text-[#0B7AB8]',
     },
     waiting: {
       bg: 'bg-red-50',

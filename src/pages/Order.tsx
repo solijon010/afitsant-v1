@@ -436,8 +436,8 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 300px' }}>
-      <section className="flex flex-col overflow-hidden bg-[#F5F5F4]">
+    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 420px' }}>
+      <section className="flex flex-col overflow-hidden" style={{ background: '#484A4D' }}>
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
           <button
             onClick={() => void handleSave()}
@@ -568,8 +568,8 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         className={cn(
           'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border-2 transition-all select-none',
           qty > 0
-            ? 'border-[#C2410C]/50 bg-white shadow-glow-primary'
-            : 'border-stone-100 bg-white shadow-card hover:shadow-card-hover hover:border-stone-300'
+            ? 'border-[#1EA4E9] bg-white shadow-glow-primary'
+            : 'border-stone-200 bg-white shadow-card hover:shadow-card-hover hover:border-stone-400'
         )}
       >
         {/* Miqdor badge */}
@@ -601,9 +601,9 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             {product.emoji ?? '📦'}
           </div>
         )}
-        <div className="flex flex-col gap-0.5 p-2.5">
-          <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink">{product.nameUzLatn}</p>
-          <p className="font-mono text-xs font-bold text-[#C2410C]">
+        <div className="flex flex-col gap-2 p-3">
+          <p className="line-clamp-2 font-semibold leading-snug" style={{ fontSize: 14, color: '#1C1917' }}>{product.nameUzLatn}</p>
+          <p className="font-mono font-bold" style={{ fontSize: 14, color: '#1C1917' }}>
             {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
           </p>
         </div>
