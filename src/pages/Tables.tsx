@@ -22,8 +22,9 @@ function useClock() {
     return () => clearInterval(t)
   }, [])
   const pad = (n: number) => String(n).padStart(2, '0')
+  const h = tick.getHours()  // 0–23, 24-soatlik format (13:08, 00:00 va h.k.)
   return {
-    time: `${pad(tick.getHours())}:${pad(tick.getMinutes())}`,
+    time: `${pad(h)}:${pad(tick.getMinutes())}`,
     secs: pad(tick.getSeconds()),
     date: `${UZ_DAYS[tick.getDay()]}, ${tick.getDate()}-${UZ_MONTHS[tick.getMonth()]}`,
   }
