@@ -255,7 +255,13 @@ export default function OrderPage(): JSX.Element {
             initialServerItemsRef.current = cart.lines.filter((l) => l.productServerId)
             toast.success('Buyurtma serverga yuborildi ✓')
           } catch (e: any) {
-            toast.error(`Server xatosi: ${e?.message ?? 'ulanish yo\'q'}`)
+            const msg = e?.message ?? ''
+            if (msg.includes('404') || msg.includes('mavjud emas') || msg.includes('inactive')) {
+              toast.warning('Ba\'zi mahsulotlar serverda yo\'q — mahalliy saqlandi')
+            } else {
+              toast.warning(`Server bilan ulanib bo'lmadi — mahalliy saqlandi`)
+            }
+            console.warn('[ORDER] syncAll xato (mahalliy saqlandi):', msg)
           }
         } else if (cart.lines.length > 0) {
           // Mahsulotlarda server_id yo'q — fullPull kerak
@@ -457,7 +463,7 @@ export default function OrderPage(): JSX.Element {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
               Bu kategoriyada mahsulot yo'q
