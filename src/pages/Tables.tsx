@@ -109,7 +109,7 @@ export default function TablesPage(): JSX.Element {
   const clock = useClock()
 
   return (
-    <div className="flex h-full flex-col" style={{ background: '#484A4D' }}>
+    <div className="flex h-full flex-col" style={{ background: '#1a2d1c' }}>
 
       {/* ── Header ── */}
       <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-stone-100 bg-white px-6 shadow-sm">
@@ -177,9 +177,10 @@ export default function TablesPage(): JSX.Element {
                 className={cn(
                   'inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-all',
                   active
-                    ? 'bg-[#C2410C] text-white shadow-sm'
+                    ? 'text-white shadow-sm'
                     : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700',
                 )}
+                style={active ? { background: '#1ac02d' } : undefined}
               >
                 {area.name}
                 {occ > 0 && (
@@ -197,7 +198,7 @@ export default function TablesPage(): JSX.Element {
       )}
 
       {/* ── Stollar ── */}
-      <main className="flex-1 overflow-y-auto px-6 py-6" style={{ background: '#484A4D' }}>
+      <main className="flex-1 overflow-y-auto px-6 py-6" style={{ background: '#1a2d1c' }}>
         {areas.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -220,7 +221,7 @@ export default function TablesPage(): JSX.Element {
                 <section key={prefix}>
                   {/* Section sarlavha */}
                   <div className="mb-4 flex items-center gap-3">
-                    <div className="h-5 w-1 rounded-full bg-[#1EA4E9]" />
+                    <div className="h-5 w-1 rounded-full bg-[#1ac02d]" />
                     <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#C8CACD' }}>
                       {prefix}
                     </h2>
@@ -275,14 +276,14 @@ function TableCard({
       badgeText: 'text-stone-500',
     },
     active: {
-      bg: 'bg-[#E8F7FD]',
-      border: 'border-[#1EA4E9] hover:border-[#0E8FD4]',
-      bar: 'bg-[#1EA4E9]',
-      dot: 'bg-[#1EA4E9]',
+      bg: 'bg-[#e8fde8]',
+      border: 'border-[#1ac02d] hover:border-[#158f24]',
+      bar: 'bg-[#1ac02d]',
+      dot: 'bg-[#1ac02d]',
       label: 'Band',
-      labelColor: 'text-[#0E8FD4]',
-      badgeBg: 'bg-[#D0EEFA]',
-      badgeText: 'text-[#0B7AB8]',
+      labelColor: 'text-[#158f24]',
+      badgeBg: 'bg-[#c2f0c7]',
+      badgeText: 'text-[#157a1e]',
     },
     waiting: {
       bg: 'bg-red-50',
