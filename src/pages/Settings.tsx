@@ -23,6 +23,8 @@ export default function SettingsPage(): JSX.Element {
   const [diagInfo, setDiagInfo] = useState<{ hasToken: boolean; branchId: string | null; serverUrl: string; logPath: string } | null>(null)
   const [recentOrders, setRecentOrders] = useState<Array<{ id: string; status: string; room: string; waiter: string; total: number; itemCount: number; createdAt: string }> | null>(null)
   const [loadingOrders, setLoadingOrders] = useState(false)
+  const [dbStatus, setDbStatus] = useState<{ waiters: { total: number; withServerId: number; list: string[] }; products: { total: number; withServerId: number }; tables: { total: number; withServerId: number; list: string[] }; token: string | null; branchId: string | null } | null>(null)
+  const [loadingDb, setLoadingDb] = useState(false)
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
@@ -482,6 +484,104 @@ export default function SettingsPage(): JSX.Element {
 
         {isAdmin && (
           <Section title="Server Zakazlar" icon={<ClipboardList size={16} />}>
+            {/* ── DB Holati ── */}
+            <button
+              onClick={async () => {
+                setLoadingDb(true)
+                try { setDbStatus(await window.afisant.diag.dbStatus()) }
+                finally { setLoadingDb(false) }
+              }}
+              disabled={loadingDb}
+              className="btn-ghost w-full"
+            >
+              <ScanLine size={13} className={loadingDb ? 'animate-spin' : ''} />
+              {loadingDb ? 'Tekshirilmoqda…' : 'DB holati — server_id bor/yo\'qligini tekshir'}
+            </button>
+
+            {dbStatus && (
+              <div className="rounded-xl border border-line bg-bg-elevated p-3 text-xs space-y-2">
+                <p className="font-semibold text-ink-soft uppercase tracking-wider text-[10px]">Mahalliy DB holati</p>
+
+                {/* Token */}
+                <div className="flex items-center gap-2">
+                  {dbStatus.token ? <CheckCircle2 size={12} className="text-brand-success shrink-0" /> : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                  <span className="text-ink-soft">Token:</span>
+                  <span className={cn('font-mono truncate', dbStatus.token ? 'text-brand-success' : 'text-brand-danger')}>
+                    {dbStatus.token ?? 'YO\'Q — qayta login qiling'}
+                  </span>
+                </div>
+
+                {/* branchId */}
+                <div className="flex items-center gap-2">
+                  {dbStatus.branchId ? <CheckCircle2 size={12} className="text-brand-success shrink-0" /> : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                  <span className="text-ink-soft">Branch ID:</span>
+                  <span className={cn('font-mono', dbStatus.branchId ? 'text-ink' : 'text-brand-danger')}>
+                    {dbStatus.branchId ? `${dbStatus.branchId.slice(0, 12)}…` : 'YO\'Q'}
+                  </span>
+                </div>
+
+                {/* Afitsantlar */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    {dbStatus.waiters.withServerId === dbStatus.waiters.total
+                      ? <CheckCircle2 size={12} className="text-brand-success shrink-0" />
+                      : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                    <span className="text-ink-soft">Afitsantlar:</span>
+                    <span className={dbStatus.waiters.withServerId === dbStatus.waiters.total ? 'text-brand-success' : 'text-brand-danger'}>
+                      {dbStatus.waiters.withServerId}/{dbStatus.waiters.total} ta server_id bilan
+                    </span>
+                  </div>
+                  <div className="pl-5 space-y-0.5">
+                    {dbStatus.waiters.list.map((w, i) => (
+                      <p key={i} className={cn('text-[10px]', w.includes('YO\'Q') ? 'text-brand-danger' : 'text-ink-soft')}>{w}</p>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mahsulotlar */}
+                <div className="flex items-center gap-2">
+                  {dbStatus.products.withServerId === dbStatus.products.total
+                    ? <CheckCircle2 size={12} className="text-brand-success shrink-0" />
+                    : <XCircle size={12} className="text-brand-warn shrink-0" />}
+                  <span className="text-ink-soft">Mahsulotlar:</span>
+                  <span className={dbStatus.products.withServerId > 0 ? 'text-brand-success' : 'text-brand-danger'}>
+                    {dbStatus.products.withServerId}/{dbStatus.products.total} ta server_id bilan
+                  </span>
+                  {dbStatus.products.withServerId === 0 && (
+                    <span className="text-brand-danger font-semibold">← Sinxronlash kerak!</span>
+                  )}
+                </div>
+
+                {/* Xonalar */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    {dbStatus.tables.withServerId === dbStatus.tables.total
+                      ? <CheckCircle2 size={12} className="text-brand-success shrink-0" />
+                      : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                    <span className="text-ink-soft">Xonalar:</span>
+                    <span className={dbStatus.tables.withServerId > 0 ? 'text-brand-success' : 'text-brand-danger'}>
+                      {dbStatus.tables.withServerId}/{dbStatus.tables.total} ta server_id bilan
+                    </span>
+                  </div>
+                  <div className="pl-5 space-y-0.5">
+                    {dbStatus.tables.list.slice(0, 5).map((t, i) => (
+                      <p key={i} className={cn('text-[10px]', t.includes('YO\'Q') ? 'text-brand-danger' : 'text-ink-soft')}>{t}</p>
+                    ))}
+                    {dbStatus.tables.list.length > 5 && (
+                      <p className="text-[10px] text-ink-dim">… va yana {dbStatus.tables.list.length - 5} ta</p>
+                    )}
+                  </div>
+                </div>
+
+                {(dbStatus.products.withServerId === 0 || dbStatus.tables.withServerId === 0 || dbStatus.waiters.withServerId === 0) && (
+                  <div className="rounded-lg bg-brand-danger/10 border border-brand-danger/30 px-3 py-2 text-brand-danger font-semibold text-[11px]">
+                    ⚠️ Server_id lar yo'q — Sozlamalar → "To'liq sinxronlash" tugmasini bosing
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="border-t border-line pt-3" />
             <button
               onClick={async () => {
                 setLoadingOrders(true)

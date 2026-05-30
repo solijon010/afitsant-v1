@@ -64,6 +64,8 @@ export const IPC = {
   diagTestWaiters: 'diag:testWaiters',
   diagOpenLogs: 'diag:openLogs',
   diagRecentOrders: 'diag:recentOrders',
+  diagDbStatus: 'diag:dbStatus',
+  diagTestOrderCreate: 'diag:testOrderCreate',
 
   onSyncEvent: 'event:sync',
   onSyncStatus: 'event:syncStatus',
@@ -184,6 +186,14 @@ export interface BridgeAPI {
       itemCount: number
       createdAt: string
     }>>
+    dbStatus: () => Promise<{
+      waiters: { total: number; withServerId: number; list: string[] }
+      products: { total: number; withServerId: number }
+      tables: { total: number; withServerId: number; list: string[] }
+      token: string | null
+      branchId: string | null
+    }>
+    testOrderCreate: (roomServerId: string, waiterServerId: string, productServerId: string) => Promise<{ ok: boolean; orderId?: string; error?: string; raw?: any }>
   }
 
   on: {
