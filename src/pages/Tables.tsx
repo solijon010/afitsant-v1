@@ -109,7 +109,7 @@ export default function TablesPage(): JSX.Element {
   const clock = useClock()
 
   return (
-    <div className="flex h-full flex-col bg-[#F5F5F4]">
+    <div className="flex h-full flex-col" style={{ background: '#2f54a6' }}>
 
       {/* ── Header ── */}
       <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-stone-100 bg-white px-6 shadow-sm">
@@ -174,12 +174,10 @@ export default function TablesPage(): JSX.Element {
               <button
                 key={area.id}
                 onClick={() => setActiveAreaId(area.id)}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-all',
-                  active
-                    ? 'bg-[#C2410C] text-white shadow-sm'
-                    : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700',
-                )}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-all"
+                style={active
+                  ? { background: '#27ff44', color: '#0a1a0a', boxShadow: '0 2px 8px rgba(39,255,68,0.4)' }
+                  : { background: 'rgba(255,255,255,0.15)', color: 'white' }}
               >
                 {area.name}
                 {occ > 0 && (
