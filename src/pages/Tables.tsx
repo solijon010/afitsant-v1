@@ -168,7 +168,7 @@ export default function TablesPage(): JSX.Element {
       {areas.length > 1 && (
         <nav
           className="flex shrink-0 items-center gap-2 overflow-x-auto px-6 py-3"
-          style={{ background: '#081b2d', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ background: '#1a2636', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
         >
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
@@ -223,12 +223,12 @@ export default function TablesPage(): JSX.Element {
                 <section key={prefix}>
                   {/* Section sarlavha */}
                   <div className="mb-4 flex items-center gap-3">
-                    <div className="h-5 w-1 rounded-full bg-[#C2410C]" />
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-stone-500">
+                    <div className="h-5 w-1 rounded-full" style={{ background: '#fffa0a' }} />
+                    <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#c8cacd' }}>
                       {prefix}
                     </h2>
-                    <div className="flex-1 h-px bg-stone-100" />
-                    <span className="text-xs font-medium text-stone-400">
+                    <div className="flex-1 h-px" style={{ background: '#fffa0a40' }} />
+                    <span className="text-xs font-medium" style={{ color: '#9ea2a6' }}>
                       {activeCount}/{tables.length} band
                     </span>
                   </div>

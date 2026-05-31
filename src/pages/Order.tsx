@@ -182,7 +182,7 @@ export default function OrderPage(): JSX.Element {
   }, [tId, table, waiter?.id, settings?.serviceFeePercent])
 
   /* Kategoriya tartibi */
-  const CAT_ORDER = ['asosiy taomlar','salatlar','ichimliklar','go\'sht va shashliklar','maxsus taomlar']
+  const CAT_ORDER = ['asosiy taomlar','asosiy mahsulotlar','zakaz taomlar','salatlar','ichimliklar','go\'sht va shashliklar','maxsus taomlar']
   const sortedCategories = useMemo(() => {
     const seen = new Set<string>()
     return [...categories]
@@ -208,7 +208,7 @@ export default function OrderPage(): JSX.Element {
     const list = products.filter((p) => p.categoryId === activeCatId)
     const seen = new Set<string>()
     return list.filter(p => {
-      const key = `${p.nameUzLatn?.toLowerCase().trim()}_${p.price}`
+      const key = (p.nameUzLatn ?? '').toLowerCase().trim()
       if (seen.has(key)) return false
       seen.add(key)
       return true
@@ -590,7 +590,7 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         whileTap={{ scale: 0.97 }}
         className="relative flex cursor-pointer flex-col overflow-hidden rounded-2xl transition-all select-none"
         style={{
-          background: '#151728',
+          background: '#ffffff',
           border: '1.5px solid rgba(255,255,255,0.2)',
           boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
         }}
@@ -625,9 +625,9 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
           </div>
         )}
         <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-          <p className="line-clamp-2" style={{ color: '#ffffff', fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: 6 }}>{product.nameUzLatn}</p>
+          <p className="line-clamp-2" style={{ color: '#000000', fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: 6 }}>{product.nameUzLatn}</p>
           <div style={{ height: 1, background: 'rgba(255,255,255,0.12)', marginBottom: 6 }} />
-          <p style={{ color: '#f5c842', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
+          <p style={{ color: '#1a1a1a', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
             {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
           </p>
         </div>
