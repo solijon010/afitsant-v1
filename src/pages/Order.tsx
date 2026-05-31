@@ -465,34 +465,77 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 300px' }}>
-      <section className="flex flex-col overflow-hidden" style={{ background: '#2f54a6' }}>
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
-          <button
-            onClick={() => void handleSave()}
-            className="btn-ghost"
-            disabled={saving || printing}
-          >
-            <ArrowLeft size={15} /> Orqaga
-          </button>
-          <div className="text-center">
-            <p className="text-base font-bold text-stone-800">{table.name}</p>
-          </div>
-          <div className="w-[80px]" />
-        </header>
+    <div className="grid h-full" style={{ gridTemplateColumns: '180px 1fr 400px' }}>
 
-        <nav className="flex gap-2 overflow-x-auto border-b border-stone-100 bg-white px-5 py-3 shrink-0">
-          {sortedCategories.map((c, idx) => (
-            <CategoryPill
-              key={c.id}
-              cat={c}
-              idx={idx}
-              active={c.id === activeCatId}
-              onClick={() => setActiveCatId(c.id)}
-            />
-          ))}
+      {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
+      <aside style={{ background: '#1a2636', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '16px 16px 12px', borderBottom: '2px solid rgba(0,0,0,0.2)' }}>
+          <button onClick={() => void handleSave()} disabled={saving || printing}
+            style={{ 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, 
+              background: '#ef4444', 
+              border: '2px solid #7f1d1d', 
+              borderRadius: 8, 
+              cursor: 'pointer', color: '#fff', fontSize: 14, fontWeight: 800, 
+              padding: '12px', marginBottom: 12, width: '100%', 
+              boxShadow: '0 4px 0 #7f1d1d', 
+              transition: 'all 0.1s',
+              textTransform: 'uppercase', letterSpacing: '0.05em'
+            }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #7f1d1d' }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #7f1d1d' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #7f1d1d' }}
+          >
+            <ArrowLeft size={16} /> Orqaga
+          </button>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>{table.name}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Buyurtma</p>
+        </div>
+
+        {/* Kategoriyalar label */}
+        <div style={{ padding: '14px 16px 6px' }}>
+          <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Kategoriyalar</p>
+        </div>
+
+        {/* Kategoriyalar list */}
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {sortedCategories.map((c, idx) => {
+            const active = c.id === activeCatId
+            return (
+              <button key={c.id} onClick={() => setActiveCatId(c.id)}
+                style={{
+                  width: '100%', padding: '14px 16px', borderRadius: 8,
+                  border: active ? '2px solid #7c2d12' : '2px solid #0f172a',
+                  cursor: 'pointer', textAlign: 'left', fontSize: 14, fontWeight: 800,
+                  background: active ? '#ea580c' : '#334155',
+                  color: active ? '#fff' : '#f8fafc',
+                  boxShadow: active ? '0 0px 0 #7c2d12' : '0 4px 0 #0f172a',
+                  transform: active ? 'translateY(4px)' : 'translateY(0)',
+                  transition: 'all 0.1s',
+                  textTransform: 'uppercase', letterSpacing: '0.02em'
+                }}
+                onMouseDown={e => { if(!active) { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #0f172a' } }}
+                onMouseUp={e => { if(!active) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #0f172a' } }}
+                onMouseLeave={e => { if(!active) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #0f172a' } }}
+              >
+                {c.nameUzLatn}
+              </button>
+            )
+          })}
         </nav>
 
+        {/* User info */}
+        <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: '#fff' }}>{waiter.firstName} {waiter.lastName}</p>
+          <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+            {waiter.role === 'manager' ? 'Manager' : 'Afitsant'}
+          </p>
+        </div>
+      </aside>
+
+      {/* ── MARKAZ: Mahsulotlar ── */}
+      <section className="flex flex-col overflow-hidden" style={{ background: '#1742a1' }}>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
@@ -646,10 +689,10 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             {product.emoji ?? '📦'}
           </div>
         )}
-        <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-          <p className="line-clamp-2" style={{ color: '#000000', fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: 6 }}>{product.nameUzLatn}</p>
+        <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 0, background: '#1a2636' }}>
+          <p className="line-clamp-2" style={{ color: '#ffffff', fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: 6 }}>{product.nameUzLatn}</p>
           <div style={{ height: 1, background: 'rgba(255,255,255,0.12)', marginBottom: 6 }} />
-          <p style={{ color: '#1a1a1a', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
+          <p style={{ color: '#fcd34d', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
             {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
           </p>
         </div>
@@ -862,7 +905,7 @@ function CartPanel({
   }, [lines.length, showHistory])
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#0063e7' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#ffef12' }}>
 
       {/* Sinxronlash ogorish banneri */}
       {syncWarning && lines.length > 0 && (
@@ -910,7 +953,7 @@ function CartPanel({
       </div>
 
       {/* Asosiy kontent — savat yoki tarix (almashinadi, footer doim ko'rinadi) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px', background: 'transparent' }}>
         <AnimatePresence mode="wait">
           {showHistory ? (
             /* ── Tarix paneli ── */

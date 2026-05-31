@@ -81,8 +81,7 @@
   }
 
   ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    display: none;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
