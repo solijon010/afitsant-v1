@@ -121,7 +121,24 @@ export async function syncAllItems(input: {
   // count > 0 bo'lgan itemlarni ajratamiz — server 0 li itemlarni rad etadi
   const activeItems = items.filter((it) => it.count > 0)
 
-  // Mavjud PENDING/READY orderni topishga urinib ko'ramiz
+  // Yopilgan/bekor qilingan statuslar — bulardan boshqasi "aktiv" hisoblanadi
+  const CLOSED_STATUSES = ['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED']
+  const isActive = (o: any): boolean =>
+    !CLOSED_STATUSES.includes((o.status ?? '').toUpperCase())
+
+  // Xona bo'yicha aktiv buyurtmani topish — room endpointidan to'g'ridan qidiramiz
+  const findActiveForRoom = async (): Promise<any> => {
+    try {
+      const res = await api.get(`/api/order/room/${roomServerId}`)
+      const data = res.data as any
+      const list: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+      return list.find((o: any) =>
+        (o.room?.id === roomServerId || o.roomId === roomServerId || !o.room) && isActive(o)
+      ) ?? null
+    } catch { return null }
+  }
+
+  // Mavjud aktiv orderni topamiz (barcha statuslar tekshiriladi, nafaqat PENDING/READY)
   let existing: any = null
   try {
     let orders: any[] = []
@@ -132,24 +149,17 @@ export async function syncAllItems(input: {
         orders = Array.isArray(data) ? data : (data?.data ?? [])
       } catch (e: any) {
         console.warn(`[ORDER] /api/order/branch/${s.branchId} xato (${e?.response?.status}), room fallback`)
-        try {
-          const res = await api.get(`/api/order/room/${roomServerId}`)
-          const data = res.data as any
-          orders = Array.isArray(data) ? data : (data?.data ?? [])
-        } catch { orders = [] }
       }
-    } else {
-      try {
-        const res = await api.get(`/api/order/room/${roomServerId}`)
-        const data = res.data as any
-        orders = Array.isArray(data) ? data : (data?.data ?? [])
-      } catch { orders = [] }
     }
+    // branch endpointida topilmasa yoki branchId yo'q bo'lsa — room endpointidan qidiramiz
     existing = orders.find((o: any) =>
-      (o.room?.id === roomServerId || o.roomId === roomServerId) &&
-      (o.status === 'PENDING' || o.status === 'READY')
+      (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
     ) ?? null
-    console.log(`[ORDER] Existing order check — found: ${existing?.id ?? 'none'}`)
+
+    if (!existing) {
+      existing = await findActiveForRoom()
+    }
+    console.log(`[ORDER] Existing order check — found: ${existing?.id ?? 'none'} (status: ${existing?.status ?? '-'})`)
   } catch (e: any) {
     console.warn('[ORDER] Existing order fetch failed:', e?.message)
     existing = null
@@ -206,8 +216,27 @@ export async function syncAllItems(input: {
     return { serverId: newId }
   } catch (e: any) {
     const errData = e?.response?.data
+    const status = e?.response?.status
     console.error('[ORDER] POST /api/order xato:', JSON.stringify(errData ?? e?.message))
-    throw new Error(`Order yaratishda xato (${e?.response?.status ?? e?.code}): ${JSON.stringify(errData?.message ?? errData ?? e?.message)}`)
+
+    // 403 "Bu honada odam bor yoki xona band" — serverda buyurtma bor, topib yangilaymiz
+    if (status === 403) {
+      console.warn('[ORDER] 403 — xonada aktiv buyurtma bor, topib patch qilamiz...')
+      const found = await findActiveForRoom()
+      if (found) {
+        try {
+          await api.patch(`/api/order/sync-items/${found.id}`, {
+            items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+          })
+          console.log('[ORDER] 403 recovery OK — patched order:', found.id)
+          return { serverId: found.id }
+        } catch (patchErr: any) {
+          console.warn('[ORDER] 403 recovery patch xato:', patchErr?.message)
+        }
+      }
+    }
+
+    throw new Error(`Order yaratishda xato (${status ?? e?.code}): "${errData?.message ?? errData ?? e?.message}"`)
   }
 }
 
