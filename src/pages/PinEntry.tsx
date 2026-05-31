@@ -109,32 +109,39 @@ export default function PinEntry(): JSX.Element {
     <div
       ref={containerRef}
       tabIndex={-1}
-      className="fixed inset-0 flex outline-none"
+      className="fixed inset-0 flex flex-col outline-none"
       style={{ background: '#151d64' }}
     >
-      {/* ── CHAP: Katta soat ── */}
-      <ClockPanel onBack={() => navigate('/select-waiter')} />
+      {/* ── TEPPA: Katta soat ── */}
+      <TopPanel onBack={() => navigate('/select-waiter')} />
 
-      {/* ── O'NG: PIN kontent ── */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10" style={{ background: '#151d64' }}>
+      {/* ── MARKAZ: PIN kontent ── */}
+      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10">
 
         {/* Avatar — Logo */}
         <motion.div
           animate={shake ? { x: [-10, 10, -7, 7, -4, 4, 0] } : { x: 0 }}
           transition={{ duration: 0.42, ease: 'easeOut' }}
-          className="mb-5"
+          className="mb-6 flex items-center justify-center"
         >
-          <img
-            src={hisobchimLogo}
-            alt="Hisobchim"
-            className="h-52 w-52 object-contain"
-            style={{ mixBlendMode: 'multiply' }}
-            draggable={false}
-          />
+          <div style={{
+            width: 140, height: 140,
+            background: 'white', borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+            padding: 20
+          }}>
+            <img
+              src={hisobchimLogo}
+              alt="Hisobchim"
+              className="h-full w-full object-contain"
+              draggable={false}
+            />
+          </div>
         </motion.div>
 
         {/* Ism */}
-        <h1 className="mb-1 text-lg font-bold text-stone-900 tracking-wide">
+        <h1 className="mb-2 text-2xl font-bold text-white tracking-wide" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
           {waiter ? `${waiter.lastName} ${waiter.firstName}`.trim() : ''}
         </h1>
 
@@ -219,8 +226,8 @@ export default function PinEntry(): JSX.Element {
   )
 }
 
-/* ─── Chap panel: katta soat ─── */
-function ClockPanel({ onBack }: { onBack: () => void }): JSX.Element {
+/* ─── Tepa panel: soat va orqaga ─── */
+function TopPanel({ onBack }: { onBack: () => void }): JSX.Element {
   const [tick, setTick] = useState(() => new Date())
   useEffect(() => {
     const t = setInterval(() => setTick(new Date()), 1000)
@@ -235,44 +242,47 @@ function ClockPanel({ onBack }: { onBack: () => void }): JSX.Element {
 
   return (
     <div style={{
-      width: 420, flexShrink: 0,
-      background: '#102cff',
-      display: 'flex', flexDirection: 'column',
+      width: '100%',
+      padding: '24px 36px',
+      display: 'flex',
+      alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '28px 36px 36px',
+      background: 'rgba(0,0,0,0.15)',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.15)'
     }}>
       {/* Orqaga */}
       <button onClick={onBack} style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', cursor: 'pointer',
-        color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: 600,
-        padding: 0,
-      }}>
-        <ArrowLeft size={16} /> Orqaga
+        background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, cursor: 'pointer',
+        color: '#fff', fontSize: 14, fontWeight: 700,
+        padding: '12px 18px', transition: 'all 0.1s',
+        boxShadow: '0 4px 0 rgba(0,0,0,0.2)'
+      }}
+      onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 rgba(0,0,0,0)' }}
+      onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 rgba(0,0,0,0.2)' }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 rgba(0,0,0,0.2)' }}
+      >
+        <ArrowLeft size={18} /> Orqaga
       </button>
 
       {/* Soat */}
-      <div style={{ textAlign: 'left' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
+      <div style={{ textAlign: 'center', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4 }}>
           <span style={{
-            fontSize: 120, fontWeight: 900,
+            fontSize: 48, fontWeight: 900,
             color: '#ffffff', lineHeight: 0.9,
-            fontFamily: 'monospace', letterSpacing: '-6px',
+            fontFamily: 'monospace', letterSpacing: '-2px',
           }}>{timeStr}</span>
           <span style={{
-            fontSize: 44, fontWeight: 700,
+            fontSize: 20, fontWeight: 700,
             color: 'rgba(255,255,255,0.6)',
-            fontFamily: 'monospace', paddingBottom: 12,
+            fontFamily: 'monospace', paddingBottom: 4,
           }}>:{secStr}</span>
         </div>
-        <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginTop: 12 }}>{dateStr}</p>
-        <div style={{ height: 3, background: 'rgba(255,255,255,0.25)', borderRadius: 99, margin: '20px 0', width: 70 }} />
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-          Afitsantni tanlang
-        </p>
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{dateStr}</p>
       </div>
 
-      <div /> {/* spacer */}
+      <div style={{ width: 110 }} /> {/* spacer */}
     </div>
   )
 }

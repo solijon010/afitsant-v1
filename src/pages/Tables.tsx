@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Building2, LogOut, Settings as SettingsIcon, UtensilsCrossed, Utensils } from 'lucide-react'
+import { Building2, LogOut, Settings, UtensilsCrossed, Utensils, Wifi, User } from 'lucide-react'
 import hisobchimLogo from '@/assets/logo.png'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -109,31 +109,23 @@ export default function TablesPage(): JSX.Element {
   const clock = useClock()
 
   return (
-    <div className="flex h-full" style={{ background: '#f0f2f5' }}>
+    <div className="flex h-full" style={{ background: '#1742a1' }}>
 
       {/* ── CHAP SIDEBAR ── */}
-      <aside style={{ width: 200, flexShrink: 0, background: '#1a2636', display: 'flex', flexDirection: 'column' }}>
+      <aside style={{ position: 'relative', width: 180, flexShrink: 0, background: '#1a2636', display: 'flex', flexDirection: 'column', borderRight: '2px solid rgba(255,255,255,0.15)', boxShadow: '6px 0px 0px rgba(0,0,0,0.4)', zIndex: 10 }}>
         {/* Logo */}
-        <div style={{ padding: '16px 16px 12px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+        <div style={{ padding: '20px 16px 12px', display: 'flex', alignItems: 'center', gap: 14, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: '#fff' }}>
             <img src={hisobchimLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
               {settings?.organizationName ?? 'Restaurant'}
             </p>
-            <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>POS</p>
+            <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>POS</p>
           </div>
         </div>
 
-        {/* Soat */}
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-            <span style={{ fontSize: 28, fontWeight: 900, color: '#fff', fontFamily: 'monospace', letterSpacing: '-1px', lineHeight: 1 }}>{clock.time}</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>:{clock.secs}</span>
-          </div>
-          <p style={{ margin: '3px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{clock.date}</p>
-        </div>
 
         {/* Xona turlari label */}
         <div style={{ padding: '16px 16px 8px' }}>
@@ -143,21 +135,23 @@ export default function TablesPage(): JSX.Element {
         </div>
 
         {/* Area list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px' }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {/* Barchasi */}
           <button
             onClick={() => setActiveAreaId(null)}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 12px', borderRadius: 10, marginBottom: 2, border: 'none', cursor: 'pointer',
-              background: activeAreaId === null ? '#e11d48' : 'transparent',
-              color: activeAreaId === null ? '#fff' : 'rgba(255,255,255,0.65)',
-              fontSize: 13, fontWeight: 600, transition: 'all .15s',
+              padding: '12px 14px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer',
+              background: activeAreaId === null ? '#2563eb' : '#cbd5e1',
+              color: activeAreaId === null ? '#fff' : '#0f172a',
+              fontSize: 14, fontWeight: 700, transition: 'all .15s',
+              boxShadow: activeAreaId === null ? '0px 0px 0px rgba(0,0,0,0)' : '3px 3px 0px rgba(0,0,0,0.3)',
+              transform: activeAreaId === null ? 'translate(3px, 3px)' : 'none',
             }}
           >
             <span>Barchasi</span>
             {totalOccupied > 0 && (
-              <span style={{ background: activeAreaId === null ? 'rgba(255,255,255,0.25)' : '#e11d48', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 7px', minWidth: 20, textAlign: 'center' }}>
+              <span style={{ background: activeAreaId === null ? '#fff' : '#2563eb', color: activeAreaId === null ? '#2563eb' : '#fff', borderRadius: 99, fontSize: 11, fontWeight: 700, padding: '2px 8px', minWidth: 24, textAlign: 'center' }}>
                 {totalOccupied}
               </span>
             )}
@@ -169,15 +163,17 @@ export default function TablesPage(): JSX.Element {
               <button key={area.id} onClick={() => setActiveAreaId(area.id)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 12px', borderRadius: 10, marginBottom: 2, border: 'none', cursor: 'pointer',
-                  background: active ? '#e11d48' : 'transparent',
-                  color: active ? '#fff' : 'rgba(255,255,255,0.65)',
-                  fontSize: 13, fontWeight: 600, transition: 'all .15s',
+                  padding: '12px 14px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer',
+                  background: active ? '#2563eb' : '#cbd5e1',
+                  color: active ? '#fff' : '#0f172a',
+                  fontSize: 14, fontWeight: 700, transition: 'all .15s',
+                  boxShadow: active ? '0px 0px 0px rgba(0,0,0,0)' : '3px 3px 0px rgba(0,0,0,0.3)',
+                  transform: active ? 'translate(3px, 3px)' : 'none',
                 }}
               >
                 <span>{area.name}</span>
                 {occ > 0 && (
-                  <span style={{ background: active ? 'rgba(255,255,255,0.25)' : '#e11d48', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 7px', minWidth: 20, textAlign: 'center' }}>
+                  <span style={{ background: active ? '#fff' : '#2563eb', color: active ? '#2563eb' : '#fff', borderRadius: 99, fontSize: 11, fontWeight: 700, padding: '2px 8px', minWidth: 24, textAlign: 'center' }}>
                     {occ}
                   </span>
                 )}
@@ -201,21 +197,42 @@ export default function TablesPage(): JSX.Element {
 
       {/* ── O'NG KONTENT ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Top bar */}
-        <div style={{ background: '#fff', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e9edf2', flexShrink: 0 }}>
+        {/* ── TEPADAGI QISM (Top bar) ── */}
+        <div style={{ position: 'relative', background: '#1a2636', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderBottom: '2px solid rgba(255,255,255,0.15)', boxShadow: '0px 6px 0px rgba(0,0,0,0.4)', zIndex: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {totalOccupied > 0 && (
-              <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 10, padding: '6px 14px' }}>
-                <p style={{ margin: 0, fontSize: 10, color: '#dc2626', fontWeight: 600 }}>{totalOccupied} ta band</p>
-                <p style={{ margin: 0, fontSize: 13, color: '#dc2626', fontWeight: 800, fontFamily: 'monospace' }}>{fmtMoney(totalSum)} so'm</p>
+              <div style={{ background: '#eab308', border: '2px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '4px 12px', color: '#0f172a', boxShadow: '3px 3px 0px rgba(0,0,0,0.4)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.85 }}>{totalOccupied} ta band</div>
+                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 1, letterSpacing: '0.5px' }}>
+                  {totalSum.toLocaleString()} so'm
+                </div>
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <StatusBar />
-            <button onClick={() => navigate('/settings')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              <SettingsIcon size={15} /> Sozlamalar
+
+          {/* MARKAZDAGI SOAT */}
+          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4px 20px', borderRadius: 10, background: '#0f172a', border: '2px solid rgba(255,255,255,0.15)', boxShadow: 'inset 0 4px 8px rgba(0,0,0,0.6), 0 2px 0 rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, lineHeight: 1 }}>
+              <span style={{ fontSize: 24, fontWeight: 900, color: '#fff', letterSpacing: '1px', fontFamily: 'monospace' }}>{clock.time}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#38bdf8', fontFamily: 'monospace' }}>:{clock.secs}</span>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px', marginTop: 2 }}>{clock.date}</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(22, 163, 74, 0.15)', padding: '6px 12px', borderRadius: 10 }}>
+              <Wifi size={14} color="#4ade80" />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#4ade80' }}>Onlayn</span>
+            </div>
+            
+            <button onClick={() => navigate('/settings')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', borderRadius: 10, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <Settings size={16} color="#cbd5e1" />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#cbd5e1' }}>Sozlamalar</span>
             </button>
+
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid rgba(255,255,255,0.1)' }}>
+              <User size={18} color="#cbd5e1" />
+            </div>
           </div>
         </div>
 
@@ -236,10 +253,10 @@ export default function TablesPage(): JSX.Element {
                 const activeCount = tables.filter((t) => !!t.order).length
                 return (
                   <section key={prefix}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em' }}>{prefix}</span>
-                      <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-                      <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{activeCount}/{tables.length} ta</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+                      <span style={{ fontSize: 18, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{prefix}</span>
+                      <div style={{ flex: 1, height: 2, background: 'rgba(255,255,255,0.15)' }} />
+                      <span style={{ fontSize: 15, color: '#cbd5e1', fontWeight: 600 }}>{activeCount}/{tables.length} ta</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: 16 }}>
                       {tables.map((tw, i) => (
@@ -358,13 +375,13 @@ function TableCard({
             </div>
           )}
           {/* Summa + o'q tugma */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-            <span style={{ fontSize: 20, fontWeight: 900, color: '#111', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 4 }}>
+            <span style={{ flex: 1, fontSize: 18, fontWeight: 900, color: '#111', fontFamily: 'monospace', letterSpacing: '-0.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {fmtMoney(total)}{' '}
               <span style={{ fontSize: 12, fontWeight: 500, color: '#666' }}>so'm</span>
             </span>
             <div style={{
-              width: 34, height: 34, borderRadius: '50%',
+              width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
               background: ACTIVE_COLOR,
               display: 'grid', placeItems: 'center',
               boxShadow: `0 4px 12px ${ACTIVE_COLOR}50`,

@@ -465,18 +465,32 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '200px 1fr 440px' }}>
+    <div className="grid h-full" style={{ gridTemplateColumns: '180px 1fr 400px' }}>
 
       {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
       <aside style={{ background: '#1a2636', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
-        <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ padding: '16px 16px 12px', borderBottom: '2px solid rgba(0,0,0,0.2)' }}>
           <button onClick={() => void handleSave()} disabled={saving || printing}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 8 }}>
-            <ArrowLeft size={15} /> Orqaga
+            style={{ 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, 
+              background: '#ef4444', 
+              border: '2px solid #7f1d1d', 
+              borderRadius: 8, 
+              cursor: 'pointer', color: '#fff', fontSize: 14, fontWeight: 800, 
+              padding: '12px', marginBottom: 12, width: '100%', 
+              boxShadow: '0 4px 0 #7f1d1d', 
+              transition: 'all 0.1s',
+              textTransform: 'uppercase', letterSpacing: '0.05em'
+            }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #7f1d1d' }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #7f1d1d' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #7f1d1d' }}
+          >
+            <ArrowLeft size={16} /> Orqaga
           </button>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>{table.name}</p>
-          <p style={{ margin: '2px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Buyurtma</p>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>{table.name}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Buyurtma</p>
         </div>
 
         {/* Kategoriyalar label */}
@@ -485,20 +499,30 @@ export default function OrderPage(): JSX.Element {
         </div>
 
         {/* Kategoriyalar list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 12px' }}>
-          {sortedCategories.map((c, idx) => (
-            <button key={c.id} onClick={() => setActiveCatId(c.id)}
-              style={{
-                width: '100%', padding: '10px 12px', borderRadius: 10, marginBottom: 2,
-                border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600,
-                background: c.id === activeCatId ? (c.color || TAB_COLORS[idx % TAB_COLORS.length]) : 'transparent',
-                color: c.id === activeCatId ? '#fff' : 'rgba(255,255,255,0.65)',
-                transition: 'all .15s',
-              }}
-            >
-              {c.nameUzLatn}
-            </button>
-          ))}
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {sortedCategories.map((c, idx) => {
+            const active = c.id === activeCatId
+            return (
+              <button key={c.id} onClick={() => setActiveCatId(c.id)}
+                style={{
+                  width: '100%', padding: '14px 16px', borderRadius: 8,
+                  border: active ? '2px solid #7c2d12' : '2px solid #0f172a',
+                  cursor: 'pointer', textAlign: 'left', fontSize: 14, fontWeight: 800,
+                  background: active ? '#ea580c' : '#334155',
+                  color: active ? '#fff' : '#f8fafc',
+                  boxShadow: active ? '0 0px 0 #7c2d12' : '0 4px 0 #0f172a',
+                  transform: active ? 'translateY(4px)' : 'translateY(0)',
+                  transition: 'all 0.1s',
+                  textTransform: 'uppercase', letterSpacing: '0.02em'
+                }}
+                onMouseDown={e => { if(!active) { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #0f172a' } }}
+                onMouseUp={e => { if(!active) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #0f172a' } }}
+                onMouseLeave={e => { if(!active) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #0f172a' } }}
+              >
+                {c.nameUzLatn}
+              </button>
+            )
+          })}
         </nav>
 
         {/* User info */}
@@ -511,7 +535,7 @@ export default function OrderPage(): JSX.Element {
       </aside>
 
       {/* ── MARKAZ: Mahsulotlar ── */}
-      <section className="flex flex-col overflow-hidden" style={{ background: '#f0f2f5' }}>
+      <section className="flex flex-col overflow-hidden" style={{ background: '#1742a1' }}>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
@@ -643,10 +667,10 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             {product.emoji ?? '📦'}
           </div>
         )}
-        <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-          <p className="line-clamp-2" style={{ color: '#000000', fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: 6 }}>{product.nameUzLatn}</p>
+        <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 0, background: '#1a2636' }}>
+          <p className="line-clamp-2" style={{ color: '#ffffff', fontSize: 15, fontWeight: 700, lineHeight: 1.3, marginBottom: 6 }}>{product.nameUzLatn}</p>
           <div style={{ height: 1, background: 'rgba(255,255,255,0.12)', marginBottom: 6 }} />
-          <p style={{ color: '#1a1a1a', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
+          <p style={{ color: '#fcd34d', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
             {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
           </p>
         </div>
@@ -859,7 +883,7 @@ function CartPanel({
   }, [lines.length, showHistory])
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#1742a1' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#ffef12' }}>
 
       {/* Sinxronlash ogorish banneri */}
       {syncWarning && lines.length > 0 && (
@@ -907,7 +931,7 @@ function CartPanel({
       </div>
 
       {/* Asosiy kontent — savat yoki tarix (almashinadi, footer doim ko'rinadi) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px', background: '#c2b70c' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px', background: 'transparent' }}>
         <AnimatePresence mode="wait">
           {showHistory ? (
             /* ── Tarix paneli ── */
@@ -1000,7 +1024,7 @@ function CartPanel({
           </button>
           <div style={{ display: 'flex', gap: 7 }}>
             <button onClick={() => void onSave()} disabled={saving || printing}
-              style={{ flex: 1, height: 42, borderRadius: 10, border: '1.5px solid #D6D3D1', background: 'white', color: '#1C1917', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving || printing ? 0.6 : 1 }}>
+              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)', opacity: saving || printing ? 0.6 : 1 }}>
               <Save size={13} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
             </button>
             <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
