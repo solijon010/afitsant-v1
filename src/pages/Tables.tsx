@@ -251,7 +251,8 @@ export default function TablesPage(): JSX.Element {
               })}
             </div>
           )}
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
