@@ -512,8 +512,6 @@ export default function OrderPage(): JSX.Element {
 
       {/* ── MARKAZ: Mahsulotlar ── */}
       <section className="flex flex-col overflow-hidden" style={{ background: '#f0f2f5' }}>
-        <div style={{ padding: '0 0', flex: 1, display: 'flex', flexDirection: 'column' }}>
-          </div>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
@@ -526,7 +524,6 @@ export default function OrderPage(): JSX.Element {
               ))}
             </div>
           )}
-        </div>
         </div>
       </section>
 
