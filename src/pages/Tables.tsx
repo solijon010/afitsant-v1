@@ -173,6 +173,14 @@ export default function TablesPage(): JSX.Element {
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
+            const COLORS = [
+              { bg: '#0EA5E9', light: '#E0F2FE', text: '#0284C7' }, // osmon ko'k
+              { bg: '#8B5CF6', light: '#EDE9FE', text: '#7C3AED' }, // binafsha
+              { bg: '#10B981', light: '#D1FAE5', text: '#059669' }, // emerald
+              { bg: '#F59E0B', light: '#FEF3C7', text: '#D97706' }, // amber
+              { bg: '#EF4444', light: '#FEE2E2', text: '#DC2626' }, // qizil
+            ]
+            const c = COLORS[idx % COLORS.length]
             return (
               <button
                 key={area.id}
