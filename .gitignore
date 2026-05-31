@@ -12,3 +12,6 @@ out
 .vscode/*
 !.vscode/extensions.json
 *.tsbuildinfo
+.claude/
+build/icons/
+USB0*
