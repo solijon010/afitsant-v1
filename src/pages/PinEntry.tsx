@@ -110,13 +110,13 @@ export default function PinEntry(): JSX.Element {
       ref={containerRef}
       tabIndex={-1}
       className="fixed inset-0 flex outline-none"
-      style={{ background: '#01f419' }}
+      style={{ background: '#151d64' }}
     >
       {/* ── CHAP: Katta soat ── */}
       <ClockPanel onBack={() => navigate('/select-waiter')} />
 
       {/* ── O'NG: PIN kontent ── */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10" style={{ background: '#01f419' }}>
+      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10" style={{ background: '#151d64' }}>
 
         {/* Avatar — Logo */}
         <motion.div
@@ -235,41 +235,39 @@ function ClockPanel({ onBack }: { onBack: () => void }): JSX.Element {
 
   return (
     <div style={{
-      width: 380, flexShrink: 0,
-      background: 'rgba(0,0,0,0.18)',
+      width: 420, flexShrink: 0,
+      background: '#102cff',
       display: 'flex', flexDirection: 'column',
       justifyContent: 'space-between',
-      padding: '24px 32px 32px',
+      padding: '28px 36px 36px',
     }}>
       {/* Orqaga */}
       <button onClick={onBack} style={{
         display: 'flex', alignItems: 'center', gap: 6,
         background: 'none', border: 'none', cursor: 'pointer',
-        color: 'rgba(0,0,0,0.7)', fontSize: 14, fontWeight: 600,
+        color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: 600,
         padding: 0,
       }}>
         <ArrowLeft size={16} /> Orqaga
       </button>
 
       {/* Soat */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4, marginBottom: 8 }}>
+      <div style={{ textAlign: 'left' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 10 }}>
           <span style={{
-            fontSize: 96, fontWeight: 900,
-            color: '#000', lineHeight: 1,
-            fontFamily: 'monospace', letterSpacing: '-4px',
+            fontSize: 120, fontWeight: 900,
+            color: '#ffffff', lineHeight: 0.9,
+            fontFamily: 'monospace', letterSpacing: '-6px',
           }}>{timeStr}</span>
           <span style={{
-            fontSize: 36, fontWeight: 700,
-            color: 'rgba(0,0,0,0.5)',
-            fontFamily: 'monospace', paddingBottom: 10,
+            fontSize: 44, fontWeight: 700,
+            color: 'rgba(255,255,255,0.6)',
+            fontFamily: 'monospace', paddingBottom: 12,
           }}>:{secStr}</span>
         </div>
-        <p style={{ fontSize: 18, fontWeight: 600, color: 'rgba(0,0,0,0.7)', marginTop: 8 }}>{dateStr}</p>
-
-        {/* Dekorativ chiziq */}
-        <div style={{ height: 3, background: 'rgba(0,0,0,0.2)', borderRadius: 99, margin: '20px auto', width: 60 }} />
-        <p style={{ fontSize: 13, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+        <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginTop: 12 }}>{dateStr}</p>
+        <div style={{ height: 3, background: 'rgba(255,255,255,0.25)', borderRadius: 99, margin: '20px 0', width: 70 }} />
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
           Afitsantni tanlang
         </p>
       </div>

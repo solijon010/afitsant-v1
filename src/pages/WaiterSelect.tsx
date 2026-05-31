@@ -97,7 +97,7 @@ export default function WaiterSelect(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ background: '#01f419' }}>
+    <div className="flex h-full flex-col" style={{ background: '#1b1f56' }}>
 
       {/* ── Sinxronlash banneri ── */}
       {syncStatus === 'syncing' && (
