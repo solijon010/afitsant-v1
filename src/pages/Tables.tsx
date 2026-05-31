@@ -67,6 +67,7 @@ export default function TablesPage(): JSX.Element {
   const waiter = useAuth((s) => s.waiter)
   const settings = useSettings((s) => s.settings)
   const { areas, snapshot, load, activeAreaId, setActiveAreaId } = useTables()
+  const { dark, toggle: toggleDark } = useTheme()
 
   useEffect(() => {
     void load()
@@ -153,6 +154,13 @@ export default function TablesPage(): JSX.Element {
             </div>
           )}
           <StatusBar />
+          <button
+            onClick={toggleDark}
+            title={dark ? 'Yorqin rejim' : 'Qorong\'i rejim'}
+            className="btn-ghost h-10 w-10 p-0"
+          >
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           <button
             onClick={() => navigate('/settings')}
             className="inline-flex items-center gap-2 rounded-xl border border-line bg-bg-card px-4 py-2.5 text-sm font-semibold text-ink hover:bg-bg-elevated hover:border-line-strong transition-all shadow-sm"
