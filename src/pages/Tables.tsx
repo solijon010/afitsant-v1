@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTheme } from '@/stores/theme'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Building2, LogOut, Settings, UtensilsCrossed, Utensils, Wifi, User } from 'lucide-react'
