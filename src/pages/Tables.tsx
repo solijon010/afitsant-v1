@@ -67,6 +67,7 @@ export default function TablesPage(): JSX.Element {
   const waiter = useAuth((s) => s.waiter)
   const settings = useSettings((s) => s.settings)
   const { areas, snapshot, load, activeAreaId, setActiveAreaId } = useTables()
+  const { dark, toggle: toggleDark } = useTheme()
 
   useEffect(() => {
     void load()
@@ -138,16 +139,15 @@ export default function TablesPage(): JSX.Element {
         <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {/* Barchasi */}
           <button
-            onClick={() => setActiveAreaId(null)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 14px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer',
-              background: activeAreaId === null ? '#2563eb' : '#cbd5e1',
-              color: activeAreaId === null ? '#fff' : '#0f172a',
-              fontSize: 14, fontWeight: 700, transition: 'all .15s',
-              boxShadow: activeAreaId === null ? '0px 0px 0px rgba(0,0,0,0)' : '3px 3px 0px rgba(0,0,0,0.3)',
-              transform: activeAreaId === null ? 'translate(3px, 3px)' : 'none',
-            }}
+            onClick={toggleDark}
+            title={dark ? 'Yorqin rejim' : 'Qorong\'i rejim'}
+            className="btn-ghost h-10 w-10 p-0"
+          >
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button
+            onClick={() => navigate('/settings')}
+            className="inline-flex items-center gap-2 rounded-xl border border-line bg-bg-card px-4 py-2.5 text-sm font-semibold text-ink hover:bg-bg-elevated hover:border-line-strong transition-all shadow-sm"
           >
             <span>Barchasi</span>
             {totalOccupied > 0 && (
@@ -159,6 +159,14 @@ export default function TablesPage(): JSX.Element {
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
+            const COLORS = [
+              { bg: '#0EA5E9', light: '#E0F2FE', text: '#0284C7' }, // osmon ko'k
+              { bg: '#8B5CF6', light: '#EDE9FE', text: '#7C3AED' }, // binafsha
+              { bg: '#10B981', light: '#D1FAE5', text: '#059669' }, // emerald
+              { bg: '#F59E0B', light: '#FEF3C7', text: '#D97706' }, // amber
+              { bg: '#EF4444', light: '#FEE2E2', text: '#DC2626' }, // qizil
+            ]
+            const c = COLORS[idx % COLORS.length]
             return (
               <button key={area.id} onClick={() => setActiveAreaId(area.id)}
                 style={{

@@ -607,6 +607,28 @@ function CategoryPill({
   )
 }
 
+function ProductImage({ imgSrc, name, emoji, qty }: { imgSrc: string | null; name: string; emoji?: string | null; qty: number }): JSX.Element {
+  const [failed, setFailed] = useState(false)
+  if (imgSrc && !failed) {
+    return (
+      <div className="relative aspect-square w-full overflow-hidden bg-white">
+        <img
+          src={imgSrc}
+          alt={name}
+          className="h-full w-full object-contain p-2"
+          onError={() => setFailed(true)}
+        />
+        {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-[#C2410C]" />}
+      </div>
+    )
+  }
+  return (
+    <div className={cn('flex aspect-square items-center justify-center text-5xl', qty > 0 ? 'bg-[#C2410C]/5' : 'bg-stone-50')}>
+      {emoji ?? '📦'}
+    </div>
+  )
+}
+
 function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
@@ -1016,22 +1038,23 @@ function CartPanel({
           </div>
         </div>
 
-        {/* Tugmalar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {/* Tugmalar — 3 xil rang */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Saqlash — ko'k */}
+          <button onClick={() => void onSave()} disabled={saving || printing}
+            style={{ width: '100%', height: 46, borderRadius: 12, border: 'none', background: saving || printing ? '#93C5FD' : 'linear-gradient(135deg,#3B82F6,#2563EB)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(59,130,246,0.4)', letterSpacing: '0.02em' }}>
+            <Save size={15} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
+          </button>
+          {/* Chek — yashil */}
+          <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
+            style={{ width: '100%', height: 46, borderRadius: 12, border: 'none', background: lines.length === 0 ? '#D1FAE5' : 'linear-gradient(135deg,#22C55E,#16A34A)', color: lines.length === 0 ? '#6EE7B7' : 'white', fontSize: 14, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: lines.length > 0 ? '0 4px 14px rgba(34,197,94,0.4)' : 'none', letterSpacing: '0.02em' }}>
+            <Printer size={15} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
+          </button>
+          {/* Bekor — qizil */}
           <button onClick={onCancel} disabled={saving || printing || lines.length === 0}
-            style={{ width: '100%', height: 40, borderRadius: 10, border: '1.5px solid #fca5a5', background: lines.length === 0 ? '#f8fafc' : '#fff1f2', color: lines.length === 0 ? '#94a3b8' : '#ef4444', fontSize: 12, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            style={{ width: '100%', height: 42, borderRadius: 12, border: '1.5px solid #FECACA', background: lines.length === 0 ? '#FEF2F2' : '#FEF2F2', color: lines.length === 0 ? '#FCA5A5' : '#EF4444', fontSize: 13, fontWeight: 600, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <Ban size={13} /> Zakazni bekor qilish
           </button>
-          <div style={{ display: 'flex', gap: 7 }}>
-            <button onClick={() => void onSave()} disabled={saving || printing}
-              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)', opacity: saving || printing ? 0.6 : 1 }}>
-              <Save size={13} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
-            </button>
-            <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
-              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: lines.length === 0 ? '#e2e8f0' : 'linear-gradient(145deg,#22c55e,#15803d)', color: lines.length === 0 ? '#94a3b8' : 'white', fontSize: 13, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: lines.length > 0 ? '0 4px 12px rgba(34,197,94,0.35)' : 'none', opacity: printing || saving ? 0.6 : 1 }}>
-              <Printer size={13} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
-            </button>
-          </div>
         </div>
       </div>
     </aside>
