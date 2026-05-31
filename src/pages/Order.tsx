@@ -274,6 +274,7 @@ export default function OrderPage(): JSX.Element {
         if (syncItems.length > 0) {
           try {
             const res = await window.afisant.orders.syncAll({
+              localOrderId: orderId ?? undefined,
               roomServerId,
               items: syncItems
             })
@@ -378,6 +379,7 @@ export default function OrderPage(): JSX.Element {
         if (itemsWithServerId.length > 0) {
           try {
             const res = await window.afisant.orders.syncAll({
+              localOrderId: orderId ?? undefined,
               roomServerId,
               items: itemsWithServerId.map((l) => ({
                 productServerId: l.productServerId!,

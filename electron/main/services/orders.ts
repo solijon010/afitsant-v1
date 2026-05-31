@@ -2,11 +2,42 @@ import { randomUUID } from 'node:crypto'
 import { getDb } from '../db/connection'
 import { mapOrder, mapOrderItem } from '../db/mappers'
 import { getApi } from './apiClient'
+import { fetchVisibleOrders } from './orderApi'
 import { getSettings } from './settings'
 import type { Order, OrderItem, OrderWithItems } from '@shared/types'
-import { enqueue } from './syncQueue'
 
 const now = () => Date.now()
+
+async function updateServerOrderStatus(orderId: string, status: 'SUCCESS' | 'CANCELED'): Promise<void> {
+  const api = getApi()
+  await api.patch(`/api/order/status/${orderId}`, null, { params: { status } })
+}
+
+function markOrderPending(orderId: number, ts = now()): void {
+  getDb()
+    .prepare(`UPDATE orders SET sync_status = 'pending', updated_at = ? WHERE id = ?`)
+    .run(ts, orderId)
+}
+
+function markOrderSynced(orderId: number, serverOrderId?: string): void {
+  const db = getDb()
+  const ts = now()
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE orders
+       SET server_id = COALESCE(?, server_id),
+           sync_status = 'synced',
+           updated_at = ?
+       WHERE id = ?`
+    ).run(serverOrderId ?? null, ts, orderId)
+    db.prepare(
+      `UPDATE order_items
+       SET sync_status = 'synced',
+           updated_at = ?
+       WHERE order_id = ?`
+    ).run(ts, orderId)
+  })()
+}
 
 function buildOrderWithItems(orderId: number): OrderWithItems | null {
   const db = getDb()
@@ -20,28 +51,8 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
   const s = getSettings()
   if (!s.apiToken) return null
 
-  const api = getApi()
   try {
-    // branchId bilan so'rov 403 bersa, xona endpointiga fallback
-    let orders: any[] = []
-    if (s.branchId) {
-      try {
-        const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
-        const data = res.data as any
-        orders = Array.isArray(data) ? data : (data?.data ?? [])
-      } catch (e: any) {
-        console.warn(`[ORDER] /api/order/branch/${s.branchId} xato (${e?.response?.status}), room endpointga fallback`)
-        try {
-          const res = await api.get(`/api/order/room/${roomServerId}`)
-          const data = res.data as any
-          orders = Array.isArray(data) ? data : (data?.data ?? [])
-        } catch { orders = [] }
-      }
-    } else {
-      const res = await api.get(`/api/order/room/${roomServerId}`)
-      const data = res.data as any
-      orders = Array.isArray(data) ? data : (data?.data ?? [])
-    }
+    const orders = await fetchVisibleOrders(200)
     const active = orders.find(
       (o: any) =>
         o.room?.id === roomServerId &&
@@ -109,6 +120,7 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
 }
 
 export async function syncAllItems(input: {
+  localOrderId?: number
   roomServerId: string
   items: Array<{ productServerId: string; count: number }>
 }): Promise<{ serverId: string }> {
@@ -116,10 +128,11 @@ export async function syncAllItems(input: {
   if (!s.apiToken) throw new Error('Token yo\'q')
 
   const api = getApi()
-  const { roomServerId, items } = input
+  const { localOrderId, roomServerId, items } = input
 
   // count > 0 bo'lgan itemlarni ajratamiz — server 0 li itemlarni rad etadi
   const activeItems = items.filter((it) => it.count > 0)
+  const patchItems = items
 
   // Yopilgan/bekor qilingan statuslar — bulardan boshqasi "aktiv" hisoblanadi
   const CLOSED_STATUSES = ['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED']
@@ -128,30 +141,16 @@ export async function syncAllItems(input: {
 
   // Xona bo'yicha aktiv buyurtmani topish — room endpointidan to'g'ridan qidiramiz
   const findActiveForRoom = async (): Promise<any> => {
-    try {
-      const res = await api.get(`/api/order/room/${roomServerId}`)
-      const data = res.data as any
-      const list: any[] = Array.isArray(data) ? data : (data?.data ?? [])
-      return list.find((o: any) =>
-        (o.room?.id === roomServerId || o.roomId === roomServerId || !o.room) && isActive(o)
-      ) ?? null
-    } catch { return null }
+    const list = await fetchVisibleOrders(200)
+    return list.find((o: any) =>
+      (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
+    ) ?? null
   }
 
   // Mavjud aktiv orderni topamiz (barcha statuslar tekshiriladi, nafaqat PENDING/READY)
   let existing: any = null
   try {
-    let orders: any[] = []
-    if (s.branchId) {
-      try {
-        const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
-        const data = res.data as any
-        orders = Array.isArray(data) ? data : (data?.data ?? [])
-      } catch (e: any) {
-        console.warn(`[ORDER] /api/order/branch/${s.branchId} xato (${e?.response?.status}), room fallback`)
-      }
-    }
-    // branch endpointida topilmasa yoki branchId yo'q bo'lsa — room endpointidan qidiramiz
+    const orders = await fetchVisibleOrders(200)
     existing = orders.find((o: any) =>
       (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
     ) ?? null
@@ -168,15 +167,16 @@ export async function syncAllItems(input: {
   if (existing) {
     if (activeItems.length === 0) {
       // Savat bo'sh — mavjud orderni bekor qilamiz
-      await api.patch(`/api/order/${existing.id}/status`, { status: 'CANCELED' })
+      await updateServerOrderStatus(existing.id, 'CANCELED')
       return { serverId: existing.id }
     }
     // Mavjud orderni yangilash — sync-items endpointi
     try {
       await api.patch(`/api/order/sync-items/${existing.id}`, {
-        items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+        items: patchItems.map((it) => ({ productId: it.productServerId, count: it.count }))
       })
       console.log(`[ORDER] Updated existing order ${existing.id}`)
+      if (localOrderId) markOrderSynced(localOrderId, existing.id)
     } catch (e: any) {
       // sync-items 400/404 bersa, to'liq yangi order yaratishga urinib ko'ramiz
       console.warn(`[ORDER] sync-items xato (${e?.response?.status}), yangi order yaratilmoqda...`)
@@ -184,7 +184,7 @@ export async function syncAllItems(input: {
       console.warn('[ORDER] sync-items error body:', JSON.stringify(errData ?? e?.message))
       // existing orderni o'chirib, yangi yaratamiz
       try {
-        await api.patch(`/api/order/${existing.id}/status`, { status: 'CANCELED' })
+        await updateServerOrderStatus(existing.id, 'CANCELED')
       } catch { /* ignore */ }
       existing = null
     }
@@ -213,6 +213,7 @@ export async function syncAllItems(input: {
     const createRes = await api.post('/api/order', body)
     const newId = createRes.data?.id ?? createRes.data?.serverId
     console.log('[ORDER] Created order:', newId)
+    if (localOrderId) markOrderSynced(localOrderId, newId)
     return { serverId: newId }
   } catch (e: any) {
     const errData = e?.response?.data
@@ -229,6 +230,7 @@ export async function syncAllItems(input: {
             items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
           })
           console.log('[ORDER] 403 recovery OK — patched order:', found.id)
+          if (localOrderId) markOrderSynced(localOrderId, found.id)
           return { serverId: found.id }
         } catch (patchErr: any) {
           console.warn('[ORDER] 403 recovery patch xato:', patchErr?.message)
@@ -241,14 +243,11 @@ export async function syncAllItems(input: {
 }
 
 export async function closeOrderOnServer(serverOrderId: string): Promise<void> {
-  const api = getApi()
-  // PATCH /api/order/{id}/status  bilan SUCCESS ga o'tkazish
-  await api.patch(`/api/order/${serverOrderId}/status`, { status: 'SUCCESS' })
+  await updateServerOrderStatus(serverOrderId, 'SUCCESS')
 }
 
 export async function cancelOrderOnServer(serverOrderId: string): Promise<void> {
-  const api = getApi()
-  await api.patch(`/api/order/${serverOrderId}/status`, { status: 'CANCELED' })
+  await updateServerOrderStatus(serverOrderId, 'CANCELED')
 }
 
 export function upsertOpenOrder(input: {
@@ -302,6 +301,7 @@ export function replaceOrderItems(
       insert.run(it.localUuid, orderId, it.productId, it.productName, it.unitPrice, it.quantity, it.notes ?? null, ts, ts)
     }
     recalculateOrder(orderId)
+    markOrderPending(orderId, ts)
   })
   tx()
 
@@ -346,6 +346,7 @@ export function addItems(
       inserted.push(mapOrderItem(row))
     }
     recalculateOrder(orderId)
+    markOrderPending(orderId, ts)
   })
   tx()
   return inserted
@@ -367,16 +368,19 @@ export function updateItem(itemId: number, patch: { quantity?: number; notes?: s
   ).run(newQuantity, newNotes, ts, itemId)
 
   recalculateOrder(existing.order_id)
+  markOrderPending(existing.order_id, ts)
   const row = db.prepare(`SELECT * FROM order_items WHERE id = ?`).get(itemId) as any
   return mapOrderItem(row)
 }
 
 export function removeItem(itemId: number): void {
   const db = getDb()
+  const ts = now()
   const existing = db.prepare(`SELECT * FROM order_items WHERE id = ?`).get(itemId) as any
   if (!existing) return
   db.prepare(`DELETE FROM order_items WHERE id = ?`).run(itemId)
   recalculateOrder(existing.order_id)
+  markOrderPending(existing.order_id, ts)
 }
 
 export function closeOrder(orderId: number): Order {

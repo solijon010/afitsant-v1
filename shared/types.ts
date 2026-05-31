@@ -164,6 +164,7 @@ export interface ServerUser {
   lastName: string
   role: string
   phoneNumer: string
+  branchId?: string | null
 }
 
 export interface BranchInfo {

@@ -13,10 +13,10 @@ const DEFAULTS: Settings = {
   printerIp: null,
   printerName: null,
   printerDevicePath: '/dev/usb/lp0',
-  organizationName: 'Restoran',
+  organizationName: '',
   serviceFeePercent: 0,
-  receiptHeader: 'Xush kelibsiz!',
-  receiptFooter: 'Tashrifingiz uchun rahmat!'
+  receiptHeader: null,
+  receiptFooter: null
 }
 
 export function getSettings(): Settings {
