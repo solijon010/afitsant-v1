@@ -1,6 +1,6 @@
 import { getDb } from '../db/connection'
 import { mapArea, mapOrder, mapOrderItem, mapTable } from '../db/mappers'
-import { getApi } from './apiClient'
+import { fetchVisibleOrders } from './orderApi'
 import { getSettings } from './settings'
 import type { Area, OrderWithItems, TableEntity, TableWithOrder } from '@shared/types'
 
@@ -37,12 +37,9 @@ export async function snapshot(): Promise<TableWithOrder[]> {
     return tables.map((t) => ({ table: t, order: getOpenOrderByTable(t.id) }))
   }
 
-  const api = getApi()
   let activeOrders: any[] = []
   try {
-    const res = await api.get(`/api/order/branch/${s.branchId}?limit=200`)
-    const data = res.data as any
-    const all: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+    const all = await fetchVisibleOrders(200)
     activeOrders = all.filter((o: any) => o.status === 'PENDING' || o.status === 'READY')
   } catch (e: any) {
     console.error('snapshot orders fetch error:', e?.message)

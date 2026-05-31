@@ -135,18 +135,37 @@ async function printRaw(data: Buffer): Promise<{ ok: true } | { ok: false; error
 async function printRawWindows(data: Buffer): Promise<{ ok: true } | { ok: false; error: string }> {
   const s = getSettings()
   // USB port nomi: USB001, USB002, ...
-  const usbPort = s.printerDevicePath ?? 'USB001'
+  const rawPort = s.printerDevicePath?.trim() ?? ''
+  if ((!rawPort || !/^USB\d+$/i.test(rawPort)) && s.printerName) {
+    return {
+      ok: false,
+      error: `USB port noto'g'ri sozlangan: ${rawPort || '(bo\'sh)'}.\nWindows printer nomi tanlangan bo'lsa printer turini WINDOWS ga o'tkazing.`
+    }
+  }
+  const usbPort = /^USB\d+$/i.test(rawPort) ? rawPort.toUpperCase() : 'USB001'
   const tmpFile = join(tmpdir(), `afisant-print-${Date.now()}.bin`)
 
   try {
     writeFileSync(tmpFile, data)
     // Windows copy /b — binary mode, to'g'ridan USB portiga
-    execSync(`copy /b "${tmpFile}" "\\\\.\\${usbPort}"`, {
-      shell: true,
-      timeout: 10000,
-      stdio: 'pipe'
-    })
-    return { ok: true }
+    const commands = [
+      `copy /b "${tmpFile}" "${usbPort}"`,
+      `copy /b "${tmpFile}" "\\\\.\\${usbPort}"`
+    ]
+    let lastError = ''
+    for (const command of commands) {
+      try {
+        execSync(command, {
+          shell: process.env['ComSpec'] ?? 'cmd.exe',
+          timeout: 10000,
+          stdio: 'pipe'
+        })
+        return { ok: true }
+      } catch (e: any) {
+        lastError = String(e?.stderr ?? e?.message ?? lastError)
+      }
+    }
+    throw new Error(lastError || 'USB port xatosi')
   } catch (e: any) {
     const msg = String(e?.stderr ?? e?.message ?? 'USB port xatosi')
     console.error('[PRINTER] Windows USB error:', msg)
@@ -282,9 +301,28 @@ export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true 
     return printRaw(buildEscPos(payload))
   }
 
+  // Old konfiguratsiyalarda Windows printer nomi USB turiga tushib qolgan bo'lishi mumkin.
+  if (
+    s.printerType === 'usb' &&
+    process.platform === 'win32' &&
+    (!s.printerDevicePath || !/^USB\d+$/i.test(s.printerDevicePath)) &&
+    s.printerName
+  ) {
+    return printViaThermalLib(payload)
+  }
+
   // Windows USB: driver siz, copy /b orqali USB portiga to'g'ridan yozish
   if (s.printerType === 'usb' && process.platform === 'win32') {
-    return printRawWindows(buildEscPos(payload))
+    const rawResult = await printRawWindows(buildEscPos(payload))
+    if (rawResult.ok || !s.printerName) return rawResult
+
+    const fallback = await printViaThermalLib(payload)
+    if (fallback.ok) return fallback
+
+    return {
+      ok: false,
+      error: `${rawResult.error}\n\nWindows printer fallback ham ishlamadi:\n${fallback.error}`
+    }
   }
 
   // Network + Windows driver: node-thermal-printer orqali
@@ -319,30 +357,43 @@ export async function listUsbPrinters(): Promise<
     const results: Array<{ vendorId: string; productId: string; manufacturer?: string; product?: string }> = []
 
     // 1. USB printer portlarini topamiz (USB001, USB002 ...) — driver siz ishlaydi
-    try {
-      const out = execSync('wmic path Win32_PnPEntity where "DeviceID like \'USBPRINT%\'" get Name,DeviceID /format:list', {
-        encoding: 'utf8', timeout: 5000, shell: true
-      })
-      const matches = [...out.matchAll(/DeviceID=.*?USB(\d+)\s/gi)]
-      for (const m of matches) {
-        const portNum = m[1]
-        results.push({
-          vendorId: 'usb-port',
-          productId: portNum,
-          manufacturer: 'USB Port (driver siz)',
-          product: `USB${portNum}`
-        })
-      }
-    } catch { /* ignore */ }
+    const seen = new Set<string>()
+    const pushUnique = (item: { vendorId: string; productId: string; manufacturer?: string; product?: string }): void => {
+      const key = `${item.vendorId}:${item.productId}:${item.product ?? ''}`
+      if (seen.has(key)) return
+      seen.add(key)
+      results.push(item)
+    }
 
-    // 2. Windows Print Spooler da o'rnatilgan printerlar
     try {
-      const out = execSync('wmic printer get Name /format:list', { encoding: 'utf8', timeout: 5000 })
-      const names = out.split('\n')
-        .map((l) => l.replace(/^Name=/, '').trim())
-        .filter((l) => l.length > 0 && !l.includes('PDF') && !l.includes('XPS') && !l.includes('Fax') && !l.includes('OneNote'))
-      for (const name of names) {
-        results.push({ vendorId: 'windows', productId: 'printer', manufacturer: 'Windows Printer', product: name })
+      const out = execSync('wmic printer get Name,PortName /format:list', {
+        encoding: 'utf8',
+        timeout: 5000
+      })
+      const blocks = out.split(/\r?\n\r?\n+/)
+      for (const block of blocks) {
+        const lines = block.split(/\r?\n/)
+        const name = lines.find((line) => line.startsWith('Name='))?.replace(/^Name=/, '').trim() ?? ''
+        const portName = lines.find((line) => line.startsWith('PortName='))?.replace(/^PortName=/, '').trim() ?? ''
+        if (!name || name.includes('PDF') || name.includes('XPS') || name.includes('Fax') || name.includes('OneNote')) {
+          continue
+        }
+
+        if (/^USB\d+$/i.test(portName)) {
+          pushUnique({
+            vendorId: 'usb-port',
+            productId: portName.toUpperCase(),
+            manufacturer: name,
+            product: portName.toUpperCase()
+          })
+        }
+
+        pushUnique({
+          vendorId: 'windows',
+          productId: portName || 'printer',
+          manufacturer: portName || 'Windows Printer',
+          product: name
+        })
       }
     } catch { /* ignore */ }
 

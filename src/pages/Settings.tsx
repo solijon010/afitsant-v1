@@ -10,22 +10,72 @@ import { initials } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import PinPad from '@/components/PinPad'
 
+interface PrinterOption {
+  vendorId: string
+  productId: string
+  manufacturer?: string
+  product: string
+}
+
+interface DiagRecentOrder {
+  id: string
+  status: string
+  room: string
+  waiter: string
+  total: number
+  itemCount: number
+  createdAt: string
+}
+
+interface WaiterDiagResult {
+  branchId: string | null
+  serverUrl: string
+  chosenUrl: string | null
+  count: number
+  users: string[]
+  blocked: Array<{ url: string; status: number | string }>
+  note: string
+}
+
+interface RoomsDiagCheck {
+  label: string
+  chosenUrl: string | null
+  blocked: Array<{ url: string; status: number | string }>
+  count: number
+  firstItemKeys: string[]
+  sample: Array<{
+    id: string
+    name: string
+    status?: string
+    roomCategoryId?: string
+    roomCategory?: { id: string; name: string }
+    categoryId?: string
+  }>
+}
+
+interface RoomsDiagResult {
+  branchId: string | null
+  serverUrl: string
+  roomCategories: RoomsDiagCheck
+  rooms: RoomsDiagCheck
+}
+
 export default function SettingsPage(): JSX.Element {
   const navigate = useNavigate()
   const { settings, load, patch } = useSettings()
   const waiter = useAuth((s) => s.waiter)
   const [form, setForm] = useState<Settings | null>(null)
   const [saving, setSaving] = useState(false)
-  const [usbDevices, setUsbDevices] = useState<Array<{ product: string }>>([])
+  const [usbDevices, setUsbDevices] = useState<PrinterOption[]>([])
   const [detecting, setDetecting] = useState(false)
   const [waiters, setWaiters] = useState<Waiter[]>([])
   const [pinTarget, setPinTarget] = useState<Waiter | null>(null)
   const [diagInfo, setDiagInfo] = useState<{ hasToken: boolean; branchId: string | null; serverUrl: string; logPath: string } | null>(null)
-  const [recentOrders, setRecentOrders] = useState<Array<{ id: string; status: string; room: string; waiter: string; total: number; itemCount: number; createdAt: string }> | null>(null)
+  const [recentOrders, setRecentOrders] = useState<DiagRecentOrder[] | null>(null)
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [dbStatus, setDbStatus] = useState<{ waiters: { total: number; withServerId: number; list: string[] }; products: { total: number; withServerId: number }; tables: { total: number; withServerId: number; list: string[] }; token: string | null; branchId: string | null } | null>(null)
   const [loadingDb, setLoadingDb] = useState(false)
-  const [roomsTest, setRoomsTest] = useState<Record<string, any> | null>(null)
+  const [roomsTest, setRoomsTest] = useState<RoomsDiagResult | null>(null)
   const [loadingRooms, setLoadingRooms] = useState(false)
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
@@ -114,19 +164,26 @@ export default function SettingsPage(): JSX.Element {
     setDetecting(true)
     try {
       const devices = await window.afisant.printer.listUsb()
-      const found = devices.filter((d) => d.product).map((d) => ({ product: d.product! }))
+      const found: PrinterOption[] = devices
+        .filter((d): d is PrinterOption => typeof d.product === 'string' && d.product.length > 0)
+        .map((d) => ({
+          vendorId: d.vendorId,
+          productId: d.productId,
+          manufacturer: d.manufacturer,
+          product: d.product
+        }))
       setUsbDevices(found)
       if (found.length === 1) {
         const d = found[0]
         if (isWindows) {
           // USB port (USB001) yoki Windows printer nomi
-          const isUsbPort = (devices.find(dev => dev.product === d.product)?.vendorId === 'usb-port')
+          const isUsbPort = d.vendorId === 'usb-port'
           if (isUsbPort) {
             setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
             toast.success(`USB port aniqlandi: ${d.product} — Test chek bosing`)
           } else {
-            setForm((f) => f ? { ...f, printerName: d.product } : f)
-            toast.success(`Printer aniqlandi: ${d.product}`)
+            setForm((f) => f ? { ...f, printerType: 'windows', printerName: d.product } : f)
+            toast.success(`Windows printer aniqlandi: ${d.product}`)
           }
         } else {
           setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
@@ -156,10 +213,15 @@ export default function SettingsPage(): JSX.Element {
     else toast.error('Printer xatosi', { description: (r as any).error })
   }
 
+  const handleBack = (): void => {
+    if (waiter) navigate(-1)
+    else navigate('/select-waiter')
+  }
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between px-6 py-4">
-        <button onClick={() => navigate(waiter ? -1 : '/select-waiter')} className="btn-ghost">
+        <button onClick={handleBack} className="btn-ghost">
           <ArrowLeft size={16} /> Orqaga
         </button>
         <h1 className="text-lg font-semibold">Sozlamalar</h1>
@@ -211,6 +273,26 @@ export default function SettingsPage(): JSX.Element {
                   <button
                     onClick={async () => {
                       const res = await window.afisant.diag.testWaiters()
+                      const waiterDiag = res as WaiterDiagResult
+                      const lines = [
+                        `branchId: ${waiterDiag.branchId ?? '—'}`,
+                        `serverUrl: ${waiterDiag.serverUrl}`,
+                        '',
+                        waiterDiag.note,
+                        ''
+                      ]
+                      if (waiterDiag.chosenUrl) {
+                        lines.push(`Ishlagan endpoint: ${waiterDiag.chosenUrl}`)
+                        lines.push(`Soni: ${waiterDiag.count} ta`)
+                        lines.push(...(waiterDiag.users.length > 0 ? waiterDiag.users.map((u) => `  ${u}`) : ["  (bo'sh)"]))
+                        lines.push('')
+                      }
+                      if (waiterDiag.blocked.length > 0) {
+                        lines.push('Yopiq endpointlar:')
+                        lines.push(...waiterDiag.blocked.map((b) => `  ${b.url}: HTTP ${b.status}`))
+                      }
+                      alert(`Afitsant API natijasi:\n\n${lines.join('\n')}`)
+                      return
                       const msg = Object.entries(res)
                         .map(([k, v]: [string, any]) =>
                           v?.error !== undefined
@@ -357,6 +439,7 @@ export default function SettingsPage(): JSX.Element {
                           if (isUsbPort) {
                             update('printerDevicePath', d.product ?? 'USB001')
                           } else {
+                            update('printerType', 'windows')
                             update('printerName', d.product ?? '')
                           }
                         }}
@@ -432,9 +515,9 @@ export default function SettingsPage(): JSX.Element {
                   <ScanLine size={14} /> {detecting ? '…' : 'Aniqlash'}
                 </button>
               </div>
-              {usbDevices.length > 1 && (
+              {usbDevices.filter((d) => d.vendorId !== 'usb-port').length > 0 && (
                 <div className="mt-2 space-y-1">
-                  {usbDevices.map((d) => (
+                  {usbDevices.filter((d) => d.vendorId !== 'usb-port').map((d) => (
                     <button
                       key={d.product}
                       onClick={() => update('printerName', d.product)}
@@ -751,7 +834,7 @@ export default function SettingsPage(): JSX.Element {
               onClick={async () => {
                 setLoadingRooms(true)
                 try {
-                  const data = await window.afisant.diag.testRooms()
+                  const data = await window.afisant.diag.testRooms() as RoomsDiagResult
                   setRoomsTest(data)
                 } finally {
                   setLoadingRooms(false)
@@ -767,22 +850,30 @@ export default function SettingsPage(): JSX.Element {
             {roomsTest !== null && (
               <div className="mt-1 rounded-xl border border-line bg-bg-elevated p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
                 <p className="font-bold text-ink">branchId: {roomsTest.branchId ?? '—'}</p>
-                {Object.entries(roomsTest).filter(([k]) => k.startsWith('/')).map(([url, val]: [string, any]) => (
-                  <div key={url} className="border-t border-line pt-2">
-                    <p className="font-mono font-bold text-ink-soft break-all">{url}</p>
-                    {val.error !== undefined ? (
+                {[roomsTest.roomCategories, roomsTest.rooms].map((section) => {
+                  const val = { error: 'Ishlaydigan endpoint topilmadi.' }
+                  return (
+                  <div key={section.label} className="border-t border-line pt-2">
+                    <p className="font-bold text-ink">{section.label}</p>
+                    {!section.chosenUrl ? (
                       <p className="text-brand-danger">❌ {String(val.error)}</p>
                     ) : (
                       <>
-                        <p className="text-ink">Soni: <span className="font-bold">{val.count}</span></p>
-                        {val.firstItemKeys?.length > 0 && (
-                          <p className="text-ink-soft">Fields: {(val.firstItemKeys as string[]).join(', ')}</p>
+                        <p className="font-mono text-ink-soft break-all">{section.chosenUrl}</p>
+                        <p className="text-ink">Soni: <span className="font-bold">{section.count}</span></p>
+                        {section.firstItemKeys.length > 0 && (
+                          <p className="text-ink-soft">Fields: {section.firstItemKeys.join(', ')}</p>
                         )}
-                        {(val.sample as any[])?.map((item: any, i: number) => (
-                          <div key={i} className="mt-1 bg-stone-50 rounded p-1.5 text-[10px] font-mono">
+                        {section.blocked.length > 0 && (
+                          <p className="text-ink-soft">
+                            Fallback ishlatildi: {section.blocked.map((entry) => `${entry.url} (${entry.status})`).join(', ')}
+                          </p>
+                        )}
+                        {section.sample.map((item, i) => (
+                          <div key={`${section.label}-${item.id}-${i}`} className="mt-1 bg-stone-50 rounded p-1.5 text-[10px] font-mono">
                             <p><span className="text-ink-soft">id:</span> {item.id}</p>
                             <p><span className="text-ink-soft">name:</span> {item.name}</p>
-                            <p><span className="text-ink-soft">status:</span> {item.status ?? 'yo\'q'}</p>
+                            <p><span className="text-ink-soft">status:</span> {item.status ?? "yo'q"}</p>
                             {item.roomCategoryId && <p><span className="text-ink-soft">roomCategoryId:</span> {item.roomCategoryId}</p>}
                             {item.roomCategory && <p><span className="text-ink-soft">roomCategory.id:</span> {item.roomCategory.id}</p>}
                             {item.categoryId && <p><span className="text-ink-soft">categoryId:</span> {item.categoryId}</p>}
@@ -791,7 +882,8 @@ export default function SettingsPage(): JSX.Element {
                       </>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </Section>
