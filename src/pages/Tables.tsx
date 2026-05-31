@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LogOut, Settings as SettingsIcon, UtensilsCrossed } from 'lucide-react'
+import { Building2, LogOut, Settings as SettingsIcon, UtensilsCrossed, Utensils } from 'lucide-react'
 import hisobchimLogo from '@/assets/logo.png'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -129,17 +129,17 @@ export default function TablesPage(): JSX.Element {
           </div>
         </div>
 
-        {/* Markaz: Soat */}
+        {/* Markaz: Soat — premium */}
         <div className="flex flex-col items-center justify-center">
-          <div className="flex items-baseline gap-0.5">
-            <span className="font-mono text-[22px] font-bold tabular-nums text-stone-800 leading-none">
+          <div className="flex items-baseline gap-1">
+            <span className="font-mono font-black tabular-nums leading-none" style={{ fontSize: 26, color: '#0f172a', letterSpacing: '-1px' }}>
               {clock.time}
             </span>
-            <span className="font-mono text-[13px] font-semibold tabular-nums text-stone-300 leading-none">
+            <span className="font-mono font-bold tabular-nums leading-none" style={{ fontSize: 15, color: '#94a3b8' }}>
               :{clock.secs}
             </span>
           </div>
-          <span className="mt-0.5 text-[10px] font-medium text-stone-400 leading-none tracking-wide">
+          <span className="mt-1 font-medium leading-none tracking-wide" style={{ fontSize: 11, color: '#64748b' }}>
             {clock.date}
           </span>
         </div>
@@ -166,7 +166,10 @@ export default function TablesPage(): JSX.Element {
 
       {/* ── Area tabs ── */}
       {areas.length > 1 && (
-        <nav className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-stone-100 bg-white px-6 py-3">
+        <nav
+          className="flex shrink-0 items-center gap-2 overflow-x-auto px-6 py-3"
+          style={{ background: '#081b2d', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+        >
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
@@ -174,17 +177,19 @@ export default function TablesPage(): JSX.Element {
               <button
                 key={area.id}
                 onClick={() => setActiveAreaId(area.id)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-all"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all"
                 style={active
-                  ? { background: '#27ff44', color: '#0a1a0a', boxShadow: '0 2px 8px rgba(39,255,68,0.4)' }
-                  : { background: 'rgba(255,255,255,0.15)', color: 'white' }}
+                  ? { background: '#27ff44', color: '#081b2d', boxShadow: '0 2px 10px rgba(39,255,68,0.5)' }
+                  : { background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}
               >
                 {area.name}
                 {occ > 0 && (
-                  <span className={cn(
-                    'inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                    active ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-700',
-                  )}>
+                  <span
+                    className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                    style={active
+                      ? { background: 'rgba(0,0,0,0.2)', color: '#081b2d' }
+                      : { background: '#27ff44', color: '#081b2d' }}
+                  >
                     {occ}
                   </span>
                 )}
@@ -296,27 +301,28 @@ function TableCard({
       {/* Yuqori rang chizig'i */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: accentColor, borderRadius: '18px 18px 0 0' }} />
 
-      {/* BAND badge — yuqori o'ng burchak */}
-      {isActive && (
-        <div style={{
-          position: 'absolute', top: 12, right: 12,
-          background: ACTIVE_COLOR, color: 'white',
-          borderRadius: 8, padding: '3px 10px',
-          fontSize: 10, fontWeight: 800, letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-        }}>
-          BAND
-        </div>
-      )}
+      {/* BAND / BO'SH badge — yuqori o'ng burchak */}
+      <div style={{
+        position: 'absolute', top: 12, right: 12,
+        background: accentColor, color: 'white',
+        borderRadius: 8, padding: '3px 10px',
+        fontSize: 10, fontWeight: 800, letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+      }}>
+        {isActive ? 'BAND' : "BO'SH"}
+      </div>
 
       {/* Icon + Stol nomi */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 }}>
         <div style={{
-          width: 38, height: 38, borderRadius: 12, flexShrink: 0,
-          background: `${accentColor}18`,
+          width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+          background: `${accentColor}1a`,
           display: 'grid', placeItems: 'center',
+          border: `1.5px solid ${accentColor}30`,
         }}>
-          <UtensilsCrossed size={18} style={{ color: accentColor }} />
+          {isActive
+            ? <Building2 size={20} style={{ color: accentColor }} />
+            : <Utensils size={20} style={{ color: accentColor }} />}
         </div>
         <span style={{ fontSize: 16, fontWeight: 800, color: '#111', letterSpacing: '-0.3px' }}>
           {tw.table.name}
