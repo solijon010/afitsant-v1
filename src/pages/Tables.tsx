@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Building2, LogOut, Settings, UtensilsCrossed, Utensils, Wifi, User } from 'lucide-react'
+import { Building2, LogOut, Moon, Settings, Sun, UtensilsCrossed, Utensils, Wifi, User } from 'lucide-react'
 import hisobchimLogo from '@/assets/logo.png'
+import { useTheme } from '@/stores/theme'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
@@ -156,7 +157,7 @@ export default function TablesPage(): JSX.Element {
               </span>
             )}
           </button>
-          {areas.map((area) => {
+          {areas.map((area, idx) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
             const COLORS = [
