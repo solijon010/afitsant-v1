@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, Settings as SettingsIcon, UtensilsCrossed } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Building2, LogOut, Settings as SettingsIcon, UtensilsCrossed, Utensils } from 'lucide-react'
+import hisobchimLogo from '@/assets/logo.png'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
@@ -9,10 +11,37 @@ import { fmtMoney, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
 
-/* Stol nomidan prefix olish: "Tepa 1" → "Tepa", "Xona 7" → "Xona" */
+/* ─── Soat hook ─── */
+const UZ_DAYS = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba']
+const UZ_MONTHS = ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentyabr','Oktyabr','Noyabr','Dekabr']
+
+function useClock() {
+  const [tick, setTick] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setTick(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const h = tick.getHours()  // 0–23, 24-soatlik format (13:08, 00:00 va h.k.)
+  return {
+    time: `${pad(h)}:${pad(tick.getMinutes())}`,
+    secs: pad(tick.getSeconds()),
+    date: `${UZ_DAYS[tick.getDay()]}, ${tick.getDate()}-${UZ_MONTHS[tick.getMonth()]}`,
+  }
+}
+
+/* ─── Animatsiya ─── */
+const cardVariants = {
+  hidden: { opacity: 0, scale: 0.96 },
+  visible: (i: number) => ({
+    opacity: 1, scale: 1,
+    transition: { delay: i * 0.03, duration: 0.2, ease: 'easeOut' },
+  }),
+}
+
+/* Stol nomidan prefix olish: "Tepa 1" → "Tepa" */
 function getPrefix(name: string): string {
-  const m = name.match(/^([^\d]+)/)?.[1]?.trim()
-  return m ?? name
+  return name.match(/^([^\d]+)/)?.[1]?.trim() ?? name
 }
 
 function sortTables(list: TableWithOrder[]): TableWithOrder[] {
@@ -26,10 +55,16 @@ function sortTables(list: TableWithOrder[]): TableWithOrder[] {
   })
 }
 
+type TableStatus = 'empty' | 'active' | 'waiting'
+
+function getStatus(tw: TableWithOrder): TableStatus {
+  if (!tw.order) return 'empty'
+  return tw.order.status === 'open' ? 'active' : 'waiting'
+}
+
 export default function TablesPage(): JSX.Element {
   const navigate = useNavigate()
   const waiter = useAuth((s) => s.waiter)
-  const logout = useAuth((s) => s.logout)
   const settings = useSettings((s) => s.settings)
   const { areas, snapshot, load, activeAreaId, setActiveAreaId } = useTables()
 
@@ -68,55 +103,101 @@ export default function TablesPage(): JSX.Element {
   const totalSum = snapshot.reduce((acc, s) => acc + (s.order?.total ?? 0), 0)
   const occupiedInArea = (id: number) => (grouped.get(id) ?? []).filter((t) => !!t.order).length
 
+  const roleLabel = waiter?.role === 'super_waiter' ? 'Super afitsant'
+    : waiter?.role === 'manager' ? 'Manager' : 'Afitsant'
+
+  const clock = useClock()
+
   return (
-    <div className="flex h-full flex-col bg-bg">
+    <div className="flex h-full flex-col" style={{ background: '#2f54a6' }}>
 
       {/* ── Header ── */}
-      <header className="flex items-center justify-between border-b border-line bg-white px-6 py-4 shadow-sm">
+      <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-stone-100 bg-white px-6 shadow-sm">
+
+        {/* Chap: Logo + foydalanuvchi */}
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-primary/10 text-brand-primary">
-            <UtensilsCrossed size={20} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm border border-stone-100">
+            <img src={hisobchimLogo} alt="Hisobchim" className="h-7 w-7 object-contain" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-ink">{settings?.organizationName ?? 'Afisant'}</h1>
-            <p className="text-xs text-ink-soft">
-              {waiter?.firstName} {waiter?.lastName} ·{' '}
-              {waiter?.role === 'super_waiter' ? 'Super afitsant' : waiter?.role === 'manager' ? 'Manager' : 'Afitsant'}
+            <p className="text-sm font-semibold text-stone-900 leading-tight">
+              {settings?.organizationName ?? 'Hisobchim POS'}
+            </p>
+            <p className="text-[11px] text-stone-400 leading-tight">
+              {waiter?.firstName} {waiter?.lastName} · {roleLabel}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Markaz: Soat — premium */}
+        <div className="flex flex-col items-center justify-center">
+          <div className="flex items-baseline gap-1">
+            <span className="font-mono font-black tabular-nums leading-none" style={{ fontSize: 26, color: '#0f172a', letterSpacing: '-1px' }}>
+              {clock.time}
+            </span>
+            <span className="font-mono font-bold tabular-nums leading-none" style={{ fontSize: 15, color: '#94a3b8' }}>
+              :{clock.secs}
+            </span>
+          </div>
+          <span className="mt-1 font-medium leading-none tracking-wide" style={{ fontSize: 11, color: '#64748b' }}>
+            {clock.date}
+          </span>
+        </div>
+
+        {/* O'ng: Statistika + tugmalar */}
+        <div className="flex items-center justify-end gap-3">
           {totalOccupied > 0 && (
-            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-right">
-              <p className="text-[11px] font-medium text-green-600">{totalOccupied} ta band</p>
-              <p className="text-sm font-bold text-green-700">{fmtMoney(totalSum)} so'm</p>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-right">
+              <p className="text-[10px] font-medium text-amber-600 leading-tight">{totalOccupied} ta band</p>
+              <p className="font-mono text-sm font-bold text-amber-700 leading-tight">{fmtMoney(totalSum)} so'm</p>
             </div>
           )}
           <StatusBar />
-          <button onClick={() => navigate('/settings')} className="btn-ghost h-10 w-10 p-0"><SettingsIcon size={16} /></button>
+          <button
+            onClick={() => navigate('/settings')}
+            className="inline-flex items-center gap-2 rounded-xl border border-line bg-bg-card px-4 py-2.5 text-sm font-semibold text-ink hover:bg-bg-elevated hover:border-line-strong transition-all shadow-sm"
+          >
+            <SettingsIcon size={16} />
+            Sozlamalar
+          </button>
           <button onClick={() => { useAuth.getState().logout(); navigate('/select-waiter', { replace: true }) }} className="btn-ghost h-10 w-10 p-0"><LogOut size={16} /></button>
         </div>
       </header>
 
       {/* ── Area tabs ── */}
-      {areas.length > 0 && (
-        <nav className="flex items-center gap-3 overflow-x-auto border-b border-line bg-white px-6 py-3">
+      {areas.length > 1 && (
+        <nav
+          className="flex shrink-0 items-center gap-2 overflow-x-auto px-6 py-3"
+          style={{ background: '#1a2636', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+        >
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
+            const COLORS = [
+              { bg: '#0EA5E9', light: '#E0F2FE', text: '#0284C7' }, // osmon ko'k
+              { bg: '#8B5CF6', light: '#EDE9FE', text: '#7C3AED' }, // binafsha
+              { bg: '#10B981', light: '#D1FAE5', text: '#059669' }, // emerald
+              { bg: '#F59E0B', light: '#FEF3C7', text: '#D97706' }, // amber
+              { bg: '#EF4444', light: '#FEE2E2', text: '#DC2626' }, // qizil
+            ]
+            const c = COLORS[idx % COLORS.length]
             return (
-              <button key={area.id} onClick={() => setActiveAreaId(area.id)}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all',
-                  active
-                    ? 'bg-brand-primary text-white shadow-md shadow-brand-primary/20'
-                    : 'border-2 border-slate-200 bg-white text-slate-500 hover:border-slate-400 hover:text-slate-700'
-                )}
+              <button
+                key={area.id}
+                onClick={() => setActiveAreaId(area.id)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all"
+                style={active
+                  ? { background: '#27ff44', color: '#081b2d', boxShadow: '0 2px 10px rgba(39,255,68,0.5)' }
+                  : { background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}
               >
                 {area.name}
                 {occ > 0 && (
-                  <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold',
-                    active ? 'bg-white/25 text-white' : 'bg-green-100 text-green-700')}>
+                  <span
+                    className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                    style={active
+                      ? { background: 'rgba(0,0,0,0.2)', color: '#081b2d' }
+                      : { background: '#27ff44', color: '#081b2d' }}
+                  >
                     {occ}
                   </span>
                 )}
@@ -131,37 +212,51 @@ export default function TablesPage(): JSX.Element {
         {areas.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <UtensilsCrossed className="mx-auto mb-3 text-slate-300" size={40} />
-              <p className="text-sm text-slate-500">Xonalar topilmadi</p>
-              <p className="mt-1 text-xs text-slate-400">Sozlamalar → Serverdan sinxronlash</p>
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-stone-100">
+                <UtensilsCrossed size={28} className="text-stone-300" />
+              </div>
+              <p className="text-sm font-medium text-stone-500">Xonalar topilmadi</p>
+              <p className="mt-1 text-xs text-stone-400">Sozlamalar → Serverdan sinxronlash</p>
             </div>
           </div>
         ) : groupedByPrefix.size === 0 ? (
-          <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+          <div className="flex h-48 items-center justify-center text-sm text-stone-400">
             Bu xonada stollar yo'q
           </div>
         ) : (
-          <div className="space-y-8">
-            {Array.from(groupedByPrefix.entries()).map(([prefix, tables]) => (
-              <section key={prefix}>
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="h-6 w-1 rounded-full bg-brand-primary" />
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-slate-600">
-                    {prefix}
-                  </h2>
-                  <div className="flex-1 h-px bg-slate-100" />
-                  <span className="text-xs text-slate-400 font-medium">
-                    {tables.filter(t => !!t.order).length}/{tables.length} band
-                  </span>
-                </div>
+          <div className="space-y-7">
+            {Array.from(groupedByPrefix.entries()).map(([prefix, tables]) => {
+              const activeCount = tables.filter((t) => !!t.order).length
+              return (
+                <section key={prefix}>
+                  {/* Section sarlavha */}
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="h-5 w-1 rounded-full" style={{ background: '#fffa0a' }} />
+                    <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#c8cacd' }}>
+                      {prefix}
+                    </h2>
+                    <div className="flex-1 h-px" style={{ background: '#fffa0a40' }} />
+                    <span className="text-xs font-medium" style={{ color: '#9ea2a6' }}>
+                      {activeCount}/{tables.length} band
+                    </span>
+                  </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: 32 }}>
-                  {tables.map((tw, i) => (
-                    <TableCard key={tw.table.id} tw={tw} idx={i} onClick={() => navigate(`/order/${tw.table.id}`)} />
-                  ))}
-                </div>
-              </section>
-            ))}
+                  <div
+                    className="grid gap-4"
+                    style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
+                  >
+                    {tables.map((tw, i) => (
+                      <TableCard
+                        key={tw.table.id}
+                        tw={tw}
+                        idx={i}
+                        onClick={() => navigate(`/order/${tw.table.id}`)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
           </div>
         )}
       </main>
@@ -169,68 +264,118 @@ export default function TablesPage(): JSX.Element {
   )
 }
 
-function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onClick: () => void }): JSX.Element {
-  const isOpen = !!tw.order
+/* ─── Stol kartasi ─── */
+function TableCard({
+  tw, idx, onClick,
+}: { tw: TableWithOrder; idx: number; onClick: () => void }): JSX.Element {
+  const status = getStatus(tw)
   const total = tw.order?.total ?? 0
   const itemCount = tw.order?.items.length ?? 0
-  const [hov, setHov] = useState(false)
+  const openedAt = tw.order?.openedAt
+
+  const ACTIVE_COLOR = '#32b80d'
+  const EMPTY_COLOR  = '#ab101a'
+
+  const isActive  = status === 'active'
+  const isEmpty   = status === 'empty'
+  const accentColor = isActive ? ACTIVE_COLOR : EMPTY_COLOR
 
   return (
-    <button
+    <motion.button
+      custom={idx}
+      variants={cardVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover={{ y: -3, transition: { duration: 0.12 } }}
+      whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
       style={{
-        position: 'relative', display: 'flex', flexDirection: 'column',
-        justifyContent: 'space-between', height: 132,
-        borderRadius: 14, padding: '14px 16px',
-        textAlign: 'left', cursor: 'pointer',
-        background: isOpen
-          ? 'linear-gradient(145deg,#f0fdf4,#dcfce7)'
-          : hov ? '#fee2e2' : '#fef2f2',
-        border: `2px solid ${isOpen ? '#22c55e' : hov ? '#f87171' : '#fca5a5'}`,
-        boxShadow: isOpen
-          ? '0 4px 16px rgba(34,197,94,0.2)'
-          : hov ? '0 6px 18px rgba(239,68,68,0.18)' : '0 2px 8px rgba(239,68,68,0.08)',
-        transform: hov && !isOpen ? 'translateY(-2px)' : 'none',
-        transition: 'all .16s ease',
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'white',
+        borderRadius: 20,
+        border: `2px solid ${accentColor}22`,
+        padding: '16px 16px 14px',
+        textAlign: 'left',
+        minHeight: 160,
+        boxShadow: isActive
+          ? `0 6px 24px ${ACTIVE_COLOR}30, 0 1px 4px rgba(0,0,0,0.06)`
+          : `0 4px 16px ${EMPTY_COLOR}20, 0 1px 4px rgba(0,0,0,0.05)`,
+        overflow: 'hidden',
+        transition: 'all 0.18s ease',
       }}
     >
-      <div style={{
-        position: 'absolute', top: 0, left: 12, right: 12, height: 3,
-        borderRadius: 99,
-        background: isOpen ? 'linear-gradient(90deg,#16a34a,#4ade80)' : 'linear-gradient(90deg,#f87171,#ef4444)',
-      }} />
+      {/* Yuqori rang chizig'i */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: accentColor, borderRadius: '18px 18px 0 0' }} />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8 }}>
-        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: isOpen ? '#15803d' : '#1e293b' }}>
-          {tw.table.name}
-        </p>
-        <div style={{
-          width: 10, height: 10, borderRadius: '50%',
-          background: isOpen ? '#22c55e' : '#ef4444',
-          boxShadow: isOpen ? '0 0 0 3px rgba(34,197,94,0.2)' : '0 0 0 3px rgba(239,68,68,0.15)',
-          flexShrink: 0,
-        }} />
+      {/* BAND / BO'SH badge — yuqori o'ng burchak */}
+      <div style={{
+        position: 'absolute', top: 12, right: 12,
+        background: accentColor, color: 'white',
+        borderRadius: 8, padding: '3px 10px',
+        fontSize: 10, fontWeight: 800, letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+      }}>
+        {isActive ? 'BAND' : "BO'SH"}
       </div>
 
-      <p style={{ margin: '4px 0 0', fontSize: 12, color: isOpen ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
-        {isOpen ? `${itemCount} ta mahsulot` : "Bo'sh"}
-      </p>
-
-      {isOpen ? (
-        <div>
-          <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#15803d', letterSpacing: '-0.5px' }}>
-            {fmtMoney(total)} <span style={{ fontSize: 11, fontWeight: 500, color: '#4ade80' }}>so'm</span>
-          </p>
+      {/* Icon + Stol nomi */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+          background: `${accentColor}1a`,
+          display: 'grid', placeItems: 'center',
+          border: `1.5px solid ${accentColor}30`,
+        }}>
+          {isActive
+            ? <Building2 size={20} style={{ color: accentColor }} />
+            : <Utensils size={20} style={{ color: accentColor }} />}
         </div>
+        <span style={{ fontSize: 16, fontWeight: 800, color: '#111', letterSpacing: '-0.3px' }}>
+          {tw.table.name}
+        </span>
+      </div>
+
+      {/* Separator */}
+      <div style={{ height: 1, background: '#f0f0f0', marginBottom: 8 }} />
+
+      {/* Ma'lumotlar */}
+      {isEmpty ? (
+        <p style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>Bosing ochish uchun</p>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e2e8f0' }} />
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Bo'sh</span>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 16, height: 16, borderRadius: 4, background: `${ACTIVE_COLOR}18`, display: 'grid', placeItems: 'center' }}>
+              <span style={{ fontSize: 9, color: ACTIVE_COLOR }}>📦</span>
+            </div>
+            <span style={{ fontSize: 12, color: '#333', fontWeight: 600 }}>{itemCount} ta mahsulot</span>
+          </div>
+          {openedAt && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 16, height: 16, borderRadius: 4, background: `${ACTIVE_COLOR}18`, display: 'grid', placeItems: 'center' }}>
+                <span style={{ fontSize: 9, color: ACTIVE_COLOR }}>⏱</span>
+              </div>
+              <span style={{ fontSize: 12, color: '#555' }}>{fmtTime(openedAt)}</span>
+            </div>
+          )}
+          {/* Summa + o'q tugma */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+            <span style={{ fontSize: 20, fontWeight: 900, color: '#111', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+              {fmtMoney(total)}{' '}
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#666' }}>so'm</span>
+            </span>
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: ACTIVE_COLOR,
+              display: 'grid', placeItems: 'center',
+              boxShadow: `0 4px 12px ${ACTIVE_COLOR}50`,
+            }}>
+              <span style={{ color: 'white', fontSize: 16, fontWeight: 700, lineHeight: 1 }}>→</span>
+            </div>
+          </div>
         </div>
       )}
-    </button>
+    </motion.button>
   )
 }
-

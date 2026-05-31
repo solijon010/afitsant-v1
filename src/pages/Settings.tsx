@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Printer, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ClipboardList, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Printer, RefreshCw, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Category, Lang, Settings, Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -21,6 +21,12 @@ export default function SettingsPage(): JSX.Element {
   const [waiters, setWaiters] = useState<Waiter[]>([])
   const [pinTarget, setPinTarget] = useState<Waiter | null>(null)
   const [diagInfo, setDiagInfo] = useState<{ hasToken: boolean; branchId: string | null; serverUrl: string; logPath: string } | null>(null)
+  const [recentOrders, setRecentOrders] = useState<Array<{ id: string; status: string; room: string; waiter: string; total: number; itemCount: number; createdAt: string }> | null>(null)
+  const [loadingOrders, setLoadingOrders] = useState(false)
+  const [dbStatus, setDbStatus] = useState<{ waiters: { total: number; withServerId: number; list: string[] }; products: { total: number; withServerId: number }; tables: { total: number; withServerId: number; list: string[] }; token: string | null; branchId: string | null } | null>(null)
+  const [loadingDb, setLoadingDb] = useState(false)
+  const [roomsTest, setRoomsTest] = useState<Record<string, any> | null>(null)
+  const [loadingRooms, setLoadingRooms] = useState(false)
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
@@ -85,6 +91,9 @@ export default function SettingsPage(): JSX.Element {
 
   if (!form) return <div className="grid h-full place-items-center"><div className="card h-24 w-72 animate-pulse" /></div>
 
+  /* Manager yoki hech kim kirmagan (admin rejim) → texnik ma'lumotlar ko'rsatiladi */
+  const isAdmin = !waiter || waiter.role === 'manager' || waiter.role === 'super_waiter'
+
   const update = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
     setForm((f) => (f ? { ...f, [key]: value } : f))
   }
@@ -99,6 +108,8 @@ export default function SettingsPage(): JSX.Element {
     }
   }
 
+  const isWindows = navigator.userAgent.toLowerCase().includes('windows')
+
   const detectUsb = async (): Promise<void> => {
     setDetecting(true)
     try {
@@ -106,10 +117,29 @@ export default function SettingsPage(): JSX.Element {
       const found = devices.filter((d) => d.product).map((d) => ({ product: d.product! }))
       setUsbDevices(found)
       if (found.length === 1) {
-        setForm((f) => f ? { ...f, printerDevicePath: found[0].product } : f)
-        toast.success(`Qurilma aniqlandi: ${found[0].product}`)
+        const d = found[0]
+        if (isWindows) {
+          // USB port (USB001) yoki Windows printer nomi
+          const isUsbPort = (devices.find(dev => dev.product === d.product)?.vendorId === 'usb-port')
+          if (isUsbPort) {
+            setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
+            toast.success(`USB port aniqlandi: ${d.product} — Test chek bosing`)
+          } else {
+            setForm((f) => f ? { ...f, printerName: d.product } : f)
+            toast.success(`Printer aniqlandi: ${d.product}`)
+          }
+        } else {
+          setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
+          toast.success(`Printer aniqlandi: ${d.product}`)
+        }
+      } else if (found.length > 1) {
+        toast.info(`${found.length} ta printer topildi — birini tanlang`)
       } else if (found.length === 0) {
-        toast.warning('USB printer topilmadi. /dev/usb/lp0 yo\'lini tekshiring')
+        if (isWindows) {
+          toast.warning("Windows printerlar topilmadi. Printer drayveri o'rnatilganligini tekshiring")
+        } else {
+          toast.warning("USB printer topilmadi. Printerni ulab qayta urining")
+        }
       }
     } finally {
       setDetecting(false)
@@ -140,41 +170,74 @@ export default function SettingsPage(): JSX.Element {
 
       <main className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-6 pb-10">
         <Section title="Server" icon={<Globe size={16} />}>
-          <Field label="Server manzili (URL)">
-            <input
-              className="input font-mono text-sm"
-              placeholder="https://api-restaurant.hisobchim.uz"
-              value={form.serverUrl ?? ''}
-              onChange={(e) => update('serverUrl', e.target.value)}
-            />
-          </Field>
-          {diagInfo && (
-            <div className="mt-2 rounded-xl border border-line bg-bg-elevated p-3 space-y-1.5 text-xs">
-              <div className="flex items-center gap-2">
-                {diagInfo.hasToken
-                  ? <CheckCircle2 size={13} className="text-brand-success shrink-0" />
-                  : <XCircle size={13} className="text-brand-danger shrink-0" />}
-                <span className="text-ink-soft">Token: </span>
-                <span className={diagInfo.hasToken ? 'text-brand-success' : 'text-brand-danger'}>
-                  {diagInfo.hasToken ? 'Mavjud' : "Yo'q — qayta login qiling"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {diagInfo.branchId
-                  ? <CheckCircle2 size={13} className="text-brand-success shrink-0" />
-                  : <XCircle size={13} className="text-brand-danger shrink-0" />}
-                <span className="text-ink-soft">Filial ID: </span>
-                <span className={cn('font-mono', diagInfo.branchId ? 'text-ink' : 'text-brand-danger')}>
-                  {diagInfo.branchId ? `${diagInfo.branchId.slice(0, 8)}…` : "Saqlanmagan"}
-                </span>
-              </div>
-              <button
-                onClick={() => void window.afisant.diag.openLogs()}
-                className="mt-1 flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors"
-              >
-                <FolderOpen size={12} />
-                Log papkasini och
-              </button>
+          {isAdmin ? (
+            /* ── Admin: to'liq server sozlamalari ── */
+            <>
+              <Field label="Server manzili (URL)">
+                <input
+                  className="input font-mono text-sm"
+                  placeholder="https://api-restaurant.hisobchim.uz"
+                  value={form.serverUrl ?? ''}
+                  onChange={(e) => update('serverUrl', e.target.value)}
+                />
+              </Field>
+              {diagInfo && (
+                <div className="mt-2 rounded-xl border border-line bg-bg-elevated p-3 space-y-1.5 text-xs">
+                  <div className="flex items-center gap-2">
+                    {diagInfo.hasToken
+                      ? <CheckCircle2 size={13} className="text-brand-success shrink-0" />
+                      : <XCircle size={13} className="text-brand-danger shrink-0" />}
+                    <span className="text-ink-soft">Token: </span>
+                    <span className={diagInfo.hasToken ? 'text-brand-success' : 'text-brand-danger'}>
+                      {diagInfo.hasToken ? 'Mavjud' : "Yo'q — qayta login qiling"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {diagInfo.branchId
+                      ? <CheckCircle2 size={13} className="text-brand-success shrink-0" />
+                      : <XCircle size={13} className="text-brand-danger shrink-0" />}
+                    <span className="text-ink-soft">Filial ID: </span>
+                    <span className={cn('font-mono', diagInfo.branchId ? 'text-ink' : 'text-brand-danger')}>
+                      {diagInfo.branchId ? `${diagInfo.branchId.slice(0, 8)}…` : "Saqlanmagan"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => void window.afisant.diag.openLogs()}
+                    className="mt-1 flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors"
+                  >
+                    <FolderOpen size={12} />
+                    Log papkasini och
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const res = await window.afisant.diag.testWaiters()
+                      const msg = Object.entries(res)
+                        .map(([k, v]: [string, any]) =>
+                          v?.error !== undefined
+                            ? `❌ ${k}: HTTP ${v.error}`
+                            : v?.count !== undefined
+                              ? `✅ ${k}: ${v.count} ta\n   ${(v.users as string[] ?? []).join('\n   ') || "(bo'sh)"}`
+                              : `${k}: ${String(v)}`
+                        ).join('\n\n')
+                      alert(`Afitsant API natijasi:\n\n${msg}`)
+                    }}
+                    className="mt-1 flex items-center gap-1.5 text-brand-info hover:text-ink transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                    Afitsantlarni server dan tekshir
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            /* ── Oddiy afitsant: faqat ulanish holati ── */
+            <div className="flex items-center gap-2 rounded-xl border border-line bg-bg-elevated px-4 py-3 text-sm">
+              {diagInfo?.hasToken
+                ? <CheckCircle2 size={15} className="text-brand-success shrink-0" />
+                : <XCircle size={15} className="text-brand-danger shrink-0" />}
+              <span className={diagInfo?.hasToken ? 'text-brand-success font-medium' : 'text-brand-danger'}>
+                {diagInfo?.hasToken ? 'Server bilan ulangan' : "Ulanmagan — managerga murojaat qiling"}
+              </span>
             </div>
           )}
         </Section>
@@ -261,19 +324,110 @@ export default function SettingsPage(): JSX.Element {
             </Field>
           )}
           {form.printerType === 'usb' && (
-            <Field label="USB qurilma yo'li">
+            isWindows ? (
+              /* Windows: USB port orqali driver siz chop etish */
+              <Field label="USB Port">
+                <p className="mb-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+                  ✅ Driver kerak emas! Windows USB port orqali to'g'ridan chop etiladi.
+                  Printer ulangan bo'lsa "Aniqlash" tugmasini bosing.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 font-mono text-sm"
+                    placeholder="USB001"
+                    value={form.printerDevicePath ?? 'USB001'}
+                    onChange={(e) => update('printerDevicePath', e.target.value || 'USB001')}
+                  />
+                  <button
+                    onClick={() => void detectUsb()}
+                    disabled={detecting}
+                    className="btn-ghost shrink-0"
+                    title="USB printerlarni avtomatik aniqlash"
+                  >
+                    <ScanLine size={14} /> {detecting ? '…' : 'Aniqlash'}
+                  </button>
+                </div>
+                {usbDevices.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {usbDevices.map((d) => (
+                      <button
+                        key={d.product}
+                        onClick={() => {
+                          const isUsbPort = d.vendorId === 'usb-port'
+                          if (isUsbPort) {
+                            update('printerDevicePath', d.product ?? 'USB001')
+                          } else {
+                            update('printerName', d.product ?? '')
+                          }
+                        }}
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-1.5 text-left text-xs transition-all',
+                          (form.printerDevicePath === d.product || form.printerName === d.product)
+                            ? 'border-brand-success bg-brand-success/10 text-brand-success'
+                            : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
+                        )}
+                      >
+                        {d.vendorId === 'usb-port' ? '🔌' : '🖨'} {d.product}
+                        {d.manufacturer && <span className="ml-1 opacity-60">({d.manufacturer})</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            ) : (
+              /* Linux: device path */
+              <Field label="USB qurilma yo'li">
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 font-mono text-sm"
+                    placeholder="/dev/usb/lp0"
+                    value={form.printerDevicePath ?? '/dev/usb/lp0'}
+                    onChange={(e) => update('printerDevicePath', e.target.value || '/dev/usb/lp0')}
+                  />
+                  <button
+                    onClick={() => void detectUsb()}
+                    disabled={detecting}
+                    className="btn-ghost shrink-0"
+                    title="USB qurilmalarni avtomatik aniqlash"
+                  >
+                    <ScanLine size={14} /> {detecting ? '…' : 'Aniqlash'}
+                  </button>
+                </div>
+                {usbDevices.length > 1 && (
+                  <div className="mt-2 space-y-1">
+                    {usbDevices.map((d) => (
+                      <button
+                        key={d.product}
+                        onClick={() => update('printerDevicePath', d.product)}
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-1.5 text-left font-mono text-xs transition-all',
+                          form.printerDevicePath === d.product
+                            ? 'border-brand-success bg-brand-success/10 text-brand-success'
+                            : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
+                        )}
+                      >
+                        {d.product}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            )
+          )}
+          {form.printerType === 'windows' && (
+            <Field label="Printer nomi (Windows)">
               <div className="flex gap-2">
                 <input
-                  className="input flex-1 font-mono text-sm"
-                  placeholder="/dev/usb/lp0"
-                  value={form.printerDevicePath ?? '/dev/usb/lp0'}
-                  onChange={(e) => update('printerDevicePath', e.target.value || '/dev/usb/lp0')}
+                  className="input flex-1"
+                  placeholder="XPrinter XP-58 yoki Windows printer nomi"
+                  value={form.printerName ?? ''}
+                  onChange={(e) => update('printerName', e.target.value || null)}
                 />
                 <button
                   onClick={() => void detectUsb()}
                   disabled={detecting}
                   className="btn-ghost shrink-0"
-                  title="USB qurilmalarni avtomatik aniqlash"
+                  title="Windows printerlarni avtomatik aniqlash"
                 >
                   <ScanLine size={14} /> {detecting ? '…' : 'Aniqlash'}
                 </button>
@@ -283,29 +437,19 @@ export default function SettingsPage(): JSX.Element {
                   {usbDevices.map((d) => (
                     <button
                       key={d.product}
-                      onClick={() => update('printerDevicePath', d.product)}
+                      onClick={() => update('printerName', d.product)}
                       className={cn(
-                        'w-full rounded-xl border px-3 py-1.5 text-left font-mono text-xs transition-all',
-                        form.printerDevicePath === d.product
+                        'w-full rounded-xl border px-3 py-1.5 text-left text-xs transition-all',
+                        form.printerName === d.product
                           ? 'border-brand-success bg-brand-success/10 text-brand-success'
                           : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
                       )}
                     >
-                      {d.product}
+                      🖨 {d.product}
                     </button>
                   ))}
                 </div>
               )}
-            </Field>
-          )}
-          {form.printerType === 'windows' && (
-            <Field label="Printer nomi (Windows)">
-              <input
-                className="input"
-                placeholder="XPrinter XP-58 yoki Windows printer nomi"
-                value={form.printerName ?? ''}
-                onChange={(e) => update('printerName', e.target.value || null)}
-              />
             </Field>
           )}
           <Field label="Chek sarlavhasi">
@@ -326,7 +470,7 @@ export default function SettingsPage(): JSX.Element {
             <button onClick={() => void testPrint()} className="btn-ghost flex-1">
               <TestTube2 size={14} /> Test chek
             </button>
-            {form.printerType === 'usb' && (
+            {form.printerType === 'usb' && !isWindows && (
               <button
                 onClick={() => void (async () => {
                   const r = await window.afisant.printer.fixPerms()
@@ -350,26 +494,29 @@ export default function SettingsPage(): JSX.Element {
               {catRows.map((row, i) => (
                 <div
                   key={row.cat.id}
+                  draggable
+                  onDragStart={(e) => {
+                    setDragIdx(i)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
                   onDragOver={(e) => {
                     e.preventDefault()
-                    if (dragOverIdx !== i) setDragOverIdx(i)
-                  }}
-                  onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverIdx(null)
+                    setDragOverIdx(i)
                   }}
                   onDrop={(e) => {
                     e.preventDefault()
-                    if (dragIdx === null || dragIdx === i) { setDragOverIdx(null); return }
-                    const next = [...catRows]
-                    const [removed] = next.splice(dragIdx, 1)
-                    next.splice(i, 0, removed)
-                    setCatRows(next)
+                    if (dragIdx !== null && dragIdx !== i) {
+                      const next = [...catRows]
+                      const [removed] = next.splice(dragIdx, 1)
+                      next.splice(i, 0, removed)
+                      setCatRows(next)
+                    }
                     setDragIdx(null)
                     setDragOverIdx(null)
                   }}
                   onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
                   className={cn(
-                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-all',
+                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-all cursor-grab active:cursor-grabbing select-none',
                     dragIdx === i
                       ? 'opacity-30 border-line bg-bg-card'
                       : dragOverIdx === i
@@ -377,21 +524,14 @@ export default function SettingsPage(): JSX.Element {
                         : 'border-line bg-bg-card hover:border-line-strong'
                   )}
                 >
-                  {/* Drag handle */}
-                  <GripVertical
-                    size={15}
-                    draggable
-                    onDragStart={(e) => {
-                      setDragIdx(i)
-                      e.dataTransfer.effectAllowed = 'move'
-                    }}
-                    className="shrink-0 cursor-grab text-ink-dim select-none active:cursor-grabbing"
-                  />
+                  {/* Drag handle — ko'rinma uchun, asl drag div dan ishlaydi */}
+                  <GripVertical size={15} className="shrink-0 text-ink-dim pointer-events-none" />
 
                   {/* Nom */}
                   <input
-                    className="input flex-1 py-1.5 text-sm"
+                    className="input flex-1 py-1.5 text-sm cursor-text select-text"
                     value={row.localName}
+                    onMouseDown={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       const next = [...catRows]
                       next[i] = { ...next[i], localName: e.target.value }
@@ -445,6 +585,217 @@ export default function SettingsPage(): JSX.Element {
             </div>
           )}
         </Section>
+
+        {isAdmin && (
+          <Section title="Server Zakazlar" icon={<ClipboardList size={16} />}>
+            {/* ── DB Holati ── */}
+            <button
+              onClick={async () => {
+                setLoadingDb(true)
+                try { setDbStatus(await window.afisant.diag.dbStatus()) }
+                finally { setLoadingDb(false) }
+              }}
+              disabled={loadingDb}
+              className="btn-ghost w-full"
+            >
+              <ScanLine size={13} className={loadingDb ? 'animate-spin' : ''} />
+              {loadingDb ? 'Tekshirilmoqda…' : 'DB holati — server_id bor/yo\'qligini tekshir'}
+            </button>
+
+            {dbStatus && (
+              <div className="rounded-xl border border-line bg-bg-elevated p-3 text-xs space-y-2">
+                <p className="font-semibold text-ink-soft uppercase tracking-wider text-[10px]">Mahalliy DB holati</p>
+
+                {/* Token */}
+                <div className="flex items-center gap-2">
+                  {dbStatus.token ? <CheckCircle2 size={12} className="text-brand-success shrink-0" /> : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                  <span className="text-ink-soft">Token:</span>
+                  <span className={cn('font-mono truncate', dbStatus.token ? 'text-brand-success' : 'text-brand-danger')}>
+                    {dbStatus.token ?? 'YO\'Q — qayta login qiling'}
+                  </span>
+                </div>
+
+                {/* branchId */}
+                <div className="flex items-center gap-2">
+                  {dbStatus.branchId ? <CheckCircle2 size={12} className="text-brand-success shrink-0" /> : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                  <span className="text-ink-soft">Branch ID:</span>
+                  <span className={cn('font-mono', dbStatus.branchId ? 'text-ink' : 'text-brand-danger')}>
+                    {dbStatus.branchId ? `${dbStatus.branchId.slice(0, 12)}…` : 'YO\'Q'}
+                  </span>
+                </div>
+
+                {/* Afitsantlar */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    {dbStatus.waiters.withServerId === dbStatus.waiters.total
+                      ? <CheckCircle2 size={12} className="text-brand-success shrink-0" />
+                      : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                    <span className="text-ink-soft">Afitsantlar:</span>
+                    <span className={dbStatus.waiters.withServerId === dbStatus.waiters.total ? 'text-brand-success' : 'text-brand-danger'}>
+                      {dbStatus.waiters.withServerId}/{dbStatus.waiters.total} ta server_id bilan
+                    </span>
+                  </div>
+                  <div className="pl-5 space-y-0.5">
+                    {dbStatus.waiters.list.map((w, i) => (
+                      <p key={i} className={cn('text-[10px]', w.includes('YO\'Q') ? 'text-brand-danger' : 'text-ink-soft')}>{w}</p>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mahsulotlar */}
+                <div className="flex items-center gap-2">
+                  {dbStatus.products.withServerId === dbStatus.products.total
+                    ? <CheckCircle2 size={12} className="text-brand-success shrink-0" />
+                    : <XCircle size={12} className="text-brand-warn shrink-0" />}
+                  <span className="text-ink-soft">Mahsulotlar:</span>
+                  <span className={dbStatus.products.withServerId > 0 ? 'text-brand-success' : 'text-brand-danger'}>
+                    {dbStatus.products.withServerId}/{dbStatus.products.total} ta server_id bilan
+                  </span>
+                  {dbStatus.products.withServerId === 0 && (
+                    <span className="text-brand-danger font-semibold">← Sinxronlash kerak!</span>
+                  )}
+                </div>
+
+                {/* Xonalar */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    {dbStatus.tables.withServerId === dbStatus.tables.total
+                      ? <CheckCircle2 size={12} className="text-brand-success shrink-0" />
+                      : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                    <span className="text-ink-soft">Xonalar:</span>
+                    <span className={dbStatus.tables.withServerId > 0 ? 'text-brand-success' : 'text-brand-danger'}>
+                      {dbStatus.tables.withServerId}/{dbStatus.tables.total} ta server_id bilan
+                    </span>
+                  </div>
+                  <div className="pl-5 space-y-0.5">
+                    {dbStatus.tables.list.slice(0, 5).map((t, i) => (
+                      <p key={i} className={cn('text-[10px]', t.includes('YO\'Q') ? 'text-brand-danger' : 'text-ink-soft')}>{t}</p>
+                    ))}
+                    {dbStatus.tables.list.length > 5 && (
+                      <p className="text-[10px] text-ink-dim">… va yana {dbStatus.tables.list.length - 5} ta</p>
+                    )}
+                  </div>
+                </div>
+
+                {(dbStatus.products.withServerId === 0 || dbStatus.tables.withServerId === 0 || dbStatus.waiters.withServerId === 0) && (
+                  <div className="rounded-lg bg-brand-danger/10 border border-brand-danger/30 px-3 py-2 text-brand-danger font-semibold text-[11px]">
+                    ⚠️ Server_id lar yo'q — Sozlamalar → "To'liq sinxronlash" tugmasini bosing
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="border-t border-line pt-3" />
+            <button
+              onClick={async () => {
+                setLoadingOrders(true)
+                try {
+                  const orders = await window.afisant.diag.recentOrders()
+                  setRecentOrders(orders)
+                } finally {
+                  setLoadingOrders(false)
+                }
+              }}
+              disabled={loadingOrders}
+              className="btn-ghost w-full"
+            >
+              <RefreshCw size={13} className={loadingOrders ? 'animate-spin' : ''} />
+              {loadingOrders ? 'Yuklanmoqda…' : "Server dan so'nggi zakazlarni ko'rish"}
+            </button>
+
+            {recentOrders !== null && (
+              recentOrders.length === 0 ? (
+                <p className="text-center text-sm text-ink-soft py-2">
+                  Server da zakas topilmadi — hali birorta yuborilmagan
+                </p>
+              ) : (
+                <div className="mt-1 space-y-1.5 max-h-72 overflow-y-auto">
+                  {recentOrders.map((o) => {
+                    const statusColor = o.status === 'SUCCESS'
+                      ? 'text-brand-success'
+                      : o.status === 'CANCELED'
+                        ? 'text-brand-danger'
+                        : 'text-brand-warn'
+                    const statusLabel = o.status === 'SUCCESS'
+                      ? 'Yopildi' : o.status === 'CANCELED'
+                        ? 'Bekor' : o.status === 'PENDING'
+                          ? 'Kutilmoqda' : o.status
+                    const dateStr = o.createdAt
+                      ? new Date(o.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                      : ''
+                    return (
+                      <div key={o.id} className="flex items-center justify-between rounded-xl border border-line bg-bg-elevated px-3 py-2 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-semibold ${statusColor}`}>{statusLabel}</span>
+                            <span className="text-ink-dim">·</span>
+                            <span className="font-medium text-ink truncate">{o.room}</span>
+                          </div>
+                          <div className="mt-0.5 text-ink-soft truncate">
+                            {o.waiter} · {o.itemCount} ta mahsulot · {dateStr}
+                          </div>
+                        </div>
+                        <div className="ml-2 shrink-0 font-bold text-ink">{o.total.toLocaleString()} so'm</div>
+                      </div>
+                    )
+                  })}
+                  <p className="text-center text-[10px] text-ink-dim pt-1">
+                    ✅ Zakazlar server da — admin panel da ko'rinadi
+                  </p>
+                </div>
+              )
+            )}
+
+            <div className="border-t border-line pt-3" />
+            <button
+              onClick={async () => {
+                setLoadingRooms(true)
+                try {
+                  const data = await window.afisant.diag.testRooms()
+                  setRoomsTest(data)
+                } finally {
+                  setLoadingRooms(false)
+                }
+              }}
+              disabled={loadingRooms}
+              className="btn-ghost w-full"
+            >
+              <RefreshCw size={13} className={loadingRooms ? 'animate-spin' : ''} />
+              {loadingRooms ? 'Tekshirilmoqda…' : 'Xonalar API ni tekshirish'}
+            </button>
+
+            {roomsTest !== null && (
+              <div className="mt-1 rounded-xl border border-line bg-bg-elevated p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
+                <p className="font-bold text-ink">branchId: {roomsTest.branchId ?? '—'}</p>
+                {Object.entries(roomsTest).filter(([k]) => k.startsWith('/')).map(([url, val]: [string, any]) => (
+                  <div key={url} className="border-t border-line pt-2">
+                    <p className="font-mono font-bold text-ink-soft break-all">{url}</p>
+                    {val.error !== undefined ? (
+                      <p className="text-brand-danger">❌ {String(val.error)}</p>
+                    ) : (
+                      <>
+                        <p className="text-ink">Soni: <span className="font-bold">{val.count}</span></p>
+                        {val.firstItemKeys?.length > 0 && (
+                          <p className="text-ink-soft">Fields: {(val.firstItemKeys as string[]).join(', ')}</p>
+                        )}
+                        {(val.sample as any[])?.map((item: any, i: number) => (
+                          <div key={i} className="mt-1 bg-stone-50 rounded p-1.5 text-[10px] font-mono">
+                            <p><span className="text-ink-soft">id:</span> {item.id}</p>
+                            <p><span className="text-ink-soft">name:</span> {item.name}</p>
+                            <p><span className="text-ink-soft">status:</span> {item.status ?? 'yo\'q'}</p>
+                            {item.roomCategoryId && <p><span className="text-ink-soft">roomCategoryId:</span> {item.roomCategoryId}</p>}
+                            {item.roomCategory && <p><span className="text-ink-soft">roomCategory.id:</span> {item.roomCategory.id}</p>}
+                            {item.categoryId && <p><span className="text-ink-soft">categoryId:</span> {item.categoryId}</p>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
 
         <Section title="Afitsantlar" icon={<Users size={16} />}>
           {waiters.length === 0 ? (

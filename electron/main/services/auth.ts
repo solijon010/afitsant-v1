@@ -10,11 +10,13 @@ const LOCK_MS = 60_000
 
 function mapRole(backendRole: string): string {
   switch (backendRole) {
-    case 'SUPER_AFITSANT': return 'super_waiter'
-    case 'AFITSANT': return 'waiter'
-    case 'MANAGER': return 'manager'
-    case 'SUPERADMIN': return 'manager'
-    default: return 'waiter'
+    case 'SUPER_AFITSANT':
+    case 'SUPER_WAITER':      return 'super_waiter'
+    case 'AFITSANT':
+    case 'WAITER':            return 'waiter'
+    case 'MANAGER':
+    case 'SUPERADMIN':        return 'manager'
+    default:                  return 'waiter'
   }
 }
 
@@ -83,8 +85,13 @@ export async function selectBranch(branchId: string, branchName: string): Promis
   try {
     setSettings({ branchId, organizationName: branchName })
     await syncWaitersForBranch(branchId)
+    // Branch tanlanganida barcha ma'lumotlarni (xonalar, mahsulotlar, kategoriyalar) sinxronlaymiz
+    const { fullPull } = await import('./syncEngine')
+    await fullPull()
+    console.log('[AUTH] selectBranch: fullPull completed')
     return { ok: true }
-  } catch {
+  } catch (e: any) {
+    console.error('[AUTH] selectBranch error:', e?.message)
     return { ok: false }
   }
 }
@@ -92,22 +99,54 @@ export async function selectBranch(branchId: string, branchName: string): Promis
 export async function syncWaitersForBranch(branchId?: string | null): Promise<void> {
   const api = getApi()
   try {
-    const res = branchId
-      ? await api.get(`/api/user/my/${branchId}`)
-      : await api.get(`/api/user/waiters`)
-    const data = res.data as any
-    const users: any[] = Array.isArray(data) ? data : (data?.data ?? [])
-    const afitsants = users.filter((u: any) =>
-      u.role === 'AFITSANT' || u.role === 'SUPER_AFITSANT' || u.role === 'MANAGER'
-    )
+    // Ikkala endpoint dan ham urinib ko'ramiz — qaysi biri ko'proq qaytarsa shu
+    const urls = branchId
+      ? [`/api/user/my/${branchId}`, `/api/user/waiters`]
+      : [`/api/user/waiters`]
+
+    let users: any[] = []
+    for (const url of urls) {
+      try {
+        const res = await api.get(url)
+        const data = res.data as any
+        const list: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+        console.log(`[WAITERS] ${url} → ${list.length} ta`)
+        if (list.length > users.length) users = list  // ko'proq natija beradigani tanlanadi
+      } catch (err: any) {
+        console.warn(`[WAITERS] ${url} xato:`, err?.message)
+      }
+    }
+
+    // SUPERADMIN rolini tashlab qolganini hammasi qabul qilamiz
+    const afitsants = users.filter((u: any) => u.role !== 'SUPERADMIN')
+    console.log(`[WAITERS] Jami: ${users.length}, filtrdan o'tdi: ${afitsants.length}`)
+    console.log(`[WAITERS] Ro'yxat:`, afitsants.map((u: any) => `${u.firstName} ${u.lastName ?? ''} (${u.role})`).join(' | '))
+
     const db = getDb()
     const now = Date.now()
 
-    // bcrypt.hash async — main thread ni bloklamaslik uchun transaction dan oldin bajaramiz
+    // Server da bo'lgan server_id lar
+    const serverIds = new Set(afitsants.map((u: any) => String(u.id)))
+
+    // Faqat server KAMIDA 1 ta user qaytargan bo'lsa deaktivlaymiz
+    // (0 qaytarsa — bu xato yoki auth muammo bo'lishi mumkin)
+    if (afitsants.length > 0) {
+      const allLocal = db.prepare(`SELECT server_id FROM waiters WHERE server_id IS NOT NULL`).all() as any[]
+      db.transaction(() => {
+        for (const row of allLocal) {
+          if (!serverIds.has(String(row.server_id))) {
+            db.prepare(`UPDATE waiters SET is_active = 0 WHERE server_id = ?`).run(row.server_id)
+            console.log(`[WAITERS] Deactivated server_id=${row.server_id} (serverda yo'q)`)
+          }
+        }
+      })()
+    }
+
+    // Yangi va mavjud afitsantlarni upsert qilamiz (pin_hash saqlanib qoladi)
     const rows: Array<{ u: any; phone: string; pinHash: string }> = []
     for (const u of afitsants) {
       const existing = db.prepare(`SELECT pin_hash FROM waiters WHERE server_id = ?`).get(u.id) as any
-      const phone = u.phoneNumer ?? u.phone ?? ''
+      const phone = u.phoneNumer ?? u.phoneNumber ?? u.phone ?? ''
       const pinHash: string = existing?.pin_hash
         ?? await bcrypt.hash(phone.length >= 4 ? phone.slice(-4) : '1234', 8)
       rows.push({ u, phone, pinHash })
@@ -117,20 +156,22 @@ export async function syncWaitersForBranch(branchId?: string | null): Promise<vo
       `INSERT INTO waiters (server_id, first_name, last_name, phone, pin_hash, role, is_active, failed_attempts, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
        ON CONFLICT(server_id) DO UPDATE SET
-         first_name = excluded.first_name,
-         last_name = excluded.last_name,
-         phone = excluded.phone,
-         role = excluded.role,
-         is_active = 1,
-         updated_at = excluded.updated_at`
+         first_name  = excluded.first_name,
+         last_name   = excluded.last_name,
+         phone       = excluded.phone,
+         role        = excluded.role,
+         is_active   = 1,
+         updated_at  = excluded.updated_at`
     )
     db.transaction(() => {
       for (const { u, phone, pinHash } of rows) {
-        stmt.run(u.id, u.firstName, u.lastName, phone, pinHash, mapRole(u.role), now, now)
+        stmt.run(u.id, u.firstName, u.lastName ?? '', phone, pinHash, mapRole(u.role), now, now)
       }
     })()
+
+    console.log(`[WAITERS] Sync tugadi — ${rows.length} ta afitsant saqlandi`)
   } catch (e: any) {
-    console.error('Sync waiters error:', e?.message)
+    console.error('[WAITERS] Sync error:', e?.message)
   }
 }
 

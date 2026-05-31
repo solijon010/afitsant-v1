@@ -90,7 +90,174 @@ export function registerIpc(): void {
     }
   })
 
+  ipcMain.handle(IPC.diagTestWaiters, async () => {
+    const { getApi } = await import('./services/apiClient')
+    const s = settings.getSettings()
+    const api = getApi()
+    const b = s.branchId
+    const results: Record<string, any> = { branchId: b, serverUrl: s.serverUrl }
+    const endpoints = [
+      // Avvalgi sinashlar
+      ...(b ? [`/api/user/my/${b}`, `/api/user/branch/${b}`] : []),
+      `/api/user/waiters`,
+      // /all/${branchId} pattern — boshqa endpointlar kabi
+      ...(b ? [
+        `/api/user/all/${b}`,
+        `/api/afisant/all/${b}`,
+        `/api/waiter/all/${b}`,
+        `/api/afisant/${b}`,
+        `/api/user/list/${b}`,
+      ] : []),
+      `/api/user/all`,
+      `/api/afisant/all`,
+      `/api/waiter/all`,
+    ]
+    for (const url of endpoints) {
+      try {
+        const res = await api.get(url)
+        const data = res.data as any
+        const list: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+        results[url] = {
+          status: res.status,
+          count: list.length,
+          rawType: Array.isArray(data) ? 'array' : typeof data,
+          rawKeys: typeof data === 'object' && data ? Object.keys(data).slice(0, 8) : [],
+          users: list.slice(0, 5).map((u: any) => `${u.firstName ?? u.name ?? u.login ?? '?'} (${u.role ?? u.type ?? '?'})`)
+        }
+      } catch (e: any) {
+        results[url] = { error: e?.response?.status ?? e?.message }
+      }
+    }
+    return results
+  })
+
   ipcMain.handle(IPC.diagOpenLogs, () => {
     void shell.openPath(app.getPath('logs'))
+  })
+
+  ipcMain.handle(IPC.diagRecentOrders, async () => {
+    const { getApi } = await import('./services/apiClient')
+    const s = settings.getSettings()
+    if (!s.apiToken || !s.branchId) return []
+    const api = getApi()
+    try {
+      const res = await api.get(`/api/order/branch/${s.branchId}?limit=20`)
+      const data = res.data as any
+      const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+      return orders.map((o: any) => ({
+        id: String(o.id ?? ''),
+        status: String(o.status ?? ''),
+        room: String(o.room?.name ?? o.room?.id ?? '—'),
+        waiter: `${o.user?.firstName ?? ''} ${o.user?.lastName ?? ''}`.trim() || '—',
+        total: Number(o.totalPrice ?? o.total ?? 0),
+        itemCount: Array.isArray(o.orderItem) ? o.orderItem.length : 0,
+        createdAt: String(o.createdAt ?? '')
+      }))
+    } catch (e: any) {
+      console.error('[DIAG] recentOrders error:', e?.message)
+      return []
+    }
+  })
+
+  // ── DB holati: server_id bor/yo'q statistika ──
+  ipcMain.handle(IPC.diagDbStatus, () => {
+    const { getDb } = require('./db/connection') as typeof import('./db/connection')
+    const db = getDb()
+    const s = settings.getSettings()
+
+    const waitersAll = db.prepare(`SELECT first_name, last_name, server_id, role FROM waiters WHERE is_active = 1`).all() as any[]
+    const productsAll = db.prepare(`SELECT COUNT(*) AS total FROM products`).get() as { total: number }
+    const productsWithId = db.prepare(`SELECT COUNT(*) AS c FROM products WHERE server_id IS NOT NULL AND server_id != ''`).get() as { c: number }
+    const tablesAll = db.prepare(`SELECT name, server_id FROM tables`).all() as any[]
+
+    return {
+      waiters: {
+        total: waitersAll.length,
+        withServerId: waitersAll.filter((w: any) => w.server_id).length,
+        list: waitersAll.map((w: any) => `${w.first_name} ${w.last_name ?? ''} (${w.role}) → serverId: ${w.server_id ?? 'YO\'Q ❌'}`)
+      },
+      products: {
+        total: productsAll.total,
+        withServerId: productsWithId.c
+      },
+      tables: {
+        total: tablesAll.length,
+        withServerId: tablesAll.filter((t: any) => t.server_id).length,
+        list: tablesAll.map((t: any) => `${t.name} → ${t.server_id ?? 'YO\'Q ❌'}`)
+      },
+      token: s.apiToken ? `${s.apiToken.slice(0, 20)}…` : null,
+      branchId: s.branchId
+    }
+  })
+
+  // ── Xonalar va room-category diagnostika ──
+  ipcMain.handle(IPC.diagTestRooms, async () => {
+    const { getApi } = await import('./services/apiClient')
+    const s = settings.getSettings()
+    const api = getApi()
+    const b = s.branchId
+    const results: Record<string, any> = { branchId: b, serverUrl: s.serverUrl }
+
+    const roomCatUrls = b
+      ? [`/api/room-category/all/${b}`, `/api/room-category/all`]
+      : [`/api/room-category/all`]
+    const roomUrls = b
+      ? [`/api/room/all/${b}`, `/api/room/all`]
+      : [`/api/room/all`]
+
+    for (const url of [...roomCatUrls, ...roomUrls]) {
+      try {
+        const res = await api.get(url)
+        const data = res.data as any
+        const list: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+        // Birinchi element barcha field nomlarini ko'rsatish uchun
+        const firstItem = list[0] ?? null
+        results[url] = {
+          status: res.status,
+          count: list.length,
+          firstItemKeys: firstItem ? Object.keys(firstItem) : [],
+          sample: list.slice(0, 3).map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            status: item.status,
+            roomCategoryId: item.roomCategoryId,
+            roomCategory: item.roomCategory ? { id: item.roomCategory.id, name: item.roomCategory.name } : undefined,
+            categoryId: item.categoryId,
+          }))
+        }
+      } catch (e: any) {
+        results[url] = { error: e?.response?.status ?? e?.message }
+      }
+    }
+    return results
+  })
+
+  // ── Test order create: haqiqiy POST /api/order yuborish ──
+  ipcMain.handle(IPC.diagTestOrderCreate, async (_e, roomServerId: string, waiterServerId: string, productServerId: string) => {
+    const { getApi } = await import('./services/apiClient')
+    const s = settings.getSettings()
+    if (!s.apiToken) return { ok: false, error: 'Token yo\'q' }
+    const api = getApi()
+    try {
+      // JWT dan real user ID
+      let realWaiterId = waiterServerId
+      try {
+        const payload = JSON.parse(Buffer.from(s.apiToken.split('.')[1], 'base64').toString())
+        if (payload.id) realWaiterId = payload.id
+      } catch {}
+
+      const body = {
+        roomId: roomServerId,
+        waiterId: realWaiterId,
+        orderItems: [{ productId: productServerId, count: 1 }]
+      }
+      console.log('[DIAG] testOrderCreate body:', JSON.stringify(body))
+      const res = await api.post('/api/order', body)
+      const raw = res.data as any
+      return { ok: true, orderId: String(raw?.id ?? raw?.serverId ?? ''), raw }
+    } catch (e: any) {
+      const errData = e?.response?.data
+      return { ok: false, error: `HTTP ${e?.response?.status ?? e?.code}: ${JSON.stringify(errData ?? e?.message)}` }
+    }
   })
 }

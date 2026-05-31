@@ -1,5 +1,7 @@
-import { writeSync, openSync, closeSync, existsSync, fsyncSync } from 'node:fs'
+import { writeSync, openSync, closeSync, existsSync, fsyncSync, writeFileSync, unlinkSync } from 'node:fs'
 import { execSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { ReceiptPayload } from '@shared/types'
 import { getSettings } from './settings'
 
@@ -128,6 +130,35 @@ async function printRaw(data: Buffer): Promise<{ ok: true } | { ok: false; error
   }
 }
 
+// Windows: driver siz, to'g'ridan USB portiga raw ESC/POS yozish
+// USB001 porti Windows USB Printing Support class driveri orqali ishlaydi
+async function printRawWindows(data: Buffer): Promise<{ ok: true } | { ok: false; error: string }> {
+  const s = getSettings()
+  // USB port nomi: USB001, USB002, ...
+  const usbPort = s.printerDevicePath ?? 'USB001'
+  const tmpFile = join(tmpdir(), `afisant-print-${Date.now()}.bin`)
+
+  try {
+    writeFileSync(tmpFile, data)
+    // Windows copy /b — binary mode, to'g'ridan USB portiga
+    execSync(`copy /b "${tmpFile}" "\\\\.\\${usbPort}"`, {
+      shell: true,
+      timeout: 10000,
+      stdio: 'pipe'
+    })
+    return { ok: true }
+  } catch (e: any) {
+    const msg = String(e?.stderr ?? e?.message ?? 'USB port xatosi')
+    console.error('[PRINTER] Windows USB error:', msg)
+    return {
+      ok: false,
+      error: `Windows USB print xatosi (${usbPort}):\n${msg}\n\nSozlamalar > Printer > USB Port ni tekshiring`
+    }
+  } finally {
+    try { unlinkSync(tmpFile) } catch { /* ignore */ }
+  }
+}
+
 export async function fixPrinterPerms(): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const rule = `KERNEL=="lp[0-9]*", SUBSYSTEM=="usb", MODE="0666"`
@@ -251,7 +282,12 @@ export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true 
     return printRaw(buildEscPos(payload))
   }
 
-  // Windows USB + network + windows: node-thermal-printer orqali
+  // Windows USB: driver siz, copy /b orqali USB portiga to'g'ridan yozish
+  if (s.printerType === 'usb' && process.platform === 'win32') {
+    return printRawWindows(buildEscPos(payload))
+  }
+
+  // Network + Windows driver: node-thermal-printer orqali
   return printViaThermalLib(payload)
 }
 
@@ -278,6 +314,42 @@ export async function testPrint(): Promise<{ ok: true } | { ok: false; error: st
 export async function listUsbPrinters(): Promise<
   Array<{ vendorId: string; productId: string; manufacturer?: string; product?: string }>
 > {
+  // Windows: USB printer portlarini va o'rnatilgan printerlarni ro'yxatlaymiz
+  if (process.platform === 'win32') {
+    const results: Array<{ vendorId: string; productId: string; manufacturer?: string; product?: string }> = []
+
+    // 1. USB printer portlarini topamiz (USB001, USB002 ...) — driver siz ishlaydi
+    try {
+      const out = execSync('wmic path Win32_PnPEntity where "DeviceID like \'USBPRINT%\'" get Name,DeviceID /format:list', {
+        encoding: 'utf8', timeout: 5000, shell: true
+      })
+      const matches = [...out.matchAll(/DeviceID=.*?USB(\d+)\s/gi)]
+      for (const m of matches) {
+        const portNum = m[1]
+        results.push({
+          vendorId: 'usb-port',
+          productId: portNum,
+          manufacturer: 'USB Port (driver siz)',
+          product: `USB${portNum}`
+        })
+      }
+    } catch { /* ignore */ }
+
+    // 2. Windows Print Spooler da o'rnatilgan printerlar
+    try {
+      const out = execSync('wmic printer get Name /format:list', { encoding: 'utf8', timeout: 5000 })
+      const names = out.split('\n')
+        .map((l) => l.replace(/^Name=/, '').trim())
+        .filter((l) => l.length > 0 && !l.includes('PDF') && !l.includes('XPS') && !l.includes('Fax') && !l.includes('OneNote'))
+      for (const name of names) {
+        results.push({ vendorId: 'windows', productId: 'printer', manufacturer: 'Windows Printer', product: name })
+      }
+    } catch { /* ignore */ }
+
+    return results
+  }
+
+  // Linux: /dev/usb/lp* device fayllarini tekshiramiz
   const devices: Array<{ vendorId: string; productId: string; product: string }> = []
   const paths = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/lp0', '/dev/lp1']
   for (const p of paths) {

@@ -56,7 +56,8 @@ function setupSocket(getMainWindow: () => BrowserWindow | null): void {
   ]) {
     socket.on(channel, (data: unknown) => {
       const win = getMainWindow()
-      win?.webContents.send('event:sync', { channel, data })
+      if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
+      win.webContents.send('event:sync', { channel, data })
     })
   }
 }
@@ -70,7 +71,8 @@ function startTicker(): void {
 
 function broadcastStatus(getMainWindow: () => BrowserWindow | null): void {
   const win = getMainWindow()
-  win?.webContents.send('event:syncStatus', {
+  if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
+  win.webContents.send('event:syncStatus', {
     online,
     queued: queuedCount(),
     lastSyncAt
@@ -115,11 +117,33 @@ export async function fullPull(): Promise<{
 
   const toArray = (raw: any): any[] => (Array.isArray(raw) ? raw : (raw?.data ?? []))
 
+  // branchId bilan so'rov 403/404 bersa, branchId siz fallback qilamiz
+  async function fetchWithFallback(urlWithBranch: string | null, urlWithout: string): Promise<any> {
+    if (urlWithBranch) {
+      try {
+        const res = await api.get(urlWithBranch)
+        console.log(`[SYNC] ${urlWithBranch} → OK (${toArray(res.data).length} ta)`)
+        return res
+      } catch (e: any) {
+        console.warn(`[SYNC] ${urlWithBranch} xato (${e?.response?.status ?? e?.code}) — fallback: ${urlWithout}`)
+      }
+    }
+    const res = await api.get(urlWithout)
+    console.log(`[SYNC] ${urlWithout} → OK (${toArray(res.data).length} ta)`)
+    return res
+  }
+
   try {
-    // 1-qadam: kategoriyalar va xona kategoriyalari (parallel)
-    const [catsRes, roomCatsRes] = await Promise.allSettled([
-      branchId ? api.get(`/api/category/all/${branchId}`) : api.get(`/api/category/all`),
-      branchId ? api.get(`/api/room-category/all/${branchId}`) : api.get(`/api/room-category/all`)
+    // Barcha ma'lumotlarni BITTA parallel to'plamda olamiz — DB dan oldin!
+    // Bu DELETE→fetch→insert zanjirida products yo'qolishini oldini oladi
+    const [catsRes, roomCatsRes, prodsRes, roomsRes] = await Promise.allSettled([
+      fetchWithFallback(branchId ? `/api/category/all/${branchId}` : null, `/api/category/all`),
+      fetchWithFallback(branchId ? `/api/room-category/all/${branchId}` : null, `/api/room-category/all`),
+      fetchWithFallback(
+        branchId ? `/api/product/all/${branchId}?page=1&limit=500` : null,
+        `/api/product/all?page=1&limit=500`
+      ),
+      fetchWithFallback(branchId ? `/api/room/all/${branchId}` : null, `/api/room/all`)
     ])
 
     let areaCount = 0
@@ -127,18 +151,19 @@ export async function fullPull(): Promise<{
     let categoryCount = 0
     let productCount = 0
 
-    // Kategoriyalarni saqlash
+    // Kategoriyalarni UPSERT — DELETE YO'Q, products CASCADE yo'qolmaydi
     if (catsRes.status === 'fulfilled') {
       const cats = toArray(catsRes.value.data)
       console.log(`[SYNC] categories raw count: ${cats.length}`)
-
-      // Avval hammani o'chirib qayta yozamiz — NULL server_id muammosini hal qiladi
-      // Products CASCADE DELETE bo'ladi lekin keyingi qadamda qayta yoziladi
-      db.prepare(`DELETE FROM categories`).run()
-
-      const insertCat = db.prepare(
-        `INSERT OR IGNORE INTO categories (server_id, name_uz_latn, name_uz_cyrl, icon, color, sort_order, is_active)
-         VALUES (?, ?, NULL, NULL, NULL, ?, ?)`
+      // Oldingilarni deaktivlaymiz, yangilar upsert bilan aktivlanadi
+      db.prepare(`UPDATE categories SET is_active = 0`).run()
+      const upsertCat = db.prepare(
+        `INSERT INTO categories (server_id, name_uz_latn, name_uz_cyrl, icon, color, sort_order, is_active)
+         VALUES (?, ?, NULL, NULL, NULL, ?, ?)
+         ON CONFLICT(server_id) DO UPDATE SET
+           name_uz_latn = excluded.name_uz_latn,
+           sort_order   = excluded.sort_order,
+           is_active    = excluded.is_active`
       )
       db.transaction(() => {
         const seenIds = new Set<string>()
@@ -146,56 +171,55 @@ export async function fullPull(): Promise<{
         for (let i = 0; i < cats.length; i++) {
           const c = cats[i]
           if (!c.name) continue
-          // server_id yoki nom bo'yicha dublikatni o'tkazib yuborish
           const idKey = String(c.id ?? '')
           const nameKey = String(c.name).toLowerCase().trim()
           if (idKey && seenIds.has(idKey)) continue
           if (seenNames.has(nameKey)) continue
           if (idKey) seenIds.add(idKey)
           seenNames.add(nameKey)
-          insertCat.run(c.id ?? null, c.name, i, c.status === 'ACTIVE' ? 1 : 0)
-          categoryCount++
+          const st = (c.status ?? '').toUpperCase()
+          const isActive = (!st || st === 'ACTIVE') ? 1 : 0
+          upsertCat.run(c.id ?? null, c.name, i, isActive)
+          if (isActive) categoryCount++
         }
       })()
+      console.log(`[SYNC] categories saved: ${categoryCount}`)
     }
 
-    // Xona kategoriyalarini (areas) saqlash — ham DELETE+INSERT
+    // Xona kategoriyalari (areas) — UPSERT, PK saqlanadi → tables yo'qolmaydi
     if (roomCatsRes.status === 'fulfilled') {
       const roomCats = toArray(roomCatsRes.value.data)
       console.log(`[SYNC] room-categories raw count: ${roomCats.length}`)
-
-      // Tables CASCADE bilan o'chadi, keyingi qadamda qayta yoziladi
-      db.prepare(`DELETE FROM areas`).run()
-
-      const insertArea = db.prepare(
-        `INSERT OR IGNORE INTO areas (server_id, name, type, icon, color, sort_order)
-         VALUES (?, ?, 'xona', NULL, NULL, ?)`
+      if (roomCats.length > 0) {
+        console.log(`[SYNC] room-categories[0]:`, JSON.stringify({ id: roomCats[0].id, name: roomCats[0].name, status: roomCats[0].status }))
+      }
+      const upsertArea = db.prepare(
+        `INSERT INTO areas (server_id, name, type, icon, color, sort_order)
+         VALUES (?, ?, 'xona', NULL, NULL, ?)
+         ON CONFLICT(server_id) DO UPDATE SET
+           name       = excluded.name,
+           sort_order = excluded.sort_order`
       )
       db.transaction(() => {
         const seenIds = new Set<string>()
         const seenNames = new Set<string>()
         for (let i = 0; i < roomCats.length; i++) {
           const rc = roomCats[i]
-          if (rc.status !== 'ACTIVE' || !rc.name) continue
+          if (!rc.name) continue
+          const st = (rc.status ?? '').toUpperCase()
+          if (st && st !== 'ACTIVE' && st !== 'PUBLISHED' && st !== 'ENABLED') continue
           const idKey = String(rc.id ?? '')
           const nameKey = String(rc.name).toLowerCase().trim()
           if (idKey && seenIds.has(idKey)) continue
           if (seenNames.has(nameKey)) continue
           if (idKey) seenIds.add(idKey)
           seenNames.add(nameKey)
-          insertArea.run(rc.id ?? null, rc.name, i)
+          upsertArea.run(rc.id ?? null, rc.name, i)
           areaCount++
         }
       })()
+      console.log(`[SYNC] areas saved: ${areaCount}`)
     }
-
-    // 2-qadam: mahsulotlar va xonalar (kategoriyalar/arealar DB'da bo'lgandan keyin)
-    const [prodsRes, roomsRes] = await Promise.allSettled([
-      branchId
-        ? api.get(`/api/product/all/${branchId}?page=1&limit=500`)
-        : api.get(`/api/product/all?page=1&limit=500`),
-      branchId ? api.get(`/api/room/all/${branchId}`) : api.get(`/api/room/all`)
-    ])
 
     // Mahsulotlarni saqlash
     if (prodsRes.status === 'fulfilled') {
@@ -236,6 +260,20 @@ export async function fullPull(): Promise<{
     if (roomsRes.status === 'fulfilled') {
       const rooms = toArray(roomsRes.value.data)
       console.log(`[SYNC] rooms raw count: ${rooms.length}`)
+      // Birinchi xona strukturasini loglaymiz — diagnostika uchun
+      if (rooms.length > 0) {
+        const sample = rooms[0]
+        console.log(`[SYNC] rooms[0] keys:`, Object.keys(sample))
+        console.log(`[SYNC] rooms[0] sample:`, JSON.stringify({
+          id: sample.id,
+          name: sample.name,
+          status: sample.status,
+          roomCategoryId: sample.roomCategoryId,
+          roomCategory: sample.roomCategory ? { id: sample.roomCategory.id } : undefined,
+          categoryId: sample.categoryId
+        }))
+      }
+
       const upsertTable = db.prepare(
         `INSERT INTO tables (server_id, area_id, name, capacity, sort_order)
          SELECT ?, areas.id, ?, NULL, ?
@@ -248,15 +286,26 @@ export async function fullPull(): Promise<{
       db.transaction(() => {
         for (let i = 0; i < rooms.length; i++) {
           const r = rooms[i]
-          if (r.status !== 'ACTIVE') continue
+          // Status filter — ACTIVE yoki belgilanmagan (null/undefined) xonalarni qabul qilamiz
+          const st = (r.status ?? '').toUpperCase()
+          if (st && st !== 'ACTIVE' && st !== 'PUBLISHED' && st !== 'ENABLED') continue
+          // Category ID ni bir necha field nomlari orqali topamiz
+          const catId = r.roomCategoryId ?? r.roomCategory?.id ?? r.categoryId ?? null
+          if (!catId) {
+            console.warn(`[SYNC] room skip (no categoryId): ${r.name} — fields: ${Object.keys(r).join(', ')}`)
+            continue
+          }
           try {
-            upsertTable.run(r.id, r.name, i, r.roomCategoryId)
-            tableCount++
+            const result = upsertTable.run(r.id, r.name, i, catId)
+            if ((result.changes ?? 0) > 0 || (result as any).lastInsertRowid) {
+              tableCount++
+            }
           } catch (err: any) {
             console.warn(`[SYNC] room skip: ${r.name} — ${err?.message}`)
           }
         }
       })()
+      console.log(`[SYNC] rooms saved: ${tableCount}`)
     }
 
     await syncWaitersForBranch(branchId)
@@ -284,7 +333,10 @@ export function status(): { online: boolean; queued: number; lastSyncAt: number 
 
 export function stopSync(): void {
   if (flushTimer) clearInterval(flushTimer)
-  if (socket) socket.disconnect()
+  if (socket) {
+    socket.removeAllListeners()  // disconnect eventini oldini olish uchun
+    socket.disconnect()
+  }
   flushTimer = null
   socket = null
 }

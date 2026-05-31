@@ -1,6 +1,6 @@
-appId: uz.sohil.afisant
-productName: Afisant
-copyright: Copyright © 2026 Sohil Choyxona
+appId: uz.hisobchim.pos
+productName: Hisobchim POS
+copyright: Copyright © 2026 Hisobchim
 
 directories:
   buildResources: build
@@ -23,8 +23,8 @@ win:
       arch: [x64]
     - target: portable
       arch: [x64]
-  icon: src/assets/logo.png
-  artifactName: Afisant-${version}-${arch}.${ext}
+  icon: src/assets/hisobchim-logo.ico
+  artifactName: Hisobchim-${version}-${arch}.${ext}
 
 nsis:
   oneClick: false
@@ -32,10 +32,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Afisant POS
+  shortcutName: Hisobchim POS
 
 portable:
-  artifactName: Afisant-${version}-portable.exe
+  artifactName: Hisobchim-${version}-portable.exe
 
 linux:
   target:
@@ -45,7 +45,7 @@ linux:
       arch: [x64]
   icon: build/icon.png
   category: Office
-  artifactName: Afisant-${version}-${arch}.${ext}
+  artifactName: Hisobchim-${version}-${arch}.${ext}
 
 deb:
   depends:

@@ -61,10 +61,16 @@ export const IPC = {
   categoryMoveProducts: 'category:moveProducts',
 
   diagGetInfo: 'diag:getInfo',
+  diagTestWaiters: 'diag:testWaiters',
   diagOpenLogs: 'diag:openLogs',
+  diagRecentOrders: 'diag:recentOrders',
+  diagDbStatus: 'diag:dbStatus',
+  diagTestOrderCreate: 'diag:testOrderCreate',
+  diagTestRooms: 'diag:testRooms',
 
   onSyncEvent: 'event:sync',
-  onSyncStatus: 'event:syncStatus'
+  onSyncStatus: 'event:syncStatus',
+  onSessionExpired: 'event:sessionExpired'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
@@ -113,7 +119,6 @@ export interface BridgeAPI {
     }) => Promise<Order>
     syncAll: (input: {
       roomServerId: string
-      waiterServerId: string
       items: Array<{ productServerId: string; count: number }>
     }) => Promise<{ serverId: string }>
     addItems: (
@@ -171,11 +176,31 @@ export interface BridgeAPI {
   diag: {
     getInfo: () => Promise<{ hasToken: boolean; branchId: string | null; serverUrl: string; logPath: string }>
     openLogs: () => Promise<void>
+    testWaiters: () => Promise<Record<string, any>>
+    recentOrders: () => Promise<Array<{
+      id: string
+      status: string
+      room: string
+      waiter: string
+      total: number
+      itemCount: number
+      createdAt: string
+    }>>
+    dbStatus: () => Promise<{
+      waiters: { total: number; withServerId: number; list: string[] }
+      products: { total: number; withServerId: number }
+      tables: { total: number; withServerId: number; list: string[] }
+      token: string | null
+      branchId: string | null
+    }>
+    testOrderCreate: (roomServerId: string, waiterServerId: string, productServerId: string) => Promise<{ ok: boolean; orderId?: string; error?: string; raw?: any }>
+    testRooms: () => Promise<Record<string, any>>
   }
 
   on: {
     sync: (cb: (event: { channel: string; data: unknown }) => void) => () => void
     syncStatus: (cb: (status: { online: boolean; queued: number; lastSyncAt: number | null }) => void) => () => void
+    sessionExpired: (cb: () => void) => () => void
   }
 
   setLanguage: (lang: Lang) => void

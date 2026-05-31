@@ -22,12 +22,26 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
 
   const api = getApi()
   try {
-    const endpoint = s.branchId
-      ? `/api/order/branch/${s.branchId}?limit=50`
-      : `/api/order/room/${roomServerId}`
-    const res = await api.get(endpoint)
-    const data = res.data as any
-    const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
+    // branchId bilan so'rov 403 bersa, xona endpointiga fallback
+    let orders: any[] = []
+    if (s.branchId) {
+      try {
+        const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+        const data = res.data as any
+        orders = Array.isArray(data) ? data : (data?.data ?? [])
+      } catch (e: any) {
+        console.warn(`[ORDER] /api/order/branch/${s.branchId} xato (${e?.response?.status}), room endpointga fallback`)
+        try {
+          const res = await api.get(`/api/order/room/${roomServerId}`)
+          const data = res.data as any
+          orders = Array.isArray(data) ? data : (data?.data ?? [])
+        } catch { orders = [] }
+      }
+    } else {
+      const res = await api.get(`/api/order/room/${roomServerId}`)
+      const data = res.data as any
+      orders = Array.isArray(data) ? data : (data?.data ?? [])
+    }
     const active = orders.find(
       (o: any) =>
         o.room?.id === roomServerId &&
@@ -96,65 +110,116 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
 
 export async function syncAllItems(input: {
   roomServerId: string
-  waiterServerId: string
   items: Array<{ productServerId: string; count: number }>
 }): Promise<{ serverId: string }> {
   const s = getSettings()
   if (!s.apiToken) throw new Error('Token yo\'q')
 
   const api = getApi()
-  const { roomServerId, waiterServerId, items } = input
+  const { roomServerId, items } = input
 
-  // Mavjud orderni topishga urinib ko'ramiz (403 bo'lsa o'tkazib yuboramiz)
+  // count > 0 bo'lgan itemlarni ajratamiz — server 0 li itemlarni rad etadi
+  const activeItems = items.filter((it) => it.count > 0)
+
+  // Mavjud PENDING/READY orderni topishga urinib ko'ramiz
   let existing: any = null
   try {
+    let orders: any[] = []
     if (s.branchId) {
-      const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
-      const data = res.data as any
-      const orders: any[] = Array.isArray(data) ? data : (data?.data ?? [])
-      existing = orders.find(
-        (o: any) => o.room?.id === roomServerId && (o.status === 'PENDING' || o.status === 'READY')
-      ) ?? null
+      try {
+        const res = await api.get(`/api/order/branch/${s.branchId}?limit=50`)
+        const data = res.data as any
+        orders = Array.isArray(data) ? data : (data?.data ?? [])
+      } catch (e: any) {
+        console.warn(`[ORDER] /api/order/branch/${s.branchId} xato (${e?.response?.status}), room fallback`)
+        try {
+          const res = await api.get(`/api/order/room/${roomServerId}`)
+          const data = res.data as any
+          orders = Array.isArray(data) ? data : (data?.data ?? [])
+        } catch { orders = [] }
+      }
+    } else {
+      try {
+        const res = await api.get(`/api/order/room/${roomServerId}`)
+        const data = res.data as any
+        orders = Array.isArray(data) ? data : (data?.data ?? [])
+      } catch { orders = [] }
     }
-  } catch {
-    // 403 yoki boshqa xato — mavjud order yo'q deb hisoblaymiz
+    existing = orders.find((o: any) =>
+      (o.room?.id === roomServerId || o.roomId === roomServerId) &&
+      (o.status === 'PENDING' || o.status === 'READY')
+    ) ?? null
+    console.log(`[ORDER] Existing order check — found: ${existing?.id ?? 'none'}`)
+  } catch (e: any) {
+    console.warn('[ORDER] Existing order fetch failed:', e?.message)
     existing = null
   }
 
   if (existing) {
-    if (items.length === 0) {
-      await api.patch(`/api/order/status/${existing.id}`, null, { params: { status: 'CANCELED' } })
+    if (activeItems.length === 0) {
+      // Savat bo'sh — mavjud orderni bekor qilamiz
+      await api.patch(`/api/order/${existing.id}/status`, { status: 'CANCELED' })
       return { serverId: existing.id }
     }
-    await api.patch(`/api/order/sync-items/${existing.id}`, { items })
-    return { serverId: existing.id }
+    // Mavjud orderni yangilash — sync-items endpointi
+    try {
+      await api.patch(`/api/order/sync-items/${existing.id}`, {
+        items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+      })
+      console.log(`[ORDER] Updated existing order ${existing.id}`)
+    } catch (e: any) {
+      // sync-items 400/404 bersa, to'liq yangi order yaratishga urinib ko'ramiz
+      console.warn(`[ORDER] sync-items xato (${e?.response?.status}), yangi order yaratilmoqda...`)
+      const errData = e?.response?.data
+      console.warn('[ORDER] sync-items error body:', JSON.stringify(errData ?? e?.message))
+      // existing orderni o'chirib, yangi yaratamiz
+      try {
+        await api.patch(`/api/order/${existing.id}/status`, { status: 'CANCELED' })
+      } catch { /* ignore */ }
+      existing = null
+    }
+    if (existing) return { serverId: existing.id }
   }
 
-  if (items.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
+  if (activeItems.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
 
-  // JWT tokendan real user ID ni olamiz — server shu IDni tekshiradi
-  let realWaiterId = waiterServerId
+  // Yangi order yaratish
+  // waiterId ni JWT tokendan olamiz — server authorization header orqali user ni biladi
+  let waiterId: string | null = null
   try {
     const payload = JSON.parse(Buffer.from(s.apiToken.split('.')[1], 'base64').toString())
-    if (payload.id) realWaiterId = payload.id
+    waiterId = payload.id ?? payload.userId ?? null
   } catch {}
 
-  const createRes = await api.post('/api/order', {
+  // branchId HECH QACHON yuborilmaydi — server "property branchId should not exist" deydi
+  const body: Record<string, any> = {
     roomId: roomServerId,
-    waiterId: realWaiterId,
-    orderItems: items.map((it) => ({ productId: it.productServerId, count: it.count }))
-  })
-  return { serverId: createRes.data.id }
+    orderItems: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+  }
+  if (waiterId) body.waiterId = waiterId
+
+  console.log('[ORDER] POST /api/order body:', JSON.stringify(body))
+  try {
+    const createRes = await api.post('/api/order', body)
+    const newId = createRes.data?.id ?? createRes.data?.serverId
+    console.log('[ORDER] Created order:', newId)
+    return { serverId: newId }
+  } catch (e: any) {
+    const errData = e?.response?.data
+    console.error('[ORDER] POST /api/order xato:', JSON.stringify(errData ?? e?.message))
+    throw new Error(`Order yaratishda xato (${e?.response?.status ?? e?.code}): ${JSON.stringify(errData?.message ?? errData ?? e?.message)}`)
+  }
 }
 
 export async function closeOrderOnServer(serverOrderId: string): Promise<void> {
   const api = getApi()
-  await api.patch(`/api/order/status/${serverOrderId}`, null, { params: { status: 'SUCCESS' } })
+  // PATCH /api/order/{id}/status  bilan SUCCESS ga o'tkazish
+  await api.patch(`/api/order/${serverOrderId}/status`, { status: 'SUCCESS' })
 }
 
 export async function cancelOrderOnServer(serverOrderId: string): Promise<void> {
   const api = getApi()
-  await api.patch(`/api/order/status/${serverOrderId}`, null, { params: { status: 'CANCELED' } })
+  await api.patch(`/api/order/${serverOrderId}/status`, { status: 'CANCELED' })
 }
 
 export function upsertOpenOrder(input: {
