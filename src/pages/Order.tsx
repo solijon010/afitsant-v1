@@ -181,10 +181,39 @@ export default function OrderPage(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tId, table, waiter?.id, settings?.serviceFeePercent])
 
-  const shownProducts = useMemo<Product[]>(
-    () => products.filter((p) => p.categoryId === activeCatId),
-    [products, activeCatId]
-  )
+  /* Kategoriya tartibi */
+  const CAT_ORDER = ['asosiy taomlar','salatlar','ichimliklar','go\'sht va shashliklar','maxsus taomlar']
+  const sortedCategories = useMemo(() => {
+    const seen = new Set<string>()
+    return [...categories]
+      .filter(c => {
+        const key = (c.nameUzLatn ?? '').toLowerCase().trim()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .sort((a, b) => {
+        const ai = CAT_ORDER.indexOf((a.nameUzLatn ?? '').toLowerCase())
+        const bi = CAT_ORDER.indexOf((b.nameUzLatn ?? '').toLowerCase())
+        if (ai === -1 && bi === -1) return 0
+        if (ai === -1) return 1
+        if (bi === -1) return -1
+        return ai - bi
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories])
+
+  /* Mahsulotlar — dublikatsiz */
+  const shownProducts = useMemo<Product[]>(() => {
+    const list = products.filter((p) => p.categoryId === activeCatId)
+    const seen = new Set<string>()
+    return list.filter(p => {
+      const key = `${p.nameUzLatn?.toLowerCase().trim()}_${p.price}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [products, activeCatId])
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
@@ -453,23 +482,24 @@ export default function OrderPage(): JSX.Element {
         </header>
 
         <nav className="flex gap-2 overflow-x-auto border-b border-stone-100 bg-white px-5 py-3 shrink-0">
-          {categories.map((c) => (
+          {sortedCategories.map((c, idx) => (
             <CategoryPill
               key={c.id}
               cat={c}
+              idx={idx}
               active={c.id === activeCatId}
               onClick={() => setActiveCatId(c.id)}
             />
           ))}
         </nav>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
               Bu kategoriyada mahsulot yo'q
             </div>
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))' }}>
+            <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))' }}>
               {shownProducts.map((p, idx) => (
                 <ProductCard key={p.id} product={p} idx={idx} />
               ))}
@@ -509,31 +539,24 @@ export default function OrderPage(): JSX.Element {
   )
 }
 
+const TAB_COLORS = ['#C2410C','#2563eb','#059669','#7c3aed','#d97706','#0891b2','#be123c']
+
 function CategoryPill({
-  cat,
-  active,
-  onClick
+  cat, active, onClick, idx
 }: {
-  cat: Category
-  active: boolean
-  onClick: () => void
+  cat: Category; active: boolean; onClick: () => void; idx: number
 }): JSX.Element {
+  const color = cat.color || TAB_COLORS[idx % TAB_COLORS.length]
   return (
     <button
       onClick={onClick}
-      className={cn(
-        'inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all',
-        active
-          ? 'text-white shadow-sm'
-          : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-700'
-      )}
-      style={
-        active
-          ? { background: cat.color || '#359d64', borderColor: cat.color || '#359d64' }
-          : undefined
+      className="inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all"
+      style={active
+        ? { background: color, borderColor: color, color: 'white', boxShadow: `0 2px 8px ${color}50` }
+        : { background: 'white', borderColor: `${color}50`, color: '#374151' }
       }
     >
-      <span className={active ? 'text-white/80' : 'text-ink-dim'}>
+      <span style={{ color: active ? 'rgba(255,255,255,0.85)' : color }}>
         {CAT_ICON[cat.icon ?? ''] ?? <Package size={16} />}
       </span>
       {cat.nameUzLatn}
