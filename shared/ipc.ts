@@ -118,6 +118,7 @@ export interface BridgeAPI {
       notes?: string | null
     }) => Promise<Order>
     syncAll: (input: {
+      localOrderId?: number
       roomServerId: string
       items: Array<{ productServerId: string; count: number }>
     }) => Promise<{ serverId: string }>
