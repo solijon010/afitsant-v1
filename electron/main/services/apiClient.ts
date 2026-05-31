@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
-import { getSettings } from './settings'
+import { getSettings, setSettings } from './settings'
 
 let cached: { instance: AxiosInstance; baseUrl: string } | null = null
 
@@ -47,7 +47,6 @@ export function getApi(): AxiosInstance {
       )
       if (error.response?.status === 401) {
         // Token muddati tugagan yoki noto'g'ri — tozalab renderer ga xabar beramiz
-        const { setSettings } = require('./settings') as typeof import('./settings')
         setSettings({ apiToken: null })
         resetApi()
         unauthorizedHandler?.()

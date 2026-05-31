@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LogOut, Settings as SettingsIcon, UtensilsCrossed } from 'lucide-react'
+import { Building2, LogOut, Settings as SettingsIcon, UtensilsCrossed, Utensils } from 'lucide-react'
 import hisobchimLogo from '@/assets/logo.png'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -22,8 +22,9 @@ function useClock() {
     return () => clearInterval(t)
   }, [])
   const pad = (n: number) => String(n).padStart(2, '0')
+  const h = tick.getHours()  // 0–23, 24-soatlik format (13:08, 00:00 va h.k.)
   return {
-    time: `${pad(tick.getHours())}:${pad(tick.getMinutes())}`,
+    time: `${pad(h)}:${pad(tick.getMinutes())}`,
     secs: pad(tick.getSeconds()),
     date: `${UZ_DAYS[tick.getDay()]}, ${tick.getDate()}-${UZ_MONTHS[tick.getMonth()]}`,
   }
@@ -108,7 +109,7 @@ export default function TablesPage(): JSX.Element {
   const clock = useClock()
 
   return (
-    <div className="flex h-full flex-col bg-[#F5F5F4]">
+    <div className="flex h-full flex-col" style={{ background: '#2f54a6' }}>
 
       {/* ── Header ── */}
       <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-stone-100 bg-white px-6 shadow-sm">
@@ -128,17 +129,17 @@ export default function TablesPage(): JSX.Element {
           </div>
         </div>
 
-        {/* Markaz: Soat */}
+        {/* Markaz: Soat — premium */}
         <div className="flex flex-col items-center justify-center">
-          <div className="flex items-baseline gap-0.5">
-            <span className="font-mono text-[22px] font-bold tabular-nums text-stone-800 leading-none">
+          <div className="flex items-baseline gap-1">
+            <span className="font-mono font-black tabular-nums leading-none" style={{ fontSize: 26, color: '#0f172a', letterSpacing: '-1px' }}>
               {clock.time}
             </span>
-            <span className="font-mono text-[13px] font-semibold tabular-nums text-stone-300 leading-none">
+            <span className="font-mono font-bold tabular-nums leading-none" style={{ fontSize: 15, color: '#94a3b8' }}>
               :{clock.secs}
             </span>
           </div>
-          <span className="mt-0.5 text-[10px] font-medium text-stone-400 leading-none tracking-wide">
+          <span className="mt-1 font-medium leading-none tracking-wide" style={{ fontSize: 11, color: '#64748b' }}>
             {clock.date}
           </span>
         </div>
@@ -165,27 +166,38 @@ export default function TablesPage(): JSX.Element {
 
       {/* ── Area tabs ── */}
       {areas.length > 1 && (
-        <nav className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-stone-100 bg-white px-6 py-3">
+        <nav
+          className="flex shrink-0 items-center gap-2 overflow-x-auto px-6 py-3"
+          style={{ background: '#1a2636', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+        >
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
+            const COLORS = [
+              { bg: '#0EA5E9', light: '#E0F2FE', text: '#0284C7' }, // osmon ko'k
+              { bg: '#8B5CF6', light: '#EDE9FE', text: '#7C3AED' }, // binafsha
+              { bg: '#10B981', light: '#D1FAE5', text: '#059669' }, // emerald
+              { bg: '#F59E0B', light: '#FEF3C7', text: '#D97706' }, // amber
+              { bg: '#EF4444', light: '#FEE2E2', text: '#DC2626' }, // qizil
+            ]
+            const c = COLORS[idx % COLORS.length]
             return (
               <button
                 key={area.id}
                 onClick={() => setActiveAreaId(area.id)}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-all',
-                  active
-                    ? 'bg-[#C2410C] text-white shadow-sm'
-                    : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700',
-                )}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all"
+                style={active
+                  ? { background: '#27ff44', color: '#081b2d', boxShadow: '0 2px 10px rgba(39,255,68,0.5)' }
+                  : { background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}
               >
                 {area.name}
                 {occ > 0 && (
-                  <span className={cn(
-                    'inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                    active ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-700',
-                  )}>
+                  <span
+                    className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
+                    style={active
+                      ? { background: 'rgba(0,0,0,0.2)', color: '#081b2d' }
+                      : { background: '#27ff44', color: '#081b2d' }}
+                  >
                     {occ}
                   </span>
                 )}
@@ -219,12 +231,12 @@ export default function TablesPage(): JSX.Element {
                 <section key={prefix}>
                   {/* Section sarlavha */}
                   <div className="mb-4 flex items-center gap-3">
-                    <div className="h-5 w-1 rounded-full bg-[#C2410C]" />
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-stone-500">
+                    <div className="h-5 w-1 rounded-full" style={{ background: '#fffa0a' }} />
+                    <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#c8cacd' }}>
                       {prefix}
                     </h2>
-                    <div className="flex-1 h-px bg-stone-100" />
-                    <span className="text-xs font-medium text-stone-400">
+                    <div className="flex-1 h-px" style={{ background: '#fffa0a40' }} />
+                    <span className="text-xs font-medium" style={{ color: '#9ea2a6' }}>
                       {activeCount}/{tables.length} band
                     </span>
                   </div>
@@ -261,39 +273,12 @@ function TableCard({
   const itemCount = tw.order?.items.length ?? 0
   const openedAt = tw.order?.openedAt
 
-  /* Rang konfiguratsiyasi */
-  const cfg = {
-    empty: {
-      bg: 'bg-white',
-      border: 'border-stone-100 hover:border-stone-300',
-      bar: 'bg-stone-200',
-      dot: 'bg-stone-300',
-      label: 'Bo\'sh',
-      labelColor: 'text-stone-400',
-      badgeBg: 'bg-stone-50',
-      badgeText: 'text-stone-500',
-    },
-    active: {
-      bg: 'bg-amber-50',
-      border: 'border-amber-200 hover:border-amber-400',
-      bar: 'bg-amber-400',
-      dot: 'bg-amber-400',
-      label: 'Band',
-      labelColor: 'text-amber-700',
-      badgeBg: 'bg-amber-100',
-      badgeText: 'text-amber-700',
-    },
-    waiting: {
-      bg: 'bg-red-50',
-      border: 'border-red-200 hover:border-red-300',
-      bar: 'bg-red-400',
-      dot: 'bg-red-400',
-      label: 'Kutmoqda',
-      labelColor: 'text-red-600',
-      badgeBg: 'bg-red-100',
-      badgeText: 'text-red-700',
-    },
-  }[status]
+  const ACTIVE_COLOR = '#32b80d'
+  const EMPTY_COLOR  = '#ab101a'
+
+  const isActive  = status === 'active'
+  const isEmpty   = status === 'empty'
+  const accentColor = isActive ? ACTIVE_COLOR : EMPTY_COLOR
 
   return (
     <motion.button
@@ -301,44 +286,94 @@ function TableCard({
       variants={cardVariants}
       initial="hidden"
       animate="visible"
-      whileHover={{ y: -2, transition: { duration: 0.12 } }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ y: -3, transition: { duration: 0.12 } }}
+      whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className={cn(
-        'relative flex flex-col justify-between rounded-xl border-2 p-4 text-left shadow-card transition-all hover:shadow-card-hover',
-        cfg.bg,
-        cfg.border,
-      )}
-      style={{ minHeight: 128 }}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'white',
+        borderRadius: 20,
+        border: `2px solid ${accentColor}22`,
+        padding: '16px 16px 14px',
+        textAlign: 'left',
+        minHeight: 160,
+        boxShadow: isActive
+          ? `0 6px 24px ${ACTIVE_COLOR}30, 0 1px 4px rgba(0,0,0,0.06)`
+          : `0 4px 16px ${EMPTY_COLOR}20, 0 1px 4px rgba(0,0,0,0.05)`,
+        overflow: 'hidden',
+        transition: 'all 0.18s ease',
+      }}
     >
-      {/* Status bar — tepada */}
-      <div className={cn('absolute left-0 right-0 top-0 h-[3px] rounded-t-xl', cfg.bar)} />
+      {/* Yuqori rang chizig'i */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: accentColor, borderRadius: '18px 18px 0 0' }} />
 
-      {/* Sarlavha + badge */}
-      <div className="mt-1 flex items-start justify-between gap-2">
-        <span className="text-[15px] font-bold text-stone-800">{tw.table.name}</span>
-        <span className={cn(
-          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-          cfg.badgeBg, cfg.badgeText,
-        )}>
-          <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-          {cfg.label}
+      {/* BAND / BO'SH badge — yuqori o'ng burchak */}
+      <div style={{
+        position: 'absolute', top: 12, right: 12,
+        background: accentColor, color: 'white',
+        borderRadius: 8, padding: '3px 10px',
+        fontSize: 10, fontWeight: 800, letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+      }}>
+        {isActive ? 'BAND' : "BO'SH"}
+      </div>
+
+      {/* Icon + Stol nomi */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+          background: `${accentColor}1a`,
+          display: 'grid', placeItems: 'center',
+          border: `1.5px solid ${accentColor}30`,
+        }}>
+          {isActive
+            ? <Building2 size={20} style={{ color: accentColor }} />
+            : <Utensils size={20} style={{ color: accentColor }} />}
+        </div>
+        <span style={{ fontSize: 16, fontWeight: 800, color: '#111', letterSpacing: '-0.3px' }}>
+          {tw.table.name}
         </span>
       </div>
 
+      {/* Separator */}
+      <div style={{ height: 1, background: '#f0f0f0', marginBottom: 8 }} />
+
       {/* Ma'lumotlar */}
-      {status === 'empty' ? (
-        <p className="mt-2 text-xs text-stone-400">Bosing ochish uchun</p>
+      {isEmpty ? (
+        <p style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>Bosing ochish uchun</p>
       ) : (
-        <div className="mt-2 space-y-1">
-          <p className="text-xs text-stone-500">{itemCount} ta mahsulot</p>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 16, height: 16, borderRadius: 4, background: `${ACTIVE_COLOR}18`, display: 'grid', placeItems: 'center' }}>
+              <span style={{ fontSize: 9, color: ACTIVE_COLOR }}>📦</span>
+            </div>
+            <span style={{ fontSize: 12, color: '#333', fontWeight: 600 }}>{itemCount} ta mahsulot</span>
+          </div>
           {openedAt && (
-            <p className="text-xs text-stone-400">{fmtTime(openedAt)}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 16, height: 16, borderRadius: 4, background: `${ACTIVE_COLOR}18`, display: 'grid', placeItems: 'center' }}>
+                <span style={{ fontSize: 9, color: ACTIVE_COLOR }}>⏱</span>
+              </div>
+              <span style={{ fontSize: 12, color: '#555' }}>{fmtTime(openedAt)}</span>
+            </div>
           )}
-          <p className="mt-1 font-mono text-base font-bold text-[#C2410C]">
-            {fmtMoney(total)}{' '}
-            <span className="text-xs font-medium text-stone-400">so'm</span>
-          </p>
+          {/* Summa + o'q tugma */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+            <span style={{ fontSize: 20, fontWeight: 900, color: '#111', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+              {fmtMoney(total)}{' '}
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#666' }}>so'm</span>
+            </span>
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: ACTIVE_COLOR,
+              display: 'grid', placeItems: 'center',
+              boxShadow: `0 4px 12px ${ACTIVE_COLOR}50`,
+            }}>
+              <span style={{ color: 'white', fontSize: 16, fontWeight: 700, lineHeight: 1 }}>→</span>
+            </div>
+          </div>
         </div>
       )}
     </motion.button>
