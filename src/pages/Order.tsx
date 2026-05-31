@@ -465,7 +465,7 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '200px 1fr 380px' }}>
+    <div className="grid h-full" style={{ gridTemplateColumns: '200px 1fr 440px' }}>
 
       {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
       <aside style={{ background: '#1a2636', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -859,7 +859,7 @@ function CartPanel({
   }, [lines.length, showHistory])
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#0063e7' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#1742a1' }}>
 
       {/* Sinxronlash ogorish banneri */}
       {syncWarning && lines.length > 0 && (
@@ -907,7 +907,7 @@ function CartPanel({
       </div>
 
       {/* Asosiy kontent — savat yoki tarix (almashinadi, footer doim ko'rinadi) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px', background: '#c2b70c' }}>
         <AnimatePresence mode="wait">
           {showHistory ? (
             /* ── Tarix paneli ── */
