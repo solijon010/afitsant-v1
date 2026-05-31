@@ -109,21 +109,14 @@ export default function PinEntry(): JSX.Element {
     <div
       ref={containerRef}
       tabIndex={-1}
-      className="fixed inset-0 flex flex-col bg-[#F5F5F4] outline-none"
+      className="fixed inset-0 flex outline-none"
+      style={{ background: '#01f419' }}
     >
-      {/* ── Yuqori panel ── */}
-      <div className="flex h-14 shrink-0 items-center px-5">
-        <button
-          onClick={() => navigate('/select-waiter')}
-          className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-stone-500 transition-colors hover:bg-white hover:text-stone-900"
-        >
-          <ArrowLeft size={16} strokeWidth={2} />
-          Orqaga
-        </button>
-      </div>
+      {/* ── CHAP: Katta soat ── */}
+      <ClockPanel onBack={() => navigate('/select-waiter')} />
 
-      {/* ── Asosiy kontent ── */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10">
+      {/* ── O'NG: PIN kontent ── */}
+      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10" style={{ background: '#01f419' }}>
 
         {/* Avatar — Logo */}
         <motion.div
@@ -222,6 +215,66 @@ export default function PinEntry(): JSX.Element {
           </p>
         )}
       </div>
+    </div>
+  )
+}
+
+/* ─── Chap panel: katta soat ─── */
+function ClockPanel({ onBack }: { onBack: () => void }): JSX.Element {
+  const [tick, setTick] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setTick(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const UZ_DAYS = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba']
+  const UZ_MONTHS = ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentyabr','Oktyabr','Noyabr','Dekabr']
+  const timeStr = `${pad(tick.getHours())}:${pad(tick.getMinutes())}`
+  const secStr = pad(tick.getSeconds())
+  const dateStr = `${UZ_DAYS[tick.getDay()]}, ${tick.getDate()} ${UZ_MONTHS[tick.getMonth()]}`
+
+  return (
+    <div style={{
+      width: 380, flexShrink: 0,
+      background: 'rgba(0,0,0,0.18)',
+      display: 'flex', flexDirection: 'column',
+      justifyContent: 'space-between',
+      padding: '24px 32px 32px',
+    }}>
+      {/* Orqaga */}
+      <button onClick={onBack} style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: 'rgba(0,0,0,0.7)', fontSize: 14, fontWeight: 600,
+        padding: 0,
+      }}>
+        <ArrowLeft size={16} /> Orqaga
+      </button>
+
+      {/* Soat */}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 4, marginBottom: 8 }}>
+          <span style={{
+            fontSize: 96, fontWeight: 900,
+            color: '#000', lineHeight: 1,
+            fontFamily: 'monospace', letterSpacing: '-4px',
+          }}>{timeStr}</span>
+          <span style={{
+            fontSize: 36, fontWeight: 700,
+            color: 'rgba(0,0,0,0.5)',
+            fontFamily: 'monospace', paddingBottom: 10,
+          }}>:{secStr}</span>
+        </div>
+        <p style={{ fontSize: 18, fontWeight: 600, color: 'rgba(0,0,0,0.7)', marginTop: 8 }}>{dateStr}</p>
+
+        {/* Dekorativ chiziq */}
+        <div style={{ height: 3, background: 'rgba(0,0,0,0.2)', borderRadius: 99, margin: '20px auto', width: 60 }} />
+        <p style={{ fontSize: 13, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+          Afitsantni tanlang
+        </p>
+      </div>
+
+      <div /> {/* spacer */}
     </div>
   )
 }

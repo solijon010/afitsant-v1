@@ -840,7 +840,7 @@ function CartPanel({
   }, [lines.length, showHistory])
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#f2ff00' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#0063e7' }}>
 
       {/* Sinxronlash ogorish banneri */}
       {syncWarning && lines.length > 0 && (
