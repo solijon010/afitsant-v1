@@ -109,87 +109,75 @@ export default function TablesPage(): JSX.Element {
   const clock = useClock()
 
   return (
-    <div className="flex h-full flex-col" style={{ background: '#2f54a6' }}>
+    <div className="flex h-full" style={{ background: '#f0f2f5' }}>
 
-      {/* ── Header ── */}
-      <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-stone-100 bg-white px-6 shadow-sm">
-
-        {/* Chap: Logo + foydalanuvchi */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm border border-stone-100">
-            <img src={hisobchimLogo} alt="Hisobchim" className="h-7 w-7 object-contain" />
+      {/* ── CHAP SIDEBAR ── */}
+      <aside style={{ width: 200, flexShrink: 0, background: '#1a2636', display: 'flex', flexDirection: 'column' }}>
+        {/* Logo */}
+        <div style={{ padding: '16px 16px 12px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+            <img src={hisobchimLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-stone-900 leading-tight">
-              {settings?.organizationName ?? 'Hisobchim POS'}
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
+              {settings?.organizationName ?? 'Restaurant'}
             </p>
-            <p className="text-[11px] text-stone-400 leading-tight">
-              {waiter?.firstName} {waiter?.lastName} · {roleLabel}
-            </p>
+            <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>POS</p>
           </div>
         </div>
 
-        {/* Markaz: Soat — premium */}
-        <div className="flex flex-col items-center justify-center">
-          <div className="flex items-baseline gap-1">
-            <span className="font-mono font-black tabular-nums leading-none" style={{ fontSize: 26, color: '#0f172a', letterSpacing: '-1px' }}>
-              {clock.time}
-            </span>
-            <span className="font-mono font-bold tabular-nums leading-none" style={{ fontSize: 15, color: '#94a3b8' }}>
-              :{clock.secs}
-            </span>
+        {/* Soat */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+            <span style={{ fontSize: 28, fontWeight: 900, color: '#fff', fontFamily: 'monospace', letterSpacing: '-1px', lineHeight: 1 }}>{clock.time}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>:{clock.secs}</span>
           </div>
-          <span className="mt-1 font-medium leading-none tracking-wide" style={{ fontSize: 11, color: '#64748b' }}>
-            {clock.date}
-          </span>
+          <p style={{ margin: '3px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{clock.date}</p>
         </div>
 
-        {/* O'ng: Statistika + tugmalar */}
-        <div className="flex items-center justify-end gap-3">
-          {totalOccupied > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-right">
-              <p className="text-[10px] font-medium text-amber-600 leading-tight">{totalOccupied} ta band</p>
-              <p className="font-mono text-sm font-bold text-amber-700 leading-tight">{fmtMoney(totalSum)} so'm</p>
-            </div>
-          )}
-          <StatusBar />
+        {/* Xona turlari label */}
+        <div style={{ padding: '16px 16px 8px' }}>
+          <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            Xona turlari
+          </p>
+        </div>
+
+        {/* Area list */}
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px' }}>
+          {/* Barchasi */}
           <button
-            onClick={() => navigate('/settings')}
-            className="inline-flex items-center gap-2 rounded-xl border border-line bg-bg-card px-4 py-2.5 text-sm font-semibold text-ink hover:bg-bg-elevated hover:border-line-strong transition-all shadow-sm"
+            onClick={() => setActiveAreaId(null)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 12px', borderRadius: 10, marginBottom: 2, border: 'none', cursor: 'pointer',
+              background: activeAreaId === null ? '#e11d48' : 'transparent',
+              color: activeAreaId === null ? '#fff' : 'rgba(255,255,255,0.65)',
+              fontSize: 13, fontWeight: 600, transition: 'all .15s',
+            }}
           >
-            <SettingsIcon size={16} />
-            Sozlamalar
+            <span>Barchasi</span>
+            {totalOccupied > 0 && (
+              <span style={{ background: activeAreaId === null ? 'rgba(255,255,255,0.25)' : '#e11d48', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 7px', minWidth: 20, textAlign: 'center' }}>
+                {totalOccupied}
+              </span>
+            )}
           </button>
-          <button onClick={() => { useAuth.getState().logout(); navigate('/select-waiter', { replace: true }) }} className="btn-ghost h-10 w-10 p-0"><LogOut size={16} /></button>
-        </div>
-      </header>
-
-      {/* ── Area tabs ── */}
-      {areas.length > 1 && (
-        <nav
-          className="flex shrink-0 items-center gap-2 overflow-x-auto px-6 py-3"
-          style={{ background: '#1a2636', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
-        >
           {areas.map((area) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
             return (
-              <button
-                key={area.id}
-                onClick={() => setActiveAreaId(area.id)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all"
-                style={active
-                  ? { background: '#27ff44', color: '#081b2d', boxShadow: '0 2px 10px rgba(39,255,68,0.5)' }
-                  : { background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)' }}
+              <button key={area.id} onClick={() => setActiveAreaId(area.id)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 12px', borderRadius: 10, marginBottom: 2, border: 'none', cursor: 'pointer',
+                  background: active ? '#e11d48' : 'transparent',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.65)',
+                  fontSize: 13, fontWeight: 600, transition: 'all .15s',
+                }}
               >
-                {area.name}
+                <span>{area.name}</span>
                 {occ > 0 && (
-                  <span
-                    className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold"
-                    style={active
-                      ? { background: 'rgba(0,0,0,0.2)', color: '#081b2d' }
-                      : { background: '#27ff44', color: '#081b2d' }}
-                  >
+                  <span style={{ background: active ? 'rgba(255,255,255,0.25)' : '#e11d48', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 7px', minWidth: 20, textAlign: 'center' }}>
                     {occ}
                   </span>
                 )}
@@ -197,60 +185,72 @@ export default function TablesPage(): JSX.Element {
             )
           })}
         </nav>
-      )}
 
-      {/* ── Stollar ── */}
-      <main className="flex-1 overflow-y-auto px-6 py-6">
-        {areas.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-stone-100">
-                <UtensilsCrossed size={28} className="text-stone-300" />
+        {/* Foydalanuvchi + chiqish */}
+        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#fff', lineHeight: 1.2 }}>{waiter?.firstName} {waiter?.lastName}</p>
+            <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{roleLabel}</p>
+          </div>
+          <button onClick={() => { useAuth.getState().logout(); navigate('/select-waiter', { replace: true }) }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', padding: 4, display: 'grid', placeItems: 'center' }}>
+            <LogOut size={16} />
+          </button>
+        </div>
+      </aside>
+
+      {/* ── O'NG KONTENT ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Top bar */}
+        <div style={{ background: '#fff', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e9edf2', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {totalOccupied > 0 && (
+              <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 10, padding: '6px 14px' }}>
+                <p style={{ margin: 0, fontSize: 10, color: '#dc2626', fontWeight: 600 }}>{totalOccupied} ta band</p>
+                <p style={{ margin: 0, fontSize: 13, color: '#dc2626', fontWeight: 800, fontFamily: 'monospace' }}>{fmtMoney(totalSum)} so'm</p>
               </div>
-              <p className="text-sm font-medium text-stone-500">Xonalar topilmadi</p>
-              <p className="mt-1 text-xs text-stone-400">Sozlamalar → Serverdan sinxronlash</p>
-            </div>
+            )}
           </div>
-        ) : groupedByPrefix.size === 0 ? (
-          <div className="flex h-48 items-center justify-center text-sm text-stone-400">
-            Bu xonada stollar yo'q
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StatusBar />
+            <button onClick={() => navigate('/settings')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              <SettingsIcon size={15} /> Sozlamalar
+            </button>
           </div>
-        ) : (
-          <div className="space-y-7">
-            {Array.from(groupedByPrefix.entries()).map(([prefix, tables]) => {
-              const activeCount = tables.filter((t) => !!t.order).length
-              return (
-                <section key={prefix}>
-                  {/* Section sarlavha */}
-                  <div className="mb-4 flex items-center gap-3">
-                    <div className="h-5 w-1 rounded-full" style={{ background: '#fffa0a' }} />
-                    <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: '#c8cacd' }}>
-                      {prefix}
-                    </h2>
-                    <div className="flex-1 h-px" style={{ background: '#fffa0a40' }} />
-                    <span className="text-xs font-medium" style={{ color: '#9ea2a6' }}>
-                      {activeCount}/{tables.length} band
-                    </span>
-                  </div>
+        </div>
 
-                  <div
-                    className="grid gap-4"
-                    style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
-                  >
-                    {tables.map((tw, i) => (
-                      <TableCard
-                        key={tw.table.id}
-                        tw={tw}
-                        idx={i}
-                        onClick={() => navigate(`/order/${tw.table.id}`)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
-          </div>
-        )}
+        {/* Stollar */}
+        <main style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+          {areas.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 12 }}>
+              <UtensilsCrossed size={32} style={{ color: '#cbd5e1' }} />
+              <p style={{ color: '#94a3b8', fontSize: 14 }}>Xonalar topilmadi</p>
+            </div>
+          ) : groupedByPrefix.size === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: 14 }}>
+              Bu xonada stollar yo'q
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+              {Array.from(groupedByPrefix.entries()).map(([prefix, tables]) => {
+                const activeCount = tables.filter((t) => !!t.order).length
+                return (
+                  <section key={prefix}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em' }}>{prefix}</span>
+                      <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                      <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{activeCount}/{tables.length} ta</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: 16 }}>
+                      {tables.map((tw, i) => (
+                        <TableCard key={tw.table.id} tw={tw} idx={i} onClick={() => navigate(`/order/${tw.table.id}`)} />
+                      ))}
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          )}
       </main>
     </div>
   )
@@ -334,7 +334,12 @@ function TableCard({
 
       {/* Ma'lumotlar */}
       {isEmpty ? (
-        <p style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>Bosing ochish uchun</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8 }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#f1f5f9', display: 'grid', placeItems: 'center' }}>
+            <span style={{ fontSize: 20, color: '#94a3b8', lineHeight: 1 }}>+</span>
+          </div>
+          <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>Yangi buyurtma</p>
+        </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

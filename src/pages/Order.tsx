@@ -465,34 +465,55 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 300px' }}>
-      <section className="flex flex-col overflow-hidden" style={{ background: '#2f54a6' }}>
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
-          <button
-            onClick={() => void handleSave()}
-            className="btn-ghost"
-            disabled={saving || printing}
-          >
+    <div className="grid h-full" style={{ gridTemplateColumns: '200px 1fr 380px' }}>
+
+      {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
+      <aside style={{ background: '#1a2636', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <button onClick={() => void handleSave()} disabled={saving || printing}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 8 }}>
             <ArrowLeft size={15} /> Orqaga
           </button>
-          <div className="text-center">
-            <p className="text-base font-bold text-stone-800">{table.name}</p>
-          </div>
-          <div className="w-[80px]" />
-        </header>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>{table.name}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Buyurtma</p>
+        </div>
 
-        <nav className="flex gap-2 overflow-x-auto border-b border-stone-100 bg-white px-5 py-3 shrink-0">
+        {/* Kategoriyalar label */}
+        <div style={{ padding: '14px 16px 6px' }}>
+          <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Kategoriyalar</p>
+        </div>
+
+        {/* Kategoriyalar list */}
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 12px' }}>
           {sortedCategories.map((c, idx) => (
-            <CategoryPill
-              key={c.id}
-              cat={c}
-              idx={idx}
-              active={c.id === activeCatId}
-              onClick={() => setActiveCatId(c.id)}
-            />
+            <button key={c.id} onClick={() => setActiveCatId(c.id)}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 10, marginBottom: 2,
+                border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: 600,
+                background: c.id === activeCatId ? (c.color || TAB_COLORS[idx % TAB_COLORS.length]) : 'transparent',
+                color: c.id === activeCatId ? '#fff' : 'rgba(255,255,255,0.65)',
+                transition: 'all .15s',
+              }}
+            >
+              {c.nameUzLatn}
+            </button>
           ))}
         </nav>
 
+        {/* User info */}
+        <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: '#fff' }}>{waiter.firstName} {waiter.lastName}</p>
+          <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+            {waiter.role === 'manager' ? 'Manager' : 'Afitsant'}
+          </p>
+        </div>
+      </aside>
+
+      {/* ── MARKAZ: Mahsulotlar ── */}
+      <section className="flex flex-col overflow-hidden" style={{ background: '#f0f2f5' }}>
+        <div style={{ padding: '0 0', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          </div>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
@@ -505,6 +526,7 @@ export default function OrderPage(): JSX.Element {
               ))}
             </div>
           )}
+        </div>
         </div>
       </section>
 
