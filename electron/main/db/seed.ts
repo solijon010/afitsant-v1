@@ -13,9 +13,13 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   printerName: '',
   printerDevicePath: '/dev/usb/lp0',
   organizationName: '',
+  organizationAddress: '',
+  organizationPhone: '',
   serviceFeePercent: '0',
   receiptHeader: '',
-  receiptFooter: ''
+  receiptFooter: '',
+  receiptQrText: '',
+  receiptQrLabel: ''
 }
 
 export function seedIfEmpty(db: Database.Database): void {

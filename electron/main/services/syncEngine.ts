@@ -11,14 +11,23 @@ let socket: Socket | null = null
 let flushTimer: NodeJS.Timeout | null = null
 let online = false
 let lastSyncAt: number | null = null
+let mainWindowGetter: (() => BrowserWindow | null) | null = null
 
 const BATCH = 25
 const TICK_MS = 15_000
 const MAX_BACKOFF = 60_000 * 5
 
 export function startSync(getMainWindow: () => BrowserWindow | null): void {
+  mainWindowGetter = getMainWindow
   setupSocket(getMainWindow)
   startTicker()
+}
+
+export function restartSync(): void {
+  if (!mainWindowGetter) return
+  online = false
+  setupSocket(mainWindowGetter)
+  broadcastStatus(mainWindowGetter)
 }
 
 function setupSocket(getMainWindow: () => BrowserWindow | null): void {
@@ -339,4 +348,6 @@ export function stopSync(): void {
   }
   flushTimer = null
   socket = null
+  online = false
+  mainWindowGetter = null
 }
