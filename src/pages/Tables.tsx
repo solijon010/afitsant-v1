@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTheme } from '@/stores/theme'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Building2, LogOut, Settings, UtensilsCrossed, Utensils, Wifi, User } from 'lucide-react'
+import { Building2, LogOut, Moon, Settings, Sun, UtensilsCrossed, Utensils, Wifi, User } from 'lucide-react'
 import hisobchimLogo from '@/assets/logo.png'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
+import { useTheme } from '@/stores/theme'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
@@ -157,7 +158,7 @@ export default function TablesPage(): JSX.Element {
               </span>
             )}
           </button>
-          {areas.map((area) => {
+          {areas.map((area, idx) => {
             const occ = occupiedInArea(area.id)
             const active = area.id === activeAreaId
             const COLORS = [
@@ -173,8 +174,8 @@ export default function TablesPage(): JSX.Element {
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '12px 14px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer',
-                  background: active ? '#2563eb' : '#cbd5e1',
-                  color: active ? '#fff' : '#0f172a',
+                  background: active ? '#2563eb' : c.light,
+                  color: active ? '#fff' : c.text,
                   fontSize: 14, fontWeight: 700, transition: 'all .15s',
                   boxShadow: active ? '0px 0px 0px rgba(0,0,0,0)' : '3px 3px 0px rgba(0,0,0,0.3)',
                   transform: active ? 'translate(3px, 3px)' : 'none',

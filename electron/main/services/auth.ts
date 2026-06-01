@@ -3,6 +3,7 @@ import { getDb } from '../db/connection'
 import { mapWaiter } from '../db/mappers'
 import { getApi, resetApi } from './apiClient'
 import { getSettings, setSettings } from './settings'
+import { restartSync } from './syncEngine'
 import type { ServerLoginResult, ServerUser, Waiter } from '@shared/types'
 
 const MAX_ATTEMPTS = 5
@@ -80,6 +81,7 @@ export async function loginWithServer(identifier: string, password: string): Pro
 
     setSettings({ apiToken: accessToken })
     resetApi()
+    restartSync()
 
     const branches = await fetchBranches(accessToken)
 
@@ -91,6 +93,7 @@ export async function loginWithServer(identifier: string, password: string): Pro
 
     if (branchId) {
       setSettings({ branchId })
+      restartSync()
     }
 
     if (user) {
@@ -146,6 +149,7 @@ async function fetchBranches(token: string): Promise<any[]> {
 export async function selectBranch(branchId: string, branchName: string): Promise<{ ok: boolean }> {
   try {
     setSettings({ branchId, organizationName: branchName })
+    restartSync()
     await syncWaitersForBranch(branchId)
     const { fullPull } = await import('./syncEngine')
     await fullPull()

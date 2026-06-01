@@ -15,6 +15,8 @@ interface PrinterOption {
   productId: string
   manufacturer?: string
   product: string
+  online?: boolean
+  statusText?: string
 }
 
 interface DiagRecentOrder {
@@ -170,16 +172,22 @@ export default function SettingsPage(): JSX.Element {
           vendorId: d.vendorId,
           productId: d.productId,
           manufacturer: d.manufacturer,
-          product: d.product
+          product: d.product,
+          online: d.online,
+          statusText: d.statusText
         }))
       setUsbDevices(found)
-      if (found.length === 1) {
-        const d = found[0]
+      const onlineFound = found.filter((d) => d.online !== false)
+      if (onlineFound.length === 1) {
+        const d = onlineFound[0]
         if (isWindows) {
-          // USB port (USB001) yoki Windows printer nomi
           const isUsbPort = d.vendorId === 'usb-port'
           if (isUsbPort) {
-            setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
+            setForm((f) => f ? {
+              ...f,
+              printerDevicePath: d.product,
+              printerName: d.manufacturer ?? f.printerName
+            } : f)
             toast.success(`USB port aniqlandi: ${d.product} — Test chek bosing`)
           } else {
             setForm((f) => f ? { ...f, printerType: 'windows', printerName: d.product } : f)
@@ -189,8 +197,11 @@ export default function SettingsPage(): JSX.Element {
           setForm((f) => f ? { ...f, printerDevicePath: d.product } : f)
           toast.success(`Printer aniqlandi: ${d.product}`)
         }
+      } else if (found.length === 1) {
+        const d = found[0]
+        toast.warning(`${d.product} topildi, lekin offline holatda: ${d.statusText ?? 'ulanmagan'}`)
       } else if (found.length > 1) {
-        toast.info(`${found.length} ta printer topildi — birini tanlang`)
+        toast.info(`${found.length} ta printer topildi — online bo'lganini tanlang`)
       } else if (found.length === 0) {
         if (isWindows) {
           toast.warning("Windows printerlar topilmadi. Printer drayveri o'rnatilganligini tekshiring")
@@ -332,6 +343,22 @@ export default function SettingsPage(): JSX.Element {
               onChange={(e) => update('organizationName', e.target.value)}
             />
           </Field>
+          <Field label="Manzil">
+            <textarea
+              className="input min-h-[84px] resize-y"
+              placeholder="Andijon viloyat, Shahrixon tumani"
+              value={form.organizationAddress ?? ''}
+              onChange={(e) => update('organizationAddress', e.target.value || null)}
+            />
+          </Field>
+          <Field label="Telefon">
+            <input
+              className="input"
+              placeholder="+99833 904 20 20"
+              value={form.organizationPhone ?? ''}
+              onChange={(e) => update('organizationPhone', e.target.value || null)}
+            />
+          </Field>
           <Field label="Xizmat haqi (%)">
             <input
               type="number"
@@ -413,6 +440,14 @@ export default function SettingsPage(): JSX.Element {
                   ✅ Driver kerak emas! Windows USB port orqali to'g'ridan chop etiladi.
                   Printer ulangan bo'lsa "Aniqlash" tugmasini bosing.
                 </p>
+                <p className="mb-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+                  Faqat ESC/POS thermal chek printer uchun. Canon, HP, Epson A4 printerlar bu rejimda ishlamaydi.
+                </p>
+                {!!form.printerDevicePath && !form.printerName && (
+                  <p className="mb-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 border border-red-200">
+                    Printer nomi birikmagan. "Aniqlash" orqali XP-80C ni qayta tanlang.
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <input
                     className="input flex-1 font-mono text-sm"
@@ -438,6 +473,7 @@ export default function SettingsPage(): JSX.Element {
                           const isUsbPort = d.vendorId === 'usb-port'
                           if (isUsbPort) {
                             update('printerDevicePath', d.product ?? 'USB001')
+                            if (d.manufacturer) update('printerName', d.manufacturer)
                           } else {
                             update('printerType', 'windows')
                             update('printerName', d.product ?? '')
@@ -445,13 +481,16 @@ export default function SettingsPage(): JSX.Element {
                         }}
                         className={cn(
                           'w-full rounded-xl border px-3 py-1.5 text-left text-xs transition-all',
-                          (form.printerDevicePath === d.product || form.printerName === d.product)
-                            ? 'border-brand-success bg-brand-success/10 text-brand-success'
-                            : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
+                          d.online === false
+                            ? 'border-brand-danger/30 bg-brand-danger/5 text-brand-danger'
+                            : (form.printerDevicePath === d.product || form.printerName === d.product)
+                              ? 'border-brand-success bg-brand-success/10 text-brand-success'
+                              : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
                         )}
                       >
                         {d.vendorId === 'usb-port' ? '🔌' : '🖨'} {d.product}
                         {d.manufacturer && <span className="ml-1 opacity-60">({d.manufacturer})</span>}
+                        {d.online === false && <span className="ml-1 font-medium">(offline)</span>}
                       </button>
                     ))}
                   </div>
@@ -499,6 +538,9 @@ export default function SettingsPage(): JSX.Element {
           )}
           {form.printerType === 'windows' && (
             <Field label="Printer nomi (Windows)">
+              <p className="mb-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+                Thermal printer tanlang. Oddiy A4 printerlarda POS chek formati to'g'ri chiqmasligi mumkin.
+              </p>
               <div className="flex gap-2">
                 <input
                   className="input flex-1"
@@ -523,12 +565,15 @@ export default function SettingsPage(): JSX.Element {
                       onClick={() => update('printerName', d.product)}
                       className={cn(
                         'w-full rounded-xl border px-3 py-1.5 text-left text-xs transition-all',
-                        form.printerName === d.product
-                          ? 'border-brand-success bg-brand-success/10 text-brand-success'
-                          : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
+                        d.online === false
+                          ? 'border-brand-danger/30 bg-brand-danger/5 text-brand-danger'
+                          : form.printerName === d.product
+                            ? 'border-brand-success bg-brand-success/10 text-brand-success'
+                            : 'border-line bg-bg-card text-ink-soft hover:border-line-strong hover:text-ink'
                       )}
                     >
                       🖨 {d.product}
+                      {d.online === false && <span className="ml-1 font-medium">(offline)</span>}
                     </button>
                   ))}
                 </div>
@@ -536,15 +581,33 @@ export default function SettingsPage(): JSX.Element {
             </Field>
           )}
           <Field label="Chek sarlavhasi">
-            <input
-              className="input"
+            <textarea
+              className="input min-h-[84px] resize-y"
+              placeholder={"CHOYXONA\nEST. 2010"}
               value={form.receiptHeader ?? ''}
               onChange={(e) => update('receiptHeader', e.target.value || null)}
             />
           </Field>
-          <Field label="Chek pastki yozuvi">
+          <Field label="QR link yoki matn">
             <input
               className="input"
+              placeholder="https://instagram.com/soxil.choyxona"
+              value={form.receiptQrText ?? ''}
+              onChange={(e) => update('receiptQrText', e.target.value || null)}
+            />
+          </Field>
+          <Field label="QR osti yozuvi">
+            <input
+              className="input"
+              placeholder="@soxil.choyxona"
+              value={form.receiptQrLabel ?? ''}
+              onChange={(e) => update('receiptQrLabel', e.target.value || null)}
+            />
+          </Field>
+          <Field label="Chek pastki yozuvi">
+            <textarea
+              className="input min-h-[112px] resize-y"
+              placeholder={"Sohil Choyxonasiga qaytib kelganingiz uchun rahmat!\nBiz bilan yana ko'rishguncha!"}
               value={form.receiptFooter ?? ''}
               onChange={(e) => update('receiptFooter', e.target.value || null)}
             />

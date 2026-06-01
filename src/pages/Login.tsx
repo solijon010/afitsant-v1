@@ -23,6 +23,12 @@ export default function LoginPage(): JSX.Element {
       const role = result.user?.role ?? ''
       const isSuperAdmin = role === 'SUPERADMIN'
       const hasBranch = !!result.user?.branchId
+      const isWaiterFamily =
+        role === 'AFITSANT' ||
+        role === 'SUPER_AFITSANT' ||
+        role === 'WAITER' ||
+        role === 'SUPER_WAITER' ||
+        role === 'MANAGER'
 
       const syncAll = async (): Promise<void> => {
         toast.loading("Ma'lumotlar yuklanmoqda…", { id: 'sync' })
@@ -46,7 +52,7 @@ export default function LoginPage(): JSX.Element {
       }
 
       await syncAll()
-      if (role === 'SUPER_AFITSANT' || role === 'MANAGER' || isSuperAdmin) {
+      if (isWaiterFamily || isSuperAdmin) {
         navigate('/select-waiter', { replace: true })
       }
       return true
