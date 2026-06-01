@@ -124,13 +124,19 @@ export interface Settings {
   printerName: string | null
   printerDevicePath: string | null
   organizationName: string
+  organizationAddress: string | null
+  organizationPhone: string | null
   serviceFeePercent: number
   receiptHeader: string | null
   receiptFooter: string | null
+  receiptQrText: string | null
+  receiptQrLabel: string | null
 }
 
 export interface ReceiptPayload {
   organizationName: string
+  organizationAddress: string | null
+  organizationPhone: string | null
   tableName: string
   waiterName: string
   orderLocalUuid: string
@@ -142,6 +148,8 @@ export interface ReceiptPayload {
   printedAt: number
   receiptHeader: string | null
   receiptFooter: string | null
+  receiptQrText: string | null
+  receiptQrLabel: string | null
 }
 
 export interface SyncEvent {

@@ -398,6 +398,8 @@ export default function OrderPage(): JSX.Element {
 
       const payload: ReceiptPayload = {
         organizationName: settings?.organizationName ?? 'Restoran',
+        organizationAddress: settings?.organizationAddress ?? null,
+        organizationPhone: settings?.organizationPhone ?? null,
         tableName: table.name,
         waiterName: `${waiter.firstName} ${waiter.lastName}`,
         orderLocalUuid: serverOrderId ?? String(orderId ?? 'unkwn'),
@@ -413,7 +415,9 @@ export default function OrderPage(): JSX.Element {
         total: cart.total(),
         printedAt: Date.now(),
         receiptHeader: settings?.receiptHeader ?? null,
-        receiptFooter: settings?.receiptFooter ?? null
+        receiptFooter: settings?.receiptFooter ?? null,
+        receiptQrText: settings?.receiptQrText ?? null,
+        receiptQrLabel: settings?.receiptQrLabel ?? null
       }
 
       // Localda saqlash va chop etilgan deb belgilash

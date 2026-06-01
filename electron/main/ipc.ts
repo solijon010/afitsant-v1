@@ -28,6 +28,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.authLogout, () => {
     settings.setSettings({ apiToken: null, branchId: null })
     resetApi()
+    sync.restartSync()
   })
 
   ipcMain.handle(IPC.menuGetCategories, () => menu.getCategories())
@@ -72,6 +73,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.settingsSet, (_e, patch) => {
     const updated = settings.setSettings(patch)
     resetApi()
+    sync.restartSync()
     return updated
   })
 
