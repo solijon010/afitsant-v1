@@ -72,6 +72,52 @@ export default function OrderPage(): JSX.Element {
     let cancelled = false
     void (async () => {
       const fee = settings?.serviceFeePercent ?? 0
+      /*
+      const res = await window.afisant.printer.receipt(payload)
+      if (!res.ok) {
+        const title = settings?.printerType
+          ? "Chek chiqarib bo'lmadi"
+          : "Printer ulanmagan — buyurtma yopilmadi"
+        toast.error(title, { description: (res as any).error })
+        return
+      }
+
+      const histId = useOrderHistory.getState().push(buildHistoryEntry(printedAt))
+      useOrderHistory.getState().markPrinted(histId)
+      toast.success('Chek chiqdi')
+
+      try {
+        if (syncedServerOrderId) {
+          await window.afisant.orders.close(persistedOrderId, syncedServerOrderId)
+        } else {
+          await window.afisant.orders.close(persistedOrderId)
+        }
+      } catch (e: any) {
+        toast.error("Chek chiqdi, ammo buyurtmani yopib bo'lmadi", {
+          description: e?.message ?? 'Yopish vaqtida xatolik'
+        })
+        return
+      }
+
+      cart.clear()
+      cart.setOrder(null, null)
+      await refreshTable(tId)
+      navigate('/tables')
+      return
+      const persistedOrderId = await persistCartToLocalOrder(fee)
+
+      await syncCartToServer(persistedOrderId, roomServerId ?? null, 'save')
+
+      if (table) {
+        useOrderHistory.getState().push(buildHistoryEntry(Date.now()))
+      }
+
+      await refreshTable(tId)
+      cart.clear()
+      cart.setOrder(null, null)
+      navigate('/tables')
+      return
+      */
       useCart.setState({ serviceFeePercent: fee })
       const roomServerId = table.serverId
 
@@ -204,70 +250,134 @@ export default function OrderPage(): JSX.Element {
   }, [categories])
 
   /* Mahsulotlar — dublikatsiz */
-  /* Mahsulot nomidan litr/hajmni chiqarish */
-  const extractVolume = (name: string): number => {
-    // "1.L", "2.L", "1.5L", "2 L" hammasi uchun ishlaydi
-    const m = name.match(/(\d+(?:[.,]\d+)?)\s*\.?\s*[Ll]/i)
-    return m ? parseFloat(m[1].replace(',', '.')) : 999
-  }
-
-  /* Kategoriya ichidagi tartib: Asosiy → sortOrder, Salatlar → maxsus, Ichimliklar → hajm bo'yicha */
-  /* Aniq mos kelish — uzunroq pattern avval tekshiriladi */
-  const exactOrder = (name: string, orders: string[]): number => {
-    const sorted = [...orders].map((s, i) => ({ s, i })).sort((a, b) => b.s.length - a.s.length)
-    for (const { s, i } of sorted) {
-      if (name.includes(s)) return i
-    }
-    return 99
-  }
-
-  const SALATLAR_ORDER = ['katta salat', 'qalampir', 'kichik salat']
-  // Non 4000 → Choy → Salfetka → Nam Salfetka → Kata Non
-  // 'kata non' avval tekshiriladi (uzunroq), keyin 'non'
-  const ASOSIY_ORDER = ['non', 'choy', 'salfetka', 'nam salfetka', 'kata non']
-  const GOSHT_ORDER = ['qiyma', "go'sht", "qo'y"]
-
   const shownProducts = useMemo<Product[]>(() => {
     const list = products.filter((p) => p.categoryId === activeCatId)
     const seen = new Set<string>()
-    const unique = list.filter(p => {
+    return list.filter(p => {
       const key = (p.nameUzLatn ?? '').toLowerCase().trim()
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
+  }, [products, activeCatId])
 
-    const catName = (categories.find(c => c.id === activeCatId)?.nameUzLatn ?? '').toLowerCase()
+  const buildLocalOrderItems = () =>
+    cart.lines.map((line) => ({
+      productId: line.productId,
+      productName: line.productName,
+      unitPrice: line.unitPrice,
+      quantity: line.quantity,
+      notes: line.notes ?? null,
+      localUuid: line.localUuid
+    }))
 
-    return [...unique].sort((a, b) => {
-      const an = (a.nameUzLatn ?? '').toLowerCase()
-      const bn = (b.nameUzLatn ?? '').toLowerCase()
+  const buildReceiptItems = () =>
+    cart.lines.map((line) => ({
+      name: line.productName,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      total: Math.round(line.unitPrice * line.quantity)
+    }))
 
-      if (catName.includes('salat')) {
-        const ai = exactOrder(an, SALATLAR_ORDER)
-        const bi = exactOrder(bn, SALATLAR_ORDER)
-        if (ai !== 99 || bi !== 99) return ai - bi
+  const buildHistoryEntry = (savedAt: number) => ({
+    tableId: tId,
+    tableName: table?.name ?? '',
+    waiterName: `${waiter.firstName} ${waiter.lastName}`,
+    savedAt,
+    items: buildReceiptItems(),
+    subtotal: cart.subtotal(),
+    serviceFee: cart.serviceFee(),
+    total: cart.total()
+  })
+
+  const ensureLocalOrder = async (serviceFeePercent: number): Promise<number> => {
+    let orderId = cart.orderId
+    if (!orderId) {
+      const baseOrder = await window.afisant.orders.upsert({
+        tableId: tId,
+        waiterId: waiter.id,
+        serviceFeePercent
+      })
+      orderId = baseOrder.id
+      useCart.setState({ orderId: baseOrder.id })
+    }
+    if (!orderId) throw new Error('Buyurtmani saqlab bo\'lmadi')
+    return orderId
+  }
+
+  const persistCartToLocalOrder = async (serviceFeePercent: number): Promise<number> => {
+    const orderId = await ensureLocalOrder(serviceFeePercent)
+    await window.afisant.orders.replaceItems(orderId, buildLocalOrderItems())
+    return orderId
+  }
+
+  const syncCartToServer = async (
+    orderId: number,
+    roomServerId: string | null,
+    mode: 'save' | 'close'
+  ): Promise<string | null> => {
+    let serverOrderId = useCart.getState().serverOrderId
+
+    if (!roomServerId) {
+      if (mode === 'save') {
+        toast.error("Xona server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
       }
-      if (catName.includes('asosiy')) {
-        const ai = exactOrder(an, ASOSIY_ORDER)
-        const bi = exactOrder(bn, ASOSIY_ORDER)
-        if (ai !== 99 || bi !== 99) return ai - bi
+      return serverOrderId
+    }
+
+    const itemsWithServerId = cart.lines.filter((line) => line.productServerId && line.quantity > 0)
+    const removedFromServer = initialServerItemsRef.current.filter(
+      (initialLine) =>
+        initialLine.productServerId &&
+        !cart.lines.some((line) => line.productServerId === initialLine.productServerId)
+    )
+    const syncItems = [
+      ...itemsWithServerId.map((line) => ({
+        productServerId: line.productServerId!,
+        count: Math.round(line.quantity)
+      })),
+      ...removedFromServer.map((line) => ({
+        productServerId: line.productServerId!,
+        count: 0
+      }))
+    ]
+
+    if (syncItems.length === 0) {
+      if (cart.lines.length > 0) {
+        toast.warning("Mahsulotlarda server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
       }
-      if (catName.includes("go'sht") || catName.includes('gosht')) {
-        const ai = exactOrder(an, GOSHT_ORDER)
-        const bi = exactOrder(bn, GOSHT_ORDER)
-        if (ai !== 99 || bi !== 99) return ai - bi
+      return serverOrderId
+    }
+
+    try {
+      const res = await window.afisant.orders.syncAll({
+        localOrderId: orderId,
+        roomServerId,
+        items: syncItems
+      })
+      serverOrderId = res.serverId
+      useCart.setState({
+        serverOrderId: res.serverId,
+        lines: cart.lines.map((line) => ({ ...line, flushed: true }))
+      })
+      initialServerItemsRef.current = cart.lines.filter((line) => line.productServerId)
+      if (mode === 'save') toast.success('Buyurtma serverga yuborildi ✓')
+      return serverOrderId
+    } catch (e: any) {
+      const msg = e?.message ?? ''
+      if (mode === 'save') {
+        if (msg.includes('404') || msg.includes('mavjud emas') || msg.includes('inactive')) {
+          toast.warning('Ba\'zi mahsulotlar serverda yo\'q — mahalliy saqlandi')
+        } else {
+          toast.warning("Server bilan ulanib bo'lmadi — mahalliy saqlandi")
+        }
+        console.warn('[ORDER] syncAll xato (mahalliy saqlandi):', msg)
+      } else {
+        toast.warning(`Server sync xatosi: ${msg || 'ulanish yo\'q'}`)
       }
-      if (catName.includes('ichimlik')) {
-        // 2L birinchi, 1.5L ikkinchi, 1L uchinchi, qolganlar oxirida
-        const av = extractVolume(a.nameUzLatn ?? '')
-        const bv = extractVolume(b.nameUzLatn ?? '')
-        if (av !== bv) return bv - av  // katta hajm birinchi
-      }
-      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, activeCatId, categories])
+      return serverOrderId
+    }
+  }
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
@@ -278,31 +388,22 @@ export default function OrderPage(): JSX.Element {
     try {
       const roomServerId = useCart.getState().roomServerId
       const fee = settings?.serviceFeePercent ?? 0
+      const persistedOrderId = await persistCartToLocalOrder(fee)
 
-      // Lazy order creation — mahsulot qo'shilganda birinchi marta SQLite buyurtma yaratiladi
-      let orderId = cart.orderId
-      if (!orderId) {
-        const baseOrder = await window.afisant.orders.upsert({
-          tableId: tId,
-          waiterId: waiter.id,
-          serviceFeePercent: fee
-        })
-        orderId = baseOrder.id
-        useCart.setState({ orderId: baseOrder.id })
+      await syncCartToServer(persistedOrderId, roomServerId ?? null, 'save')
+
+      if (table) {
+        useOrderHistory.getState().push(buildHistoryEntry(Date.now()))
       }
 
-      // Har doim local SQLite ga saqlash (offline persistence uchun)
-      await window.afisant.orders.replaceItems(
-        orderId,
-        cart.lines.map((l) => ({
-          productId: l.productId,
-          productName: l.productName,
-          unitPrice: l.unitPrice,
-          quantity: l.quantity,
-          notes: l.notes ?? null,
-          localUuid: l.localUuid
-        }))
-      )
+      await refreshTable(tId)
+      cart.clear()
+      cart.setOrder(null, null)
+      navigate('/tables')
+      return
+
+      // Lazy order creation — mahsulot qo'shilganda birinchi marta SQLite buyurtma yaratiladi
+      const orderId = await persistCartToLocalOrder(fee)
 
       // Server sync — roomServerId bo'lsa yuboramiz (waiterServerId shart emas — JWT tokendan olinadi)
       if (!roomServerId) {
@@ -329,7 +430,7 @@ export default function OrderPage(): JSX.Element {
           try {
             const res = await window.afisant.orders.syncAll({
               localOrderId: orderId ?? undefined,
-              roomServerId,
+              roomServerId: roomServerId!,
               items: syncItems
             })
             useCart.setState({ serverOrderId: res.serverId })
@@ -357,7 +458,7 @@ export default function OrderPage(): JSX.Element {
       if (table) {
         useOrderHistory.getState().push({
           tableId: tId,
-          tableName: table.name,
+          tableName: table!.name,
           waiterName: `${waiter.firstName} ${waiter.lastName}`,
           savedAt: Date.now(),
           items: cart.lines.map((l) => ({
@@ -406,17 +507,69 @@ export default function OrderPage(): JSX.Element {
 
   const handleCloseAndPrint = async (): Promise<void> => {
     if (!table || !waiter) return
-    if (cart.lines.length === 0 && !cart.serverOrderId) {
+    if (cart.lines.length === 0) {
       toast.error("Savat bo'sh")
       return
     }
     setPrinting(true)
     try {
       const roomServerId = useCart.getState().roomServerId
-      let serverOrderId = useCart.getState().serverOrderId
       const fee = settings?.serviceFeePercent ?? 0
+      const persistedOrderId = await persistCartToLocalOrder(fee)
+      const syncedServerOrderId = await syncCartToServer(persistedOrderId, roomServerId ?? null, 'close')
+      const printedAt = Date.now()
+      const payload: ReceiptPayload = {
+        organizationName: settings?.organizationName ?? 'Restoran',
+        organizationAddress: settings?.organizationAddress ?? null,
+        organizationPhone: settings?.organizationPhone ?? null,
+        tableName: table.name,
+        waiterName: `${waiter.firstName} ${waiter.lastName}`,
+        orderLocalUuid: syncedServerOrderId ?? String(persistedOrderId),
+        items: buildReceiptItems(),
+        subtotal: cart.subtotal(),
+        serviceFeePercent: cart.serviceFeePercent,
+        serviceFee: cart.serviceFee(),
+        total: cart.total(),
+        printedAt,
+        receiptHeader: settings?.receiptHeader ?? null,
+        receiptFooter: settings?.receiptFooter ?? null,
+        receiptQrText: settings?.receiptQrText ?? null,
+        receiptQrLabel: settings?.receiptQrLabel ?? null
+      }
+      const res = await window.afisant.printer.receipt(payload)
+      if (!res.ok) {
+        const title = settings?.printerType
+          ? "Chek chiqarib bo'lmadi"
+          : "Printer ulanmagan — buyurtma yopilmadi"
+        toast.error(title, { description: (res as any).error })
+        return
+      }
+
+      const histId = useOrderHistory.getState().push(buildHistoryEntry(printedAt))
+      useOrderHistory.getState().markPrinted(histId)
+      toast.success('Chek chiqdi')
+
+      try {
+        if (syncedServerOrderId) {
+          await window.afisant.orders.close(persistedOrderId, syncedServerOrderId)
+        } else {
+          await window.afisant.orders.close(persistedOrderId)
+        }
+      } catch (e: any) {
+        toast.error("Chek chiqdi, ammo buyurtmani yopib bo'lmadi", {
+          description: e?.message ?? 'Yopish vaqtida xatolik'
+        })
+        return
+      }
+
+      cart.clear()
+      cart.setOrder(null, null)
+      await refreshTable(tId)
+      navigate('/tables')
+      return
 
       // Lazy order creation — mahsulot bor bo'lsa SQLite buyurtma yaratamiz
+      /*
       let orderId = cart.orderId
       if (!orderId && cart.lines.length > 0) {
         const baseOrder = await window.afisant.orders.upsert({
@@ -508,6 +661,7 @@ export default function OrderPage(): JSX.Element {
       cart.setOrder(null, null)
       await refreshTable(tId)
       navigate('/tables')
+      */
     } catch (e: any) {
       toast.error('Xatolik', { description: e?.message })
     } finally {
@@ -525,27 +679,27 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '180px 1fr 400px' }}>
+    <div className="grid h-full bg-[#F5F5F4]" style={{ gridTemplateColumns: 'minmax(172px, 196px) 1fr minmax(336px, 400px)' }}>
 
       {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
-      <aside style={{ background: '#1a2636', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <aside style={{ background: '#1C1917', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
         <div style={{ padding: '16px 16px 12px', borderBottom: '2px solid rgba(0,0,0,0.2)' }}>
-          <button onClick={() => void handleSave()} disabled={saving || printing}
+          <button onClick={() => navigate('/tables')} disabled={printing}
             style={{ 
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, 
-              background: '#ef4444', 
-              border: '2px solid #7f1d1d', 
+              background: '#44403C', 
+              border: '1px solid #78716C', 
               borderRadius: 8, 
               cursor: 'pointer', color: '#fff', fontSize: 14, fontWeight: 800, 
               padding: '12px', marginBottom: 12, width: '100%', 
-              boxShadow: '0 4px 0 #7f1d1d', 
+              boxShadow: '0 4px 0 #292524', 
               transition: 'all 0.1s',
               textTransform: 'uppercase', letterSpacing: '0.05em'
             }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #7f1d1d' }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #7f1d1d' }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #7f1d1d' }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #292524' }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #292524' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #292524' }}
           >
             <ArrowLeft size={16} /> Orqaga
           </button>
@@ -595,7 +749,7 @@ export default function OrderPage(): JSX.Element {
       </aside>
 
       {/* ── MARKAZ: Mahsulotlar ── */}
-      <section className="flex flex-col overflow-hidden" style={{ background: '#1742a1' }}>
+      <section className="flex flex-col overflow-hidden" style={{ background: '#F5F5F4' }}>
         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
           {shownProducts.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm text-ink-dim">
@@ -965,7 +1119,7 @@ function CartPanel({
   }, [lines.length, showHistory])
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#ffef12' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#F5F5F4' }}>
 
       {/* Sinxronlash ogorish banneri */}
       {syncWarning && lines.length > 0 && (
@@ -1013,7 +1167,7 @@ function CartPanel({
       </div>
 
       {/* Asosiy kontent — savat yoki tarix (almashinadi, footer doim ko'rinadi) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px', background: 'transparent' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px', background: '#F5F5F4' }}>
         <AnimatePresence mode="wait">
           {showHistory ? (
             /* ── Tarix paneli ── */

@@ -47,17 +47,19 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.ordersUpdateItem, (_e, itemId: number, patch: any) => orders.updateItem(itemId, patch))
   ipcMain.handle(IPC.ordersRemoveItem, (_e, itemId: number) => orders.removeItem(itemId))
   ipcMain.handle(IPC.ordersSyncAll, (_e, input: any) => orders.syncAllItems(input))
-  ipcMain.handle(IPC.ordersClose, (_e, orderId: number, serverOrderId?: string) => {
+  ipcMain.handle(IPC.ordersClose, async (_e, orderId: number, serverOrderId?: string) => {
     if (serverOrderId) {
-      return orders.closeOrderOnServer(serverOrderId).then(() => orders.closeOrder(orderId))
+      await orders.closeOrderOnServer(serverOrderId)
     }
-    return orders.closeOrder(orderId)
+    if (orderId > 0) return orders.closeOrder(orderId)
+    return null
   })
-  ipcMain.handle(IPC.ordersCancel, (_e, orderId: number, serverOrderId?: string) => {
+  ipcMain.handle(IPC.ordersCancel, async (_e, orderId: number, serverOrderId?: string) => {
     if (serverOrderId) {
-      return orders.cancelOrderOnServer(serverOrderId).then(() => orders.cancelOrder(orderId))
+      await orders.cancelOrderOnServer(serverOrderId)
     }
-    return orders.cancelOrder(orderId)
+    if (orderId > 0) return orders.cancelOrder(orderId)
+    return null
   })
 
   ipcMain.handle(IPC.printReceipt, (_e, payload) => printer.printReceipt(payload))

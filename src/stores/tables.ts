@@ -5,7 +5,7 @@ interface TablesState {
   areas: Area[]
   snapshot: TableWithOrder[]
   activeAreaId: number | null
-  setActiveAreaId: (id: number) => void
+  setActiveAreaId: (id: number | null) => void
   load: () => Promise<void>
   refreshTable: (tableId: number) => Promise<void>
 }
