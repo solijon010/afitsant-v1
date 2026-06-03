@@ -141,8 +141,9 @@ export default function TablesPage(): JSX.Element {
             onClick={() => setActiveAreaId(-1)}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: activeAreaId === -1 || activeAreaId === null ? '#e11d48' : 'transparent',
+              padding: '10px 12px', borderRadius: 10,
+              border: 'none', outline: 'none', cursor: 'pointer',
+              background: activeAreaId === -1 || activeAreaId === null ? '#e11d48' : 'rgba(255,255,255,0.06)',
               color: activeAreaId === -1 || activeAreaId === null ? '#fff' : 'rgba(255,255,255,0.7)',
               fontSize: 13, fontWeight: 600, transition: 'all .15s',
             }}

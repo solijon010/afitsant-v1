@@ -206,7 +206,8 @@ export default function OrderPage(): JSX.Element {
   /* Mahsulotlar — dublikatsiz */
   /* Mahsulot nomidan litr/hajmni chiqarish */
   const extractVolume = (name: string): number => {
-    const m = name.match(/(\d+(?:[.,]\d+)?)\s*[Ll]/i)
+    // "1.L", "2.L", "1.5L", "2 L" hammasi uchun ishlaydi
+    const m = name.match(/(\d+(?:[.,]\d+)?)\s*\.?\s*[Ll]/i)
     return m ? parseFloat(m[1].replace(',', '.')) : 999
   }
 
