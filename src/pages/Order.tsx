@@ -208,7 +208,7 @@ export default function OrderPage(): JSX.Element {
   const extractVolume = (name: string): number => {
     // "1.L", "2.L", "1.5L", "2 L" hammasi uchun ishlaydi
     const m = name.match(/(\d+(?:[.,]\d+)?)\s*\.?\s*[Ll]/i)
-    return m ? parseFloat(m[1].replace(',', '.')) : 999
+    return m ? parseFloat(m[1].replace(',', '.')) : -1  // -1 = L yo'q → oxirida
   }
 
   /* Kategoriya ichidagi tartib: Asosiy → sortOrder, Salatlar → maxsus, Ichimliklar → hajm bo'yicha */
