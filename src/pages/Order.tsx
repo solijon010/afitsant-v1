@@ -204,16 +204,55 @@ export default function OrderPage(): JSX.Element {
   }, [categories])
 
   /* Mahsulotlar — dublikatsiz */
+  /* Mahsulot nomidan litr/hajmni chiqarish */
+  const extractVolume = (name: string): number => {
+    const m = name.match(/(\d+(?:[.,]\d+)?)\s*[Ll]/i)
+    return m ? parseFloat(m[1].replace(',', '.')) : 999
+  }
+
+  /* Kategoriya ichidagi tartib: Asosiy → sortOrder, Salatlar → maxsus, Ichimliklar → hajm bo'yicha */
+  const SALATLAR_ORDER = ['katta salat', 'qalampir', 'kichik salat']
+  const ASOSIY_ORDER = ['non', 'choy', 'salfetka', 'nam salfetka', 'kata non']
+  const GOSHT_ORDER = ['qiyma', "go'sht", "qo'y"]
+
   const shownProducts = useMemo<Product[]>(() => {
     const list = products.filter((p) => p.categoryId === activeCatId)
     const seen = new Set<string>()
-    return list.filter(p => {
+    const unique = list.filter(p => {
       const key = (p.nameUzLatn ?? '').toLowerCase().trim()
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
-  }, [products, activeCatId])
+
+    const catName = (categories.find(c => c.id === activeCatId)?.nameUzLatn ?? '').toLowerCase()
+
+    return [...unique].sort((a, b) => {
+      const an = (a.nameUzLatn ?? '').toLowerCase()
+      const bn = (b.nameUzLatn ?? '').toLowerCase()
+
+      if (catName.includes('salat')) {
+        const ai = SALATLAR_ORDER.findIndex(s => an.includes(s))
+        const bi = SALATLAR_ORDER.findIndex(s => bn.includes(s))
+        if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+      }
+      if (catName.includes('asosiy')) {
+        const ai = ASOSIY_ORDER.findIndex(s => an.includes(s))
+        const bi = ASOSIY_ORDER.findIndex(s => bn.includes(s))
+        if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+      }
+      if (catName.includes("go'sht") || catName.includes('gosht')) {
+        const ai = GOSHT_ORDER.findIndex(s => an.includes(s))
+        const bi = GOSHT_ORDER.findIndex(s => bn.includes(s))
+        if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+      }
+      if (catName.includes('ichimlik')) {
+        return extractVolume(b.nameUzLatn ?? '') - extractVolume(a.nameUzLatn ?? '')
+      }
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, activeCatId, categories])
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
