@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import type { ReceiptPayload } from '@shared/types'
 import { getSettings } from './settings'
+import { getDb } from '../db/connection'
 
 const ESC = 0x1b
 const GS = 0x1d
@@ -38,9 +39,12 @@ function fmt(n: number): string {
 
 function fmtDateTime(ts: number): { date: string; time: string } {
   const d = new Date(ts)
-  const date = d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const time = d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
-  return { date, time }
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return { date: `${dd}.${mm}.${yyyy}`, time: `${hh}:${min}` }
 }
 
 function splitLines(text: string | null | undefined): string[] {
@@ -50,17 +54,211 @@ function splitLines(text: string | null | undefined): string[] {
     .filter(Boolean)
 }
 
+const RECEIPT_WIDTH = 48
+
+function sanitizeReceiptText(text: string): string {
+  return text
+    .replace(/№/g, 'No')
+    .replace(/[‘’`]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/ў/g, "'")
+    .replace(/Ў/g, "'")
+    .replace(/ʼ/g, "'")
+}
+
+function wrapText(text: string, width: number): string[] {
+  const cleaned = sanitizeReceiptText(text).trim()
+  if (!cleaned) return ['']
+
+  const words = cleaned.split(/\s+/)
+  const lines: string[] = []
+  let current = ''
+
+  for (const word of words) {
+    if (word.length > width) {
+      if (current) {
+        lines.push(current)
+        current = ''
+      }
+      for (let i = 0; i < word.length; i += width) {
+        lines.push(word.slice(i, i + width))
+      }
+      continue
+    }
+
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length <= width) {
+      current = candidate
+    } else {
+      if (current) lines.push(current)
+      current = word
+    }
+  }
+
+  if (current) lines.push(current)
+  return lines
+}
+
+function buildReceiptLines(
+  payload: ReceiptPayload,
+  width = RECEIPT_WIDTH,
+  options: { brandedHeader?: boolean } = {}
+): string[] {
+  const brandedHeader = options.brandedHeader ?? false
+  const nameCol = 16
+  const qtyCol = 4
+  const sumCol = Math.max(8, width - nameCol - qtyCol - 2)
+  const line = '-'.repeat(width)
+  const { date, time } = fmtDateTime(payload.printedAt)
+  const receiptNo = formatReceiptNo(payload.orderLocalUuid, payload.receiptNumber)
+  const headerLines = splitLines(payload.receiptHeader)
+  const footerLines = splitLines(payload.receiptFooter)
+  const lines: string[] = []
+
+  if (!brandedHeader) {
+    lines.push(center(sanitizeReceiptText(payload.organizationName).slice(0, width), width))
+    for (const lineText of headerLines) {
+      for (const row of wrapText(lineText, width)) lines.push(center(row, width))
+    }
+  }
+  if (payload.organizationAddress) {
+    for (const row of wrapText(payload.organizationAddress, width)) lines.push(center(row, width))
+  }
+  lines.push(center(sanitizeReceiptText(`Xizmata: ${payload.waiterName}`).slice(0, width), width))
+  if (payload.organizationPhone) {
+    lines.push(center(sanitizeReceiptText(`Tel: ${payload.organizationPhone}`).slice(0, width), width))
+  }
+  lines.push(line)
+  lines.push(pad(`CHEK No: ${receiptNo}`, `STOL: ${sanitizeReceiptText(payload.tableName)}`, width))
+  lines.push(pad(`SANA: ${date}`, `VAQT: ${time}`, width))
+  lines.push(line)
+  lines.push('BUYURTMALAR'.padEnd(nameCol) + ' ' + 'SONI'.padStart(qtyCol) + ' ' + 'SUMMA'.padStart(sumCol))
+  lines.push('-'.repeat(nameCol) + ' ' + '-'.repeat(qtyCol) + ' ' + '-'.repeat(sumCol))
+
+  for (const item of payload.items) {
+    const itemName = sanitizeReceiptText(item.name)
+    const nameLines = wrapText(itemName, nameCol)
+    const qty = fmtQty(item.quantity).padStart(qtyCol)
+    const total = `${fmt(item.total)} so'm`.padStart(sumCol)
+    lines.push((nameLines.shift() ?? '').padEnd(nameCol) + ' ' + qty + ' ' + total)
+    for (const rest of nameLines) {
+      lines.push(rest.padEnd(nameCol))
+    }
+  }
+
+  lines.push(line)
+  if (payload.serviceFee > 0) {
+    lines.push(pad(`Xizmat ${payload.serviceFeePercent}%:`, `${fmt(payload.serviceFee)} so'm`, width))
+    lines.push(line)
+  }
+  lines.push(pad('JAMI:', `${fmt(payload.total)} so'm`, width))
+  lines.push(line)
+
+  for (const lineText of footerLines) {
+    for (const row of wrapText(lineText, width)) lines.push(center(row, width))
+  }
+  if (payload.receiptQrLabel) {
+    for (const row of wrapText(payload.receiptQrLabel, width)) lines.push(center(row, width))
+  }
+  if (payload.receiptQrText) {
+    for (const row of wrapText(payload.receiptQrText, width)) lines.push(center(row, width))
+  }
+
+  return lines
+}
+
 function fmtQty(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '')
 }
 
-function formatReceiptNo(orderLocalUuid: string): string {
+function formatReceiptNo(orderLocalUuid: string, dailyNo?: number): string {
+  if (dailyNo !== undefined) return String(dailyNo).padStart(5, '0')
   const digits = orderLocalUuid.replace(/\D/g, '')
   if (digits.length > 0) return digits.slice(-5).padStart(5, '0')
   return orderLocalUuid.slice(0, 8).toUpperCase()
 }
 
-function resolveReceiptLogoPath(): string | null {
+function nextDailyReceiptNo(): number {
+  const db = getDb()
+  const today = new Date().toISOString().slice(0, 10)
+  const upsert = db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+  const getRow = (key: string) => (db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null
+
+  const storedDate = getRow('receiptDailyDate')
+  const storedCount = getRow('receiptDailyCount')
+  const count = storedDate === today && storedCount ? parseInt(storedCount, 10) + 1 : 1
+
+  upsert.run('receiptDailyDate', today)
+  upsert.run('receiptDailyCount', String(count))
+  return count
+}
+
+function buildQrEscPos(url: string): Buffer {
+  const data = Buffer.from(url, 'utf8')
+  const storeLen = data.length + 3
+  const pL = storeLen & 0xff
+  const pH = (storeLen >> 8) & 0xff
+  const storeHeader = Buffer.from([GS, 0x28, 0x6b, pL, pH, 49, 80, 48])
+  return Buffer.concat([
+    Buffer.from([GS, 0x28, 0x6b, 4, 0, 49, 65, 50, 0]),
+    Buffer.from([GS, 0x28, 0x6b, 3, 0, 49, 67, 6]),
+    Buffer.from([GS, 0x28, 0x6b, 3, 0, 49, 69, 49]),
+    Buffer.concat([storeHeader, data]),
+    Buffer.from([GS, 0x28, 0x6b, 3, 0, 49, 81, 48])
+  ])
+}
+
+function resolveReceiptHeaderAssetPath(): string | null {
+  const roots = Array.from(new Set([app.getAppPath(), process.cwd()]))
+  const fileCandidates = roots.map((root) => join(root, 'src', 'assets', 'receipt-header.png'))
+  for (const filePath of fileCandidates) {
+    if (existsSync(filePath)) return filePath
+  }
+
+  const assetDirs = roots.map((root) => join(root, 'out', 'renderer', 'assets'))
+  for (const dir of assetDirs) {
+    if (!existsSync(dir)) continue
+    try {
+      const file = readdirSync(dir).find((name) => /^receipt-header.*\.png$/i.test(name))
+      if (file) return join(dir, file)
+    } catch {
+      // ignore lookup errors
+    }
+  }
+
+  return null
+}
+
+function resolveReceiptTemplatePath(): string | null {
+  const roots = Array.from(new Set([app.getAppPath(), process.cwd()]))
+  const fileCandidates = roots.flatMap((root) => [
+    join(root, 'src', 'assets', 'chek-template.png'),
+    join(root, 'chek.jpg'),
+    join(root, 'chek.png'),
+    join(root, 'src', 'assets', 'chek.jpg'),
+    join(root, 'src', 'assets', 'chek.png')
+  ])
+
+  for (const filePath of fileCandidates) {
+    if (existsSync(filePath)) return filePath
+  }
+
+  const assetDirs = roots.map((root) => join(root, 'out', 'renderer', 'assets'))
+  for (const dir of assetDirs) {
+    if (!existsSync(dir)) continue
+    try {
+      const file = readdirSync(dir).find((name) => /^chek.*\.(png|jpg|jpeg)$/i.test(name))
+      if (file) return join(dir, file)
+    } catch {
+      // ignore lookup errors
+    }
+  }
+
+  return null
+}
+
+function resolveAppLogoPath(): string | null {
   const roots = Array.from(new Set([app.getAppPath(), process.cwd()]))
   const fileCandidates = roots.map((root) => join(root, 'src', 'assets', 'logo.png'))
   for (const filePath of fileCandidates) {
@@ -80,116 +278,41 @@ function resolveReceiptLogoPath(): string | null {
   return null
 }
 
+function resolveReceiptLogoPath(): string | null {
+  return resolveReceiptHeaderAssetPath() ?? resolveAppLogoPath()
+}
+
 function buildEscPos(payload: ReceiptPayload): Buffer {
-  const W = 30
-  const line = '-'.repeat(W)
-  const { date, time } = fmtDateTime(payload.printedAt)
-  const headerLines = splitLines(payload.receiptHeader)
-  const footerLines = splitLines(payload.receiptFooter)
-  const receiptNo = formatReceiptNo(payload.orderLocalUuid)
+  const W = RECEIPT_WIDTH
+  const lines = buildReceiptLines(payload, W, { brandedHeader: Boolean(resolveReceiptHeaderAssetPath()) })
 
   const parts: Uint8Array[] = [
-    bytes(ESC, 0x40),                    // reset
-    bytes(ESC, 0x61, 0x01),              // center
-    bytes(ESC, 0x45, 0x01),              // bold on
-    textBytes(payload.organizationName.slice(0, W) + '\n'),
-    bytes(ESC, 0x45, 0x00),              // bold off
+    bytes(ESC, 0x40),
+    bytes(ESC, 0x61, 0x00),
   ]
 
-  for (const lineText of headerLines) {
-    parts.push(textBytes(center(lineText, W) + '\n'))
+  for (const lineText of lines) {
+    if (lineText.trim().startsWith('JAMI:')) {
+      parts.push(bytes(ESC, 0x45, 0x01))
+      parts.push(textBytes(lineText + '\n'))
+      parts.push(bytes(ESC, 0x45, 0x00))
+    } else {
+      parts.push(textBytes(lineText + '\n'))
+    }
   }
-  if (payload.organizationAddress) parts.push(textBytes(center(payload.organizationAddress.slice(0, W), W) + '\n'))
-  parts.push(textBytes(center(`Xizmata: ${payload.waiterName}`.slice(0, W), W) + '\n'))
-  if (payload.organizationPhone) parts.push(textBytes(center(`Tel: ${payload.organizationPhone}`.slice(0, W), W) + '\n'))
-
-  parts.push(
-    bytes(ESC, 0x61, 0x00),              // left
-    textBytes(line + '\n'),
-    textBytes(pad(`CHEK №: ${receiptNo}`, `STOL: ${payload.tableName}`, W) + '\n'),
-    textBytes(pad(`SANA: ${date}`, `VAQT: ${time}`, W) + '\n'),
-    textBytes(line + '\n'),
-    textBytes(pad('BUYURTMALAR', 'SONI', W - 11) + 'SUMMA\n'),
-    textBytes(line + '\n')
-  )
-
-  for (const item of payload.items) {
-    const itemName = item.name.slice(0, 16)
-    const qty = fmtQty(item.quantity).padStart(4, ' ')
-    const total = `${fmt(item.total)} so'm`
-    parts.push(textBytes(itemName.padEnd(16, ' ') + qty + total.padStart(W - 20, ' ') + '\n'))
+  if (payload.receiptQrText) {
+    parts.push(bytes(ESC, 0x61, 0x01))
+    parts.push(bytes(ESC, 0x64, 1))
+    parts.push(buildQrEscPos(payload.receiptQrText))
+    parts.push(bytes(ESC, 0x64, 1))
   }
-
-  parts.push(textBytes(line + '\n'))
-
-  if (payload.serviceFee > 0) {
-    parts.push(textBytes(
-      pad(`Xizmat ${payload.serviceFeePercent}%:`, fmt(payload.serviceFee), W) + '\n'
-    ))
-  }
-
-  parts.push(
-    bytes(ESC, 0x45, 0x01),              // bold on
-    textBytes(pad('JAMI:', `${fmt(payload.total)} so'm`, W) + '\n'),
-    bytes(ESC, 0x45, 0x00),              // bold off
-    textBytes(line + '\n'),
-  )
-
-  parts.push(bytes(ESC, 0x61, 0x01))
-  for (const lineText of footerLines) {
-    parts.push(textBytes(center(lineText.slice(0, W), W) + '\n'))
-  }
-  if (payload.receiptQrLabel) {
-    parts.push(textBytes(center(payload.receiptQrLabel.slice(0, W), W) + '\n'))
-  }
-
-  // Qog'oz surish (auto-cutter bo'lmasa ham yirtish uchun qulay)
-  parts.push(bytes(ESC, 0x64, 3))        // 3 qator surish
-  parts.push(bytes(GS, 0x56, 0x00))      // kesish (cutter bo'lsa ishlaydi)
-
+  parts.push(bytes(ESC, 0x64, 3))
+  parts.push(bytes(GS, 0x56, 0x00))
   return concat(...parts)
 }
 
-function buildReceiptText(payload: ReceiptPayload, width = 32): string {
-  const line = '-'.repeat(width)
-  const { date, time } = fmtDateTime(payload.printedAt)
-  const receiptNo = formatReceiptNo(payload.orderLocalUuid)
-  const headerLines = splitLines(payload.receiptHeader)
-  const footerLines = splitLines(payload.receiptFooter)
-  const lines: string[] = []
-
-  lines.push(center(payload.organizationName.slice(0, width), width))
-  for (const lineText of headerLines) lines.push(center(lineText.slice(0, width), width))
-  if (payload.organizationAddress) lines.push(center(payload.organizationAddress.slice(0, width), width))
-  lines.push(center(`Xizmata: ${payload.waiterName}`.slice(0, width), width))
-  if (payload.organizationPhone) lines.push(center(`Tel: ${payload.organizationPhone}`.slice(0, width), width))
-  lines.push(line)
-  lines.push(pad(`CHEK №: ${receiptNo}`, `STOL: ${payload.tableName}`, width))
-  lines.push(pad(`SANA: ${date}`, `VAQT: ${time}`, width))
-  lines.push(line)
-  lines.push(pad('BUYURTMALAR', 'SONI', width - 11) + 'SUMMA')
-  lines.push(line)
-
-  for (const item of payload.items) {
-    const itemName = item.name.slice(0, 16)
-    const qty = fmtQty(item.quantity).padStart(4, ' ')
-    const total = `${fmt(item.total)} so'm`
-    lines.push(itemName.padEnd(16, ' ') + qty + total.padStart(Math.max(1, width - 20), ' '))
-  }
-
-  lines.push(line)
-  if (payload.serviceFee > 0) {
-    lines.push(pad(`Xizmat ${payload.serviceFeePercent}%:`, `${fmt(payload.serviceFee)} so'm`, width))
-    lines.push(line)
-  }
-  lines.push(pad('JAMI:', `${fmt(payload.total)} so'm`, width))
-  lines.push(line)
-
-  for (const lineText of footerLines) lines.push(center(lineText.slice(0, width), width))
-  if (payload.receiptQrLabel) lines.push(center(payload.receiptQrLabel.slice(0, width), width))
-  if (payload.receiptQrText) lines.push(center(payload.receiptQrText.slice(0, width), width))
-
-  return lines.join('\n')
+function buildReceiptText(payload: ReceiptPayload, width = RECEIPT_WIDTH): string {
+  return buildReceiptLines(payload, width, { brandedHeader: Boolean(resolveReceiptHeaderAssetPath()) }).join('\n')
 }
 
 async function printRaw(data: Buffer): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -241,47 +364,38 @@ async function printRawWindowsPort(data: Buffer, usbPort: string): Promise<{ ok:
     }
   }
 
-  const usbPrinter = findWindowsPrinterByPort(normalizedPort)
-  const usbStatus = probeWindowsUsbPort(normalizedPort)
-  if (!usbStatus.online) {
-    return {
-      ok: false,
-      error: `USB printer ulanmagan yoki offline: ${usbPrinter?.name ?? 'Thermal printer'} (${normalizedPort}).\nUSB kabelini, printerning elektrini va Windows portini tekshiring.`
-    }
-  }
-  const tmpFile = join(tmpdir(), `afisant-print-${Date.now()}.bin`)
-
+  const devicePath = `\\\\.\\${normalizedPort}`
   try {
-    writeFileSync(tmpFile, data)
-    // Windows copy /b — binary mode, to'g'ridan device pathga.
-    // Yalang'och "USB002" yozuvi cwd ichida oddiy fayl yaratib yuborishi mumkin,
-    // shuning uchun faqat haqiqiy device path bilan urinamiz.
-    const commands = [
-      `copy /b "${tmpFile}" "\\\\.\\${normalizedPort}"`
-    ]
-    let lastError = ''
-    for (const command of commands) {
-      try {
-        execSync(command, {
-          shell: process.env['ComSpec'] ?? 'cmd.exe',
-          timeout: 10000,
-          stdio: 'pipe'
-        })
-        return { ok: true }
-      } catch (e: any) {
-        lastError = String(e?.stderr ?? e?.message ?? lastError)
+    const fd = openSync(devicePath, 'w')
+    try {
+      writeSync(fd, data)
+      try { fsyncSync(fd) } catch { /* ba'zi USB drayverlar fsync qo'llab-quvvatlamaydi */ }
+    } finally {
+      closeSync(fd)
+    }
+    return { ok: true }
+  } catch (e: any) {
+    const msg = String(e?.message ?? 'USB port xatosi')
+    const usbPrinter = findWindowsPrinterByPort(normalizedPort)
+    const printerName = usbPrinter?.name ?? 'Thermal printer'
+    console.error('[PRINTER] Windows USB error:', msg)
+
+    if (/no such file|cannot find|enoent/i.test(msg)) {
+      return {
+        ok: false,
+        error: `USB printer topilmadi (${normalizedPort}).\nUSB kabelini ulang va printerni yoqing.`
       }
     }
-    throw new Error(lastError || 'USB port xatosi')
-  } catch (e: any) {
-    const msg = String(e?.stderr ?? e?.message ?? 'USB port xatosi')
-    console.error('[PRINTER] Windows USB error:', msg)
+    if (/access is denied|eacces|permission/i.test(msg)) {
+      return {
+        ok: false,
+        error: `${printerName} (${normalizedPort}) ga ruxsat yo'q.\nPrinterni qayta ulab ko'ring yoki administratordan ruxsat so'rang.`
+      }
+    }
     return {
       ok: false,
       error: `Windows USB print xatosi (${normalizedPort}):\n${msg}\n\nSozlamalar > Printer > USB Port ni tekshiring`
     }
-  } finally {
-    try { unlinkSync(tmpFile) } catch { /* ignore */ }
   }
 }
 
@@ -480,10 +594,7 @@ function loadWindowsPrinterDriver(): any | null {
 }
 
 async function renderReceipt(printer: any, payload: ReceiptPayload): Promise<void> {
-  const { date, time } = fmtDateTime(payload.printedAt)
-  const receiptNo = formatReceiptNo(payload.orderLocalUuid)
-  const headerLines = splitLines(payload.receiptHeader)
-  const footerLines = splitLines(payload.receiptFooter)
+  const lines = buildReceiptLines(payload, RECEIPT_WIDTH, { brandedHeader: Boolean(resolveReceiptHeaderAssetPath()) })
   const logoPath = resolveReceiptLogoPath()
 
   printer.alignCenter()
@@ -495,71 +606,22 @@ async function renderReceipt(printer: any, payload: ReceiptPayload): Promise<voi
       console.warn('[PRINTER] logo print skipped:', (e as Error)?.message ?? e)
     }
   }
-  printer.bold(true)
-  printer.setTextDoubleWidth()
-  printer.println(payload.organizationName)
-  printer.setTextNormal()
-  printer.bold(false)
-
-  for (const lineText of headerLines) {
-    printer.println(lineText)
-  }
-  if (payload.organizationAddress) printer.println(payload.organizationAddress)
-  printer.println(`Xizmata: ${payload.waiterName}`)
-  if (payload.organizationPhone) printer.println(`Tel: ${payload.organizationPhone}`)
-  printer.drawLine()
-
   printer.alignLeft()
-  printer.leftRight(`CHEK №: ${receiptNo}`, `STOL: ${payload.tableName}`)
-  printer.leftRight(`SANA: ${date}`, `VAQT: ${time}`)
-  printer.drawLine()
-
-  printer.tableCustom([
-    { text: 'BUYURTMALAR', align: 'LEFT', width: 0.56, bold: true },
-    { text: 'SONI', align: 'CENTER', width: 0.14, bold: true },
-    { text: 'SUMMA', align: 'RIGHT', width: 0.30, bold: true }
-  ])
-  printer.drawLine()
-
-  for (const item of payload.items) {
-    printer.tableCustom([
-      { text: item.name, align: 'LEFT', width: 0.56 },
-      { text: fmtQty(item.quantity), align: 'CENTER', width: 0.14 },
-      { text: `${fmt(item.total)} so'm`, align: 'RIGHT', width: 0.30 }
-    ])
-  }
-  printer.drawLine()
-
-  if (payload.serviceFee > 0) {
-    printer.tableCustom([
-      { text: `Xizmat (${payload.serviceFeePercent}%)`, align: 'LEFT', width: 0.56 },
-      { text: '', align: 'CENTER', width: 0.14 },
-      { text: `${fmt(payload.serviceFee)} so'm`, align: 'RIGHT', width: 0.30 }
-    ])
-    printer.drawLine()
-  }
-
-  printer.bold(true)
-  printer.tableCustom([
-    { text: 'JAMI:', align: 'LEFT', width: 0.35, bold: true },
-    { text: `${fmt(payload.total)} so'm`, align: 'RIGHT', width: 0.65, bold: true }
-  ])
-  printer.bold(false)
-  printer.drawLine()
-
-  printer.alignCenter()
-  for (const lineText of footerLines) {
+  for (const lineText of lines) {
+    if (lineText.trim().startsWith('JAMI:')) {
+      printer.bold(true)
+      printer.println(lineText)
+      printer.bold(false)
+      continue
+    }
     printer.println(lineText)
   }
   if (payload.receiptQrText) {
+    printer.alignCenter()
     printer.newLine()
     printer.printQR(payload.receiptQrText, { cellSize: 5, correction: 'M', model: 2 })
     printer.newLine()
   }
-  if (payload.receiptQrLabel) {
-    printer.println(payload.receiptQrLabel)
-  }
-
   printer.cut()
 }
 
@@ -571,7 +633,7 @@ async function buildThermalBuffer(payload: ReceiptPayload): Promise<Buffer | nul
   const printer = new ThermalPrinter({
     type: PrinterTypes.EPSON,
     interface: join(tmpdir(), `afisant-buffer-${Date.now()}.tmp`),
-    width: 42,
+    width: RECEIPT_WIDTH,
     characterSet: 'PC866_CYRILLIC2',
     removeSpecialCharacters: false,
     lineCharacter: '-'
@@ -592,53 +654,151 @@ async function buildReceiptBuffer(payload: ReceiptPayload): Promise<Buffer> {
 }
 
 async function printViaWindowsDocument(payload: ReceiptPayload, printerName: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const textFile = join(tmpdir(), `afisant-receipt-${Date.now()}.txt`)
+  const jsonFile = join(tmpdir(), `afisant-receipt-${Date.now()}.json`)
   const scriptFile = join(tmpdir(), `afisant-receipt-${Date.now()}.ps1`)
+  const templatePath = resolveReceiptTemplatePath()
   const logoPath = resolveReceiptLogoPath()
-  const receiptText = buildReceiptText(payload)
   const safePrinterName = printerName.replace(/'/g, "''")
-  const safeTextFile = textFile.replace(/'/g, "''")
+  const safeJsonFile = jsonFile.replace(/'/g, "''")
+  const safeTemplatePath = (templatePath ?? '').replace(/'/g, "''")
   const safeLogoPath = (logoPath ?? '').replace(/'/g, "''")
-  const paperHeight = Math.max(700, 220 + receiptText.split(/\r?\n/).length * 22)
+  const { date, time } = fmtDateTime(payload.printedAt)
+  const receiptNo = formatReceiptNo(payload.orderLocalUuid, payload.receiptNumber)
+
+  const itemRows = payload.items.flatMap((item) => {
+    const nameLines = wrapText(item.name, 18)
+    return nameLines.map((name, index) => ({
+      name,
+      quantity: index === 0 ? fmtQty(item.quantity) : '',
+      total: index === 0 ? `${fmt(item.total)} so'm` : '',
+      primary: index === 0
+    }))
+  })
+  if (payload.serviceFee > 0) {
+    itemRows.push({
+      name: `Xizmat (${payload.serviceFeePercent}%)`,
+      quantity: '',
+      total: `${fmt(payload.serviceFee)} so'm`,
+      primary: true
+    })
+  }
+
+  const renderModel = {
+    organizationAddress: payload.organizationAddress ?? '',
+    waiterName: payload.waiterName,
+    organizationPhone: payload.organizationPhone ?? '',
+    receiptNo,
+    tableName: payload.tableName,
+    date,
+    time,
+    items: itemRows,
+    total: `${fmt(payload.total)} so'm`,
+    footerLines: splitLines(payload.receiptFooter),
+    qrLabel: payload.receiptQrLabel ?? ''
+  }
 
   const script = [
     "Add-Type -AssemblyName System.Drawing",
     `$printerName = '${safePrinterName}'`,
-    `$textFile = '${safeTextFile}'`,
+    `$jsonFile = '${safeJsonFile}'`,
+    `$templatePath = '${safeTemplatePath}'`,
     `$logoPath = '${safeLogoPath}'`,
-    '$lines = Get-Content -Path $textFile',
+    '$data = Get-Content -Path $jsonFile -Raw | ConvertFrom-Json',
     '$doc = New-Object System.Drawing.Printing.PrintDocument',
     '$doc.PrinterSettings.PrinterName = $printerName',
     '$doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController',
-    `$doc.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize('AfisantReceipt', 315, ${paperHeight})`,
+    "$doc.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize('AfisantReceipt', 300, 620)",
     '$doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(6, 6, 6, 6)',
     '$doc.add_PrintPage({',
     '  param($sender, $e)',
-    '  $y = 8',
-    '  if ($logoPath -and (Test-Path $logoPath)) {',
-    '    $img = [System.Drawing.Image]::FromFile($logoPath)',
-    '    try {',
-    '      $targetWidth = 140',
-    '      $targetHeight = [int]($img.Height * ($targetWidth / $img.Width))',
-    '      $x = [int](($e.PageBounds.Width - $targetWidth) / 2)',
-    '      $e.Graphics.DrawImage($img, $x, $y, $targetWidth, $targetHeight)',
-    '      $y += $targetHeight + 8',
-    '    } finally {',
-    '      $img.Dispose()',
-    '    }',
-    '  }',
-    "  $font = New-Object System.Drawing.Font('Consolas', 10)",
-    "  $bold = New-Object System.Drawing.Font('Consolas', 11, [System.Drawing.FontStyle]::Bold)",
+    '  $e.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality',
+    '  $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic',
+    '  $e.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality',
+    '  $e.Graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit',
+    '  $left = $e.MarginBounds.Left',
+    '  $printableWidth = $e.MarginBounds.Width',
+    '  $template = if ($templatePath -and (Test-Path $templatePath)) { [System.Drawing.Image]::FromFile($templatePath) } elseif ($logoPath -and (Test-Path $logoPath)) { [System.Drawing.Image]::FromFile($logoPath) } else { $null }',
     '  try {',
-    '    foreach ($line in $lines) {',
-    "      $currentFont = if ($line.Trim().StartsWith('JAMI:') -or $line.Trim().StartsWith('CHEK')) { $bold } else { $font }",
-    '      $e.Graphics.DrawString($line, $currentFont, [System.Drawing.Brushes]::Black, 8, $y)',
-    '      $y += [int]([Math]::Ceiling($currentFont.GetHeight($e.Graphics))) + 2',
+    '    if ($template) {',
+    '      $targetWidth = [Math]::Min(264, $printableWidth)',
+    '      $targetHeight = [int]($template.Height * ($targetWidth / $template.Width))',
+    '      $x = [int]($left + (($printableWidth - $targetWidth) / 2))',
+    '      $y = $e.MarginBounds.Top',
+    '      $bitmap = New-Object System.Drawing.Bitmap($template.Width, $template.Height)',
+    '      $gfx = [System.Drawing.Graphics]::FromImage($bitmap)',
+    '      try {',
+    '        $gfx.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality',
+    '        $gfx.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic',
+    '        $gfx.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality',
+    '        $gfx.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit',
+    '        $gfx.DrawImage($template, 0, 0, $template.Width, $template.Height)',
+    '        $black = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Black)',
+    '        $center = New-Object System.Drawing.StringFormat',
+    '        $center.Alignment = [System.Drawing.StringAlignment]::Center',
+    '        $center.LineAlignment = [System.Drawing.StringAlignment]::Center',
+    '        $leftFmt = New-Object System.Drawing.StringFormat',
+    '        $leftFmt.Alignment = [System.Drawing.StringAlignment]::Near',
+    '        $leftFmt.LineAlignment = [System.Drawing.StringAlignment]::Center',
+    '        $rightFmt = New-Object System.Drawing.StringFormat',
+    '        $rightFmt.Alignment = [System.Drawing.StringAlignment]::Far',
+    '        $rightFmt.LineAlignment = [System.Drawing.StringAlignment]::Center',
+    "        $fontSmall = New-Object System.Drawing.Font('Arial', 28, [System.Drawing.FontStyle]::Regular)",
+    "        $fontMeta = New-Object System.Drawing.Font('Arial', 31, [System.Drawing.FontStyle]::Bold)",
+    "        $fontItem = New-Object System.Drawing.Font('Arial', 26, [System.Drawing.FontStyle]::Regular)",
+    "        $fontTotal = New-Object System.Drawing.Font('Arial', 40, [System.Drawing.FontStyle]::Bold)",
+    '        try {',
+    '          $gfx.DrawString([string]$data.organizationAddress, $fontSmall, $black, (New-Object System.Drawing.RectangleF(184, 621, 520, 44)), $center)',
+    '          $gfx.DrawString(("Xizmata: " + [string]$data.waiterName), $fontSmall, $black, (New-Object System.Drawing.RectangleF(184, 680, 520, 44)), $center)',
+    '          $gfx.DrawString(("Tel: " + [string]$data.organizationPhone), $fontSmall, $black, (New-Object System.Drawing.RectangleF(184, 739, 520, 44)), $center)',
+    '          $gfx.DrawString([string]$data.receiptNo, $fontMeta, $black, (New-Object System.Drawing.RectangleF(205, 850, 160, 48)), $leftFmt)',
+    '          $gfx.DrawString([string]$data.tableName, $fontMeta, $black, (New-Object System.Drawing.RectangleF(712, 850, 74, 48)), $rightFmt)',
+    '          $gfx.DrawString([string]$data.date, $fontMeta, $black, (New-Object System.Drawing.RectangleF(150, 946, 210, 48)), $leftFmt)',
+    '          $gfx.DrawString([string]$data.time, $fontMeta, $black, (New-Object System.Drawing.RectangleF(635, 946, 152, 48)), $rightFmt)',
+    '          $rowY = 1138',
+    '          foreach ($row in $data.items) {',
+    '            $gfx.DrawString([string]$row.name, $fontItem, $black, (New-Object System.Drawing.RectangleF(100, $rowY, 335, 40)), $leftFmt)',
+    '            if ([string]$row.quantity) { $gfx.DrawString([string]$row.quantity, $fontItem, $black, (New-Object System.Drawing.RectangleF(468, $rowY, 72, 40)), $center) }',
+    '            if ([string]$row.total) { $gfx.DrawString([string]$row.total, $fontItem, $black, (New-Object System.Drawing.RectangleF(586, $rowY, 196, 40)), $rightFmt) }',
+    '            $rowY += 45',
+    '          }',
+    '          $gfx.DrawString([string]$data.total, $fontTotal, $black, (New-Object System.Drawing.RectangleF(520, 1455, 248, 60)), $rightFmt)',
+    '        } finally {',
+        '          $fontSmall.Dispose()',
+        '          $fontMeta.Dispose()',
+        '          $fontItem.Dispose()',
+        '          $fontTotal.Dispose()',
+        '          $black.Dispose()',
+    '          $center.Dispose()',
+    '          $leftFmt.Dispose()',
+    '          $rightFmt.Dispose()',
+    '        }',
+    '        $e.Graphics.DrawImage($bitmap, $x, $y, $targetWidth, $targetHeight)',
+    '      } finally {',
+    '        $gfx.Dispose()',
+    '        $bitmap.Dispose()',
+    '      }',
+    '    } else {',
+    "      $font = New-Object System.Drawing.Font('Consolas', 8.5)",
+    "      $bold = New-Object System.Drawing.Font('Consolas', 9.5, [System.Drawing.FontStyle]::Bold)",
+    '      try {',
+    '        $lines = @()',
+    '        $lines += [string]$data.organizationAddress',
+    '        $lines += ("Xizmata: " + [string]$data.waiterName)',
+    '        $lines += ("Tel: " + [string]$data.organizationPhone)',
+    '        $lines += ("CHEK No: " + [string]$data.receiptNo)',
+    '        foreach ($line in $lines) {',
+    "          $currentFont = if ($line.Trim().StartsWith('CHEK')) { $bold } else { $font }",
+    '          $e.Graphics.DrawString($line, $currentFont, [System.Drawing.Brushes]::Black, [float]$left, [float]$y)',
+    '          $y += [int]([Math]::Ceiling($currentFont.GetHeight($e.Graphics))) + 2',
+    '        }',
+    '      } finally {',
+    '        $font.Dispose()',
+    '        $bold.Dispose()',
+    '      }',
     '    }',
     '  } finally {',
-    '    $font.Dispose()',
-    '    $bold.Dispose()',
-    '  }',
+    '    if ($template) { $template.Dispose() }',
+    '    }',
     '  $e.HasMorePages = $false',
     '})',
     'try {',
@@ -649,7 +809,7 @@ async function printViaWindowsDocument(payload: ReceiptPayload, printerName: str
   ].join("\r\n")
 
   try {
-    writeFileSync(textFile, receiptText, 'utf8')
+    writeFileSync(jsonFile, JSON.stringify(renderModel), 'utf8')
     writeFileSync(scriptFile, script, 'utf8')
     execSync(`powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${scriptFile}"`, {
       timeout: 20000,
@@ -663,7 +823,7 @@ async function printViaWindowsDocument(payload: ReceiptPayload, printerName: str
       error: `Windows printer xatosi (${printerName}):\n${msg}`
     }
   } finally {
-    try { unlinkSync(textFile) } catch { /* ignore */ }
+    try { unlinkSync(jsonFile) } catch { /* ignore */ }
     try { unlinkSync(scriptFile) } catch { /* ignore */ }
   }
 }
@@ -704,7 +864,7 @@ async function printViaThermalLib(payload: ReceiptPayload): Promise<{ ok: true }
       type: PrinterTypes.EPSON,
       interface: iface,
       driver,
-      width: 42,
+      width: RECEIPT_WIDTH,
       characterSet: 'PC866_CYRILLIC2',
       removeSpecialCharacters: false
     })
@@ -722,64 +882,37 @@ async function printViaThermalLib(payload: ReceiptPayload): Promise<{ ok: true }
 export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true } | { ok: false; error: string }> {
   const s = getSettings()
   if (!s.printerType) return { ok: false, error: 'Printer sozlanmagan' }
-  const receiptBuffer = await buildReceiptBuffer(payload)
 
-  // Linux USB: to'g'ridan device pathga yozish (ESC/POS raw)
-  if (s.printerType === 'usb' && process.platform !== 'win32') {
+  const dailyNo = nextDailyReceiptNo()
+  const p: ReceiptPayload = { ...payload, receiptNumber: dailyNo }
+
+  if (process.platform === 'win32') {
+    // Windows: template mavjud bo'lsa — FAQAT document yo'l (ikki marta chiqmasligi uchun USB parallel ishlatilmaydi)
+    const templatePath = resolveReceiptTemplatePath()
+    if (templatePath && s.printerName) {
+      return printViaWindowsDocument(p, s.printerName)
+    }
+    // Template yo'q: raw ESC/POS USB portga
+    const rawPort = resolveWindowsRawPort()
+    if (rawPort) {
+      const receiptBuffer = await buildReceiptBuffer(p)
+      return printRawWindowsPort(receiptBuffer, rawPort)
+    }
+    // Oxirgi fallback: Windows document (template siz)
+    if (s.printerName) {
+      return printViaWindowsDocument(p, s.printerName)
+    }
+    return { ok: false, error: 'Printer sozlanmagan: USB port (USB001/USB002) yoki printer nomi kiritilmagan' }
+  }
+
+  // Linux USB
+  if (s.printerType === 'usb') {
+    const receiptBuffer = await buildReceiptBuffer(p)
     return printRaw(receiptBuffer)
   }
 
-  // Windows thermal printerlar odatda USB001/USB002 portiga ulangan bo'ladi.
-  // Agar printer nomidan USB portni aniqlasak, WINDOWS rejimida ham raw ESC/POS ishlatamiz.
-  if (process.platform === 'win32' && (s.printerType === 'usb' || s.printerType === 'windows')) {
-    const rawPort = resolveWindowsRawPort()
-    if (rawPort) {
-      const rawResult = await printRawWindowsPort(receiptBuffer, rawPort)
-      if (rawResult.ok) return rawResult
-
-      if (s.printerName) {
-        const windowsDoc = await printViaWindowsDocument(payload, s.printerName)
-        if (windowsDoc.ok) return windowsDoc
-      }
-
-      if (s.printerType === 'usb') return rawResult
-
-      const fallback = await printViaThermalLib(payload)
-      if (fallback.ok) return fallback
-
-      return {
-        ok: false,
-        error: `${rawResult.error}\n\nWindows printer fallback ham ishlamadi:\n${fallback.error}`
-      }
-    }
-  }
-
-  // Old konfiguratsiyalarda Windows printer nomi USB turiga tushib qolgan bo'lishi mumkin.
-  if (
-    s.printerType === 'usb' &&
-    process.platform === 'win32' &&
-    (!s.printerDevicePath || !/^USB\d+$/i.test(s.printerDevicePath)) &&
-    s.printerName
-  ) {
-    return printViaThermalLib(payload)
-  }
-
-  // Windows USB: driver siz, copy /b orqali USB portiga to'g'ridan yozish
-  if (s.printerType === 'usb' && process.platform === 'win32') {
-    const rawResult = await printRawWindows(receiptBuffer)
-    if (rawResult.ok || !s.printerName) return rawResult
-
-    const fallback = await printViaThermalLib(payload)
-    if (fallback.ok) return fallback
-
-    return {
-      ok: false,
-      error: `${rawResult.error}\n\nWindows printer fallback ham ishlamadi:\n${fallback.error}`
-    }
-  }
-
-  // Network + Windows driver: node-thermal-printer orqali
-  return printViaThermalLib(payload)
+  // Network
+  return printViaThermalLib(p)
 }
 
 export async function testPrint(): Promise<{ ok: true } | { ok: false; error: string }> {
