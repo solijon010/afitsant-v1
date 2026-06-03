@@ -204,16 +204,70 @@ export default function OrderPage(): JSX.Element {
   }, [categories])
 
   /* Mahsulotlar — dublikatsiz */
+  /* Mahsulot nomidan litr/hajmni chiqarish */
+  const extractVolume = (name: string): number => {
+    // "1.L", "2.L", "1.5L", "2 L" hammasi uchun ishlaydi
+    const m = name.match(/(\d+(?:[.,]\d+)?)\s*\.?\s*[Ll]/i)
+    return m ? parseFloat(m[1].replace(',', '.')) : 999
+  }
+
+  /* Kategoriya ichidagi tartib: Asosiy → sortOrder, Salatlar → maxsus, Ichimliklar → hajm bo'yicha */
+  /* Aniq mos kelish — uzunroq pattern avval tekshiriladi */
+  const exactOrder = (name: string, orders: string[]): number => {
+    const sorted = [...orders].map((s, i) => ({ s, i })).sort((a, b) => b.s.length - a.s.length)
+    for (const { s, i } of sorted) {
+      if (name.includes(s)) return i
+    }
+    return 99
+  }
+
+  const SALATLAR_ORDER = ['katta salat', 'qalampir', 'kichik salat']
+  // Non 4000 → Choy → Salfetka → Nam Salfetka → Kata Non
+  // 'kata non' avval tekshiriladi (uzunroq), keyin 'non'
+  const ASOSIY_ORDER = ['non', 'choy', 'salfetka', 'nam salfetka', 'kata non']
+  const GOSHT_ORDER = ['qiyma', "go'sht", "qo'y"]
+
   const shownProducts = useMemo<Product[]>(() => {
     const list = products.filter((p) => p.categoryId === activeCatId)
     const seen = new Set<string>()
-    return list.filter(p => {
+    const unique = list.filter(p => {
       const key = (p.nameUzLatn ?? '').toLowerCase().trim()
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
-  }, [products, activeCatId])
+
+    const catName = (categories.find(c => c.id === activeCatId)?.nameUzLatn ?? '').toLowerCase()
+
+    return [...unique].sort((a, b) => {
+      const an = (a.nameUzLatn ?? '').toLowerCase()
+      const bn = (b.nameUzLatn ?? '').toLowerCase()
+
+      if (catName.includes('salat')) {
+        const ai = exactOrder(an, SALATLAR_ORDER)
+        const bi = exactOrder(bn, SALATLAR_ORDER)
+        if (ai !== 99 || bi !== 99) return ai - bi
+      }
+      if (catName.includes('asosiy')) {
+        const ai = exactOrder(an, ASOSIY_ORDER)
+        const bi = exactOrder(bn, ASOSIY_ORDER)
+        if (ai !== 99 || bi !== 99) return ai - bi
+      }
+      if (catName.includes("go'sht") || catName.includes('gosht')) {
+        const ai = exactOrder(an, GOSHT_ORDER)
+        const bi = exactOrder(bn, GOSHT_ORDER)
+        if (ai !== 99 || bi !== 99) return ai - bi
+      }
+      if (catName.includes('ichimlik')) {
+        // 2L birinchi, 1.5L ikkinchi, 1L uchinchi, qolganlar oxirida
+        const av = extractVolume(a.nameUzLatn ?? '')
+        const bv = extractVolume(b.nameUzLatn ?? '')
+        if (av !== bv) return bv - av  // katta hajm birinchi
+      }
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, activeCatId, categories])
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {

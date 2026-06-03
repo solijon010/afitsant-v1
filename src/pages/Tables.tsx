@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useTheme } from '@/stores/theme'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Building2, LogOut, Moon, Settings, Sun, UtensilsCrossed, Utensils, Wifi, User } from 'lucide-react'
+import { Building2, LogOut, Settings, UtensilsCrossed, Utensils, Wifi, User } from 'lucide-react'
 import hisobchimLogo from '@/assets/logo.png'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
-import { useTheme } from '@/stores/theme'
 import { fmtMoney, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import StatusBar from '@/components/StatusBar'
@@ -69,7 +67,6 @@ export default function TablesPage(): JSX.Element {
   const waiter = useAuth((s) => s.waiter)
   const settings = useSettings((s) => s.settings)
   const { areas, snapshot, load, activeAreaId, setActiveAreaId } = useTables()
-  const { dark, toggle: toggleDark } = useTheme()
 
   useEffect(() => {
     void load()
@@ -89,7 +86,7 @@ export default function TablesPage(): JSX.Element {
 
   /* Aktiv areadagi stollar — prefix bo'yicha guruhlangan */
   const groupedByPrefix = useMemo(() => {
-    const list = activeAreaId !== null
+    const list = activeAreaId !== null && activeAreaId !== -1
       ? sortTables(grouped.get(activeAreaId) ?? [])
       : sortTables(Array.from(grouped.values()).flat())
     const map = new Map<string, TableWithOrder[]>()
@@ -138,22 +135,22 @@ export default function TablesPage(): JSX.Element {
         </div>
 
         {/* Area list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {/* Barchasi */}
           <button
-            onClick={toggleDark}
-            title={dark ? 'Yorqin rejim' : 'Qorong\'i rejim'}
-            className="btn-ghost h-10 w-10 p-0"
-          >
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-          <button
-            onClick={() => navigate('/settings')}
-            className="inline-flex items-center gap-2 rounded-xl border border-line bg-bg-card px-4 py-2.5 text-sm font-semibold text-ink hover:bg-bg-elevated hover:border-line-strong transition-all shadow-sm"
+            onClick={() => setActiveAreaId(-1)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 12px', borderRadius: 10,
+              border: 'none', outline: 'none', cursor: 'pointer',
+              background: activeAreaId === -1 || activeAreaId === null ? '#e11d48' : 'rgba(255,255,255,0.06)',
+              color: activeAreaId === -1 || activeAreaId === null ? '#fff' : 'rgba(255,255,255,0.7)',
+              fontSize: 13, fontWeight: 600, transition: 'all .15s',
+            }}
           >
             <span>Barchasi</span>
             {totalOccupied > 0 && (
-              <span style={{ background: activeAreaId === null ? '#fff' : '#2563eb', color: activeAreaId === null ? '#2563eb' : '#fff', borderRadius: 99, fontSize: 11, fontWeight: 700, padding: '2px 8px', minWidth: 24, textAlign: 'center' }}>
+              <span style={{ background: activeAreaId === -1 || activeAreaId === null ? 'rgba(255,255,255,0.25)' : '#e11d48', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '1px 7px', minWidth: 20, textAlign: 'center' }}>
                 {totalOccupied}
               </span>
             )}
