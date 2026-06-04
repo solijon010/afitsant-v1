@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
   ChefHat,
   CupSoda,
-  Delete,
   Flame,
   Leaf,
   Minus,
@@ -36,7 +34,7 @@ const CAT_ICON: Record<string, JSX.Element> = {
   plus: <Plus size={18} />,
   'cup-soda': <CupSoda size={18} />,
   flame: <Flame size={18} />,
-  'chef-hat': <ChefHat size={18} />
+  'chef-hat': <ChefHat size={18} />,
 }
 
 export default function OrderPage(): JSX.Element {
@@ -111,7 +109,7 @@ export default function OrderPage(): JSX.Element {
 
           // Local yoq — server buyurtmasini yuklaymiz
           const serverLines = existingOrder.items.map<CartLine>((it) => {
-            const product = products.find((p) => p.id === it.productId || p.serverId === it.serverId)
+            const product = products.find((p) => p.id === it.productId || (it.serverId != null && p.serverId === it.serverId))
             return {
               localUuid: it.localUuid,
               productId: it.productId,
@@ -345,7 +343,6 @@ export default function OrderPage(): JSX.Element {
             } else {
               toast.warning(`Server bilan ulanib bo'lmadi — mahalliy saqlandi`)
             }
-            console.warn('[ORDER] syncAll xato (mahalliy saqlandi):', msg)
           }
         } else if (cart.lines.length > 0) {
           // Mahsulotlarda server_id yo'q — fullPull kerak
@@ -441,7 +438,6 @@ export default function OrderPage(): JSX.Element {
               }))
             })
             serverOrderId = res.serverId
-            console.log('[ORDER] Close sync OK, serverId:', serverOrderId)
           } catch (e: any) {
             toast.warning(`Server sync xatosi: ${e?.message ?? 'ulanish yo\'q'}`)
           }
@@ -547,13 +543,8 @@ export default function OrderPage(): JSX.Element {
           <p style={{ margin: '2px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Buyurtma</p>
         </div>
 
-        {/* Kategoriyalar label */}
-        <div style={{ padding: '12px 10px 5px' }}>
-          <p style={{ margin: 0, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Kategoriyalar</p>
-        </div>
-
         {/* Kategoriyalar list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {sortedCategories.map((c) => (
             <CategoryBtn
               key={c.id}
@@ -565,7 +556,7 @@ export default function OrderPage(): JSX.Element {
         </nav>
 
         {/* User info */}
-        <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+        <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#ffffff', lineHeight: 1.3 }}>{waiter.firstName} {waiter.lastName}</p>
           <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {waiter.role === 'manager' ? 'Manager' : 'Afitsant'}
@@ -574,7 +565,7 @@ export default function OrderPage(): JSX.Element {
       </aside>
 
       {/* ── MARKAZ: Mahsulotlar ── */}
-      <section style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f1f5f9' }}>
+      <section style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#D2D0D1' }}>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px' }}>
           {shownProducts.length === 0 ? (
             <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#94a3b8' }}>
@@ -600,23 +591,21 @@ export default function OrderPage(): JSX.Element {
         saving={saving}
       />
 
-      <AnimatePresence>
-        {confirmClose && (
-          <ConfirmCloseModal
-            onCancel={() => setConfirmClose(false)}
-            onConfirm={handleCloseAndPrint}
-            total={cart.total()}
-            busy={printing}
-          />
-        )}
-        {confirmCancel && (
-          <ConfirmCancelModal
-            onCancel={() => setConfirmCancel(false)}
-            onConfirm={handleCancel}
-            busy={saving}
-          />
-        )}
-      </AnimatePresence>
+      {confirmClose && (
+        <ConfirmCloseModal
+          onCancel={() => setConfirmClose(false)}
+          onConfirm={handleCloseAndPrint}
+          total={cart.total()}
+          busy={printing}
+        />
+      )}
+      {confirmCancel && (
+        <ConfirmCancelModal
+          onCancel={() => setConfirmCancel(false)}
+          onConfirm={handleCancel}
+          busy={saving}
+        />
+      )}
     </div>
   )
 }
@@ -627,11 +616,11 @@ function CategoryBtn({ label, active, onClick }: { label: string; active: boolea
       onClick={onClick}
       style={{
         width: '100%', padding: '11px 12px', borderRadius: 10,
-        border: active ? '1.5px solid #2563eb' : '1.5px solid rgba(255,255,255,0.08)',
+        border: active ? '1.5px solid #16a34a' : '1.5px solid rgba(255,255,255,0.08)',
         cursor: 'pointer', textAlign: 'left', fontSize: 15, fontWeight: 700,
-        background: active ? '#2563eb' : 'rgba(255,255,255,0.05)',
+        background: active ? '#16a34a' : 'rgba(255,255,255,0.05)',
         color: '#fff', lineHeight: 1.3,
-        boxShadow: active ? '0 2px 10px rgba(37,99,235,0.4)' : 'none',
+        boxShadow: active ? '0 2px 10px rgba(22,163,74,0.4)' : 'none',
       }}
     >
       {label}
@@ -706,15 +695,10 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
 
   return (
     <>
-      <motion.div
+      <div
         onClick={handleClick}
-        onHoverStart={() => setHovered(true)}
-        onHoverEnd={() => setHovered(false)}
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: idx * 0.012 }}
-        whileTap={{ scale: 0.96 }}
-        whileHover={{ y: -3, transition: { duration: 0.12 } }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
           position: 'relative',
           display: 'flex',
@@ -723,16 +707,13 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
           borderRadius: 14,
           cursor: 'pointer',
           background: '#ffffff',
-          border: qty > 0 || hovered ? '2px solid #2563eb' : '2px solid #e2e8f0',
+          border: '2px solid #e2e8f0',
           boxShadow: qty > 0 ? '0 4px 16px rgba(37,99,235,0.18)' : hovered ? '0 6px 20px rgba(37,99,235,0.15)' : '0 2px 6px rgba(0,0,0,0.07)',
           transition: 'border .15s, box-shadow .18s',
           userSelect: 'none',
         }}
       >
         {/* Aktiv holat — yuqori chiziq */}
-        {qty > 0 && (
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: '#2563eb', zIndex: 1 }} />
-        )}
 
         {/* Miqdor badge */}
         {qtyLabel && (
@@ -773,17 +754,15 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             </span>
           </p>
         </div>
-      </motion.div>
+      </div>
 
-      <AnimatePresence>
-        {showKgModal && (
-          <KgModal
-            product={product}
-            onClose={() => setShowKgModal(false)}
-            onAdd={(weight) => { add(product, weight); setShowKgModal(false) }}
-          />
-        )}
-      </AnimatePresence>
+      {showKgModal && (
+        <KgModal
+          product={product}
+          onClose={() => setShowKgModal(false)}
+          onAdd={(weight) => { add(product, weight); setShowKgModal(false) }}
+        />
+      )}
     </>
   )
 }
@@ -840,11 +819,10 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.45)' }} onClick={onClose}>
-      <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }} transition={{ duration: 0.15 }}
+      <div
         onClick={(e) => e.stopPropagation()}
         style={{ width: 300, borderRadius: 20, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.28)', overflow: 'hidden' }}>
 
@@ -931,8 +909,8 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
             + Qo'shish {canAdd ? `(${finalKg.toFixed(2).replace(/\.?0+$/, '')} kg)` : ''}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }
 
@@ -1029,12 +1007,8 @@ function CartPanel({
 
       {/* Savat yoki tarix */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px', background: '#f8fafc' }}>
-        <AnimatePresence mode="wait">
-          {showHistory ? (
-            <motion.div key="history"
-              initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
-              transition={{ duration: 0.15 }}
-            >
+        {showHistory ? (
+          <div>
               <p style={{ margin: '4px 4px 8px', fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 {table.name} — Zakazlar tarixi
               </p>
@@ -1043,13 +1017,9 @@ function CartPanel({
                   <HistoryEntryRow key={entry.id} entry={entry} />
                 ))}
               </ul>
-            </motion.div>
-          ) : (
-            <motion.div key="cart"
-              initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
-              transition={{ duration: 0.15 }}
-              style={{ height: lines.length === 0 ? '100%' : undefined }}
-            >
+          </div>
+        ) : (
+          <div style={{ height: lines.length === 0 ? '100%' : undefined }}>
               {lines.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10 }}>
                   <div style={{ width: 52, height: 52, borderRadius: 16, background: '#eff6ff', display: 'grid', placeItems: 'center' }}>
@@ -1094,9 +1064,8 @@ function CartPanel({
                   ))}
                 </ul>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
@@ -1162,27 +1131,20 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }): JSX.Element {
         </div>
         <p className="shrink-0 text-sm font-bold text-brand-success">{fmtMoney(entry.total)} so'm</p>
       </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            exit={{ height: 0 }}
-            className="overflow-hidden border-t border-line"
-          >
-            <ul className="space-y-1 px-3 py-2">
-              {entry.items.map((item, i) => (
-                <li key={i} className="flex items-baseline justify-between text-xs">
-                  <span className="flex-1 truncate text-ink-soft">{item.name}</span>
-                  <span className="ml-2 shrink-0 font-medium">
-                    {item.quantity} × {fmtMoney(item.unitPrice)} = {fmtMoney(item.total)} so'm
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {open && (
+        <div className="overflow-hidden border-t border-line">
+          <ul className="space-y-1 px-3 py-2">
+            {entry.items.map((item, i) => (
+              <li key={i} className="flex items-baseline justify-between text-xs">
+                <span className="flex-1 truncate text-ink-soft">{item.name}</span>
+                <span className="ml-2 shrink-0 font-medium">
+                  {item.quantity} × {fmtMoney(item.unitPrice)} = {fmtMoney(item.total)} so'm
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </li>
   )
 }
@@ -1231,17 +1193,11 @@ function ConfirmCancelModal({
   busy: boolean
 }): JSX.Element {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+    <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm"
       onClick={onCancel}
     >
-      <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
+      <div
         onClick={(e) => e.stopPropagation()}
         className="card w-full max-w-sm p-6"
       >
@@ -1264,8 +1220,8 @@ function ConfirmCancelModal({
             <Ban size={14} /> {busy ? 'Bekor qilinmoqda…' : 'Ha, bekor qilish'}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }
 
@@ -1281,17 +1237,11 @@ function ConfirmCloseModal({
   busy: boolean
 }): JSX.Element {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+    <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm"
       onClick={onCancel}
     >
-      <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
+      <div
         onClick={(e) => e.stopPropagation()}
         className="card-elevated w-full max-w-sm p-6"
       >
@@ -1314,7 +1264,7 @@ function ConfirmCloseModal({
             <Printer size={14} /> {busy ? 'Chiqarilmoqda…' : 'Tasdiqlash'}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }
