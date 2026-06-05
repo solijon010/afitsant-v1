@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/stores/auth'
 import { useMenu } from '@/stores/menu'
 import { useTables } from '@/stores/tables'
-import loginBg from '@/assets/manzara-foto.png'
+import loginBg from '@/assets/cccccccc (1)11.png'
 import hisobchimLogo from '@/assets/logo.png'
 import LoginForm from '@/components/LoginForm'
 
@@ -63,48 +63,77 @@ export default function LoginPage(): JSX.Element {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#060f06]">
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
 
-      {/* Fon rasmi */}
-      <img
-        src={loginBg}
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: 'brightness(0.55) saturate(1.1)' }}
-      />
-      {/* Qorang'ilik overlay */}
-      <div className="absolute inset-0 bg-black/35" />
-      {/* Oltin chiziqlar */}
-      <div className="absolute left-0 top-0 h-full w-0.5" style={{ background: 'linear-gradient(to bottom,transparent 5%,#f5c842 50%,transparent 95%)' }} />
-      <div className="absolute right-0 top-0 h-full w-0.5" style={{ background: 'linear-gradient(to bottom,transparent 5%,#f5c842 50%,transparent 95%)' }} />
+      {/* ── CHAP: Forma panel ── */}
+      <div style={{
+        width: 400, flexShrink: 0,
+        background: '#0a0d0a',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '40px 36px',
+        position: 'relative', zIndex: 2,
+        boxShadow: '6px 0 40px rgba(0,0,0,0.7)',
+      }}>
+        {/* Oltin chiziqlar */}
+        <div style={{ position: 'absolute', left: 0, top: 0, width: 3, height: '100%', background: 'linear-gradient(to bottom, transparent 5%, #f5c842 50%, transparent 95%)' }} />
+        <div style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', background: 'linear-gradient(to bottom, transparent 5%, rgba(245,200,66,0.4) 50%, transparent 95%)' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 3, background: 'linear-gradient(to right, #f5c842 0%, transparent 100%)' }} />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: 3, background: 'linear-gradient(to right, #f5c842 0%, transparent 100%)' }} />
 
-      {/* Kontent */}
-      <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center px-6">
-
-        {/* Logo doira */}
-        <div
-          className="mb-5 overflow-hidden rounded-full"
-          style={{
-            width: 148, height: 148, flexShrink: 0,
-            border: '3px solid #f5c842',
-            boxShadow: '0 0 0 8px rgba(245,200,66,0.13), 0 10px 40px rgba(0,0,0,0.8)',
-          }}
-        >
-          <img src={hisobchimLogo} alt="Hisobchim" className="h-full w-full object-cover" />
+        {/* Logo */}
+        <div style={{
+          width: 120, height: 120, borderRadius: '50%', overflow: 'hidden', marginBottom: 16, flexShrink: 0,
+          border: '3px solid #f5c842',
+          boxShadow: '0 0 0 7px rgba(245,200,66,0.12), 0 0 36px rgba(245,200,66,0.22), 0 10px 40px rgba(0,0,0,0.9)',
+        }}>
+          <img src={hisobchimLogo} alt="Hisobchim" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
         {/* Sarlavha */}
-        <h1
-          className="mb-6 text-[36px] font-black uppercase tracking-[0.12em]"
-          style={{ color: '#f5c842', fontFamily: 'Georgia,serif', textShadow: '0 3px 14px rgba(0,0,0,0.95)' }}
-        >
+        <h1 style={{
+          margin: '0 0 4px', fontSize: 34, fontWeight: 900, textTransform: 'uppercase',
+          letterSpacing: '0.16em', color: '#f5c842',
+          fontFamily: 'Georgia, serif',
+          textShadow: '0 0 28px rgba(245,200,66,0.40), 0 3px 14px rgba(0,0,0,1)',
+        }}>
           Hisobchim
         </h1>
+        <p style={{ margin: '0 0 26px', fontSize: 10, fontWeight: 700, color: 'rgba(245,200,66,0.50)', letterSpacing: '0.28em', textTransform: 'uppercase' }}>
+          POS · Restoran tizimi
+        </p>
 
-        {/* Login forma — oq karta */}
-        <LoginForm onSubmit={handleSubmit} />
+        {/* Forma */}
+        <div style={{
+          width: '100%',
+          background: 'rgba(255,255,255,0.04)',
+          border: '1.5px solid rgba(245,200,66,0.25)',
+          borderRadius: 18, padding: '26px 24px 22px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        }}>
+          <LoginForm onSubmit={handleSubmit} />
+        </div>
 
+        <p style={{ marginTop: 18, fontSize: 10, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.06em' }}>
+          © 2025 Hisobchim · Barcha huquqlar himoyalangan
+        </p>
       </div>
+
+      {/* ── O'NG: Rasm ── */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
+        <img
+          src={loginBg}
+          alt=""
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center center',
+            filter: 'brightness(0.88) saturate(1.1)',
+          }}
+        />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(10,13,10,0.60) 0%, rgba(0,0,0,0.05) 35%, transparent 100%)' }} />
+      </div>
+
     </div>
   )
 }
