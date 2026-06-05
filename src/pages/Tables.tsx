@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Building2, LogOut, Moon, Settings, Sun, UtensilsCrossed, Utensils } from 'lucide-react'
+import { Building2, Clock, LogOut, Moon, Plus, Settings, ShoppingBag, Sun, UtensilsCrossed, Utensils } from 'lucide-react'
 import hisobchimLogo from '@/assets/logo.png'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -9,6 +9,7 @@ import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
 import { useTheme } from '@/stores/theme'
 import { fmtMoney, fmtTime } from '@/lib/format'
+import StatusBar from '@/components/StatusBar'
 
 /* ─── Soat hook ─── */
 const UZ_DAYS = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba']

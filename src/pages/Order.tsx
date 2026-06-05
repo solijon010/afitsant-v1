@@ -16,6 +16,7 @@ import {
   X,
   Ban
 } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
 import type { Category, Product, ReceiptPayload, TableEntity } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -1182,9 +1183,9 @@ function CartPanel({
                   <HistoryEntryRow key={entry.id} entry={entry} />
                 ))}
               </ul>
-          </div>
-        ) : (
-          <div style={{ height: lines.length === 0 ? '100%' : undefined }}>
+            </motion.div>
+          ) : (
+            <div style={{ height: lines.length === 0 ? '100%' : undefined }}>
               {lines.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10 }}>
                   <div style={{ width: 52, height: 52, borderRadius: 16, background: '#eff6ff', display: 'grid', placeItems: 'center' }}>
@@ -1229,8 +1230,9 @@ function CartPanel({
                   ))}
                 </ul>
               )}
-          </div>
-        )}
+            </div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Footer */}
