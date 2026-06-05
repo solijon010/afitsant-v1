@@ -853,8 +853,35 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
           </button>
         </div>
 
+        {/* KG / So'm display — tepada */}
+        <div style={{ display: 'flex', borderBottom: '2px solid #f1f5f9' }}>
+          <button onClick={() => switchMode('kg')} style={{
+            flex: 1, padding: '14px 16px', textAlign: 'left', border: 'none', cursor: 'pointer',
+            background: mode === 'kg' ? '#f0fdf4' : '#fafafa',
+            borderRight: '2px solid #f1f5f9',
+            borderBottom: mode === 'kg' ? '3px solid #16a34a' : '3px solid transparent',
+            transition: 'all 0.15s'
+          }}>
+            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 800, color: mode === 'kg' ? '#16a34a' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.10em' }}>KG</p>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, color: mode === 'kg' ? '#14532d' : '#cbd5e1', fontFamily: 'monospace', letterSpacing: '-1px' }}>
+              {mode === 'kg' ? (kgVal || '0') : (parsedSom > 0 ? (parsedSom / product.price).toFixed(3).replace(/\.?0+$/, '') : displayKg)}
+            </p>
+          </button>
+          <button onClick={() => switchMode('som')} style={{
+            flex: 1, padding: '14px 16px', textAlign: 'left', border: 'none', cursor: 'pointer',
+            background: mode === 'som' ? '#eff6ff' : '#fafafa',
+            borderBottom: mode === 'som' ? '3px solid #2563eb' : '3px solid transparent',
+            transition: 'all 0.15s'
+          }}>
+            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 800, color: mode === 'som' ? '#2563eb' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.10em' }}>SO'M</p>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, color: mode === 'som' ? '#1d4ed8' : '#cbd5e1', fontFamily: 'monospace', letterSpacing: '-1px' }}>
+              {mode === 'som' ? (somVal || '0') : displaySom}
+            </p>
+          </button>
+        </div>
+
         {/* Numpad */}
-        <div style={{ padding: '14px 14px 8px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        <div style={{ padding: '12px 14px 8px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {NUMPAD_KEYS.map((key) => (
             <button
               key={key}
@@ -885,33 +912,6 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
               {key}
             </button>
           ))}
-        </div>
-
-        {/* KG / So'm display — numpad pastida */}
-        <div style={{ display: 'flex', margin: '6px 14px 0', borderRadius: 14, overflow: 'hidden', border: '2px solid #e2e8f0' }}>
-          <button onClick={() => switchMode('kg')} style={{
-            flex: 1, padding: '12px 14px', textAlign: 'left', border: 'none', cursor: 'pointer',
-            background: mode === 'kg' ? '#f0fdf4' : '#f8fafc',
-            borderRight: '2px solid #e2e8f0',
-            borderBottom: mode === 'kg' ? '3px solid #16a34a' : '3px solid transparent',
-            transition: 'all 0.15s'
-          }}>
-            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 800, color: mode === 'kg' ? '#16a34a' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.10em' }}>KG</p>
-            <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: mode === 'kg' ? '#14532d' : '#cbd5e1', fontFamily: 'monospace', letterSpacing: '-1px' }}>
-              {mode === 'kg' ? (kgVal || '0') : (parsedSom > 0 ? (parsedSom / product.price).toFixed(3).replace(/\.?0+$/, '') : displayKg)}
-            </p>
-          </button>
-          <button onClick={() => switchMode('som')} style={{
-            flex: 1, padding: '12px 14px', textAlign: 'left', border: 'none', cursor: 'pointer',
-            background: mode === 'som' ? '#eff6ff' : '#f8fafc',
-            borderBottom: mode === 'som' ? '3px solid #2563eb' : '3px solid transparent',
-            transition: 'all 0.15s'
-          }}>
-            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 800, color: mode === 'som' ? '#2563eb' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.10em' }}>SO'M</p>
-            <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: mode === 'som' ? '#1d4ed8' : '#cbd5e1', fontFamily: 'monospace', letterSpacing: '-1px' }}>
-              {mode === 'som' ? (somVal || '0') : displaySom}
-            </p>
-          </button>
         </div>
 
         {/* Tugmalar */}
