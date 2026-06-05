@@ -81,25 +81,25 @@ export default function WaiterLogin(): JSX.Element {
     setError('')
     setLoading(true)
     try {
-      const res = await fetch('https://api-restaurant.hisobchim.uz/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumer: phone.trim(), password }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(
-          Array.isArray(data?.message) ? data.message[0] : (data?.message ?? 'Login xatosi')
-        )
+      const result = await window.afisant.auth.loginServer(phone.trim(), password)
+      if (!result.ok) {
+        setError(result.message ?? 'Login xatosi')
         return
       }
-      const { accessToken, refreshToken, user } = data
+
+      const user = result.user
       if (user?.role !== 'AFITSANT' && user?.role !== 'SUPER_AFITSANT') {
         setError('Siz afitsant emassiz')
         return
       }
-      localStorage.setItem('rms_auth', JSON.stringify({ accessToken, refreshToken, user }))
-      navigate('/waiter')
+
+      if (user.branchId) {
+        await window.afisant.auth.selectBranch(user.branchId, '')
+      } else if (result.branches?.length === 1) {
+        await window.afisant.auth.selectBranch(result.branches[0].id, result.branches[0].name)
+      }
+
+      navigate('/select-waiter', { replace: true })
     } catch {
       setError('Ulanishda xatolik yuz berdi')
     } finally {

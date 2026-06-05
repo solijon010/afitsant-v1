@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { LogOut, RefreshCw, Settings, Shield } from 'lucide-react'
+import { LogOut, RefreshCw, Settings, Shield, User } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -13,15 +12,6 @@ import StatusBar from '@/components/StatusBar'
 import { cn } from '@/lib/cn'
 import hisobchimLogo from '@/assets/logo.png'
 
-/* ─── Animatsiya variantlari ─── */
-const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.06 } },
-}
-const cardVariants = {
-  hidden: { opacity: 0, y: 16, scale: 0.97 },
-  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: 'easeOut' } },
-}
 
 /* Afitsantlarni yaratilish vaqti bo'yicha tartiblaymiz (birinchi yaratilgan — birinchida) */
 function sortWaiters(list: Waiter[]): Waiter[] {
@@ -35,14 +25,12 @@ function sortWaiters(list: Waiter[]): Waiter[] {
   })
 }
 
-// Session da bir marta avtomatik sync qilganligini saqlaymiz
-let autoSyncDone = false
-
 export default function WaiterSelect(): JSX.Element {
   const [waiters, setWaiters] = useState<Waiter[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle')
+  const autoSyncDone = useRef(false)
   const navigate = useNavigate()
   const settings = useSettings((s) => s.settings)
   const logout = useAuth((s) => s.logout)
@@ -63,7 +51,7 @@ export default function WaiterSelect(): JSX.Element {
     try {
       const res = await window.afisant.sync.fullPull()
       if (res.ok) {
-        autoSyncDone = true
+        autoSyncDone.current = true
         setSyncStatus('done')
         toast.success(`Sinxronlandi ✓ — kategoriyalar: ${res.counts?.categories ?? 0}, mahsulotlar: ${res.counts?.products ?? 0}, xonalar: ${res.counts?.tables ?? 0}`)
         loadWaiters()
@@ -84,7 +72,7 @@ export default function WaiterSelect(): JSX.Element {
   // Ochilganda bir marta avtomatik sinxronlaymiz (session boshida)
   useEffect(() => {
     loadWaiters()
-    if (!autoSyncDone) {
+    if (!autoSyncDone.current) {
       void handleSync()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,7 +85,7 @@ export default function WaiterSelect(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#F5F5F4]">
+    <div className="flex h-full flex-col" style={{ background: '#D1CFD0' }}>
 
       {/* ── Sinxronlash banneri ── */}
       {syncStatus === 'syncing' && (
@@ -108,7 +96,7 @@ export default function WaiterSelect(): JSX.Element {
       )}
 
       {/* ── HEADER ── */}
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-6 shadow-sm">
+      <header className="flex h-16 shrink-0 items-center justify-between px-6" style={{ background: '#1E2C46', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
 
         {/* Chap: Logo + nom */}
         <div className="flex items-center gap-3">
@@ -120,10 +108,10 @@ export default function WaiterSelect(): JSX.Element {
             />
           </div>
           <div>
-            <p className="text-sm font-semibold text-stone-900 leading-tight">
+            <p className="text-sm font-semibold leading-tight" style={{ color: '#ffffff' }}>
               {settings?.organizationName ?? 'Hisobchim POS'}
             </p>
-            <p className="text-[11px] text-stone-400 leading-tight">Afitsantni tanlang</p>
+            <p className="text-[11px] leading-tight" style={{ color: 'rgba(255,255,255,0.55)' }}>Afitsantni tanlang</p>
           </div>
         </div>
 
@@ -169,17 +157,14 @@ export default function WaiterSelect(): JSX.Element {
           </div>
         ) : (
           /* ── Afitsantlar grid ── */
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
+          <div
             className="grid gap-5"
             style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
           >
             {waiters.map((w) => (
               <WaiterCard key={w.id} waiter={w} onClick={() => navigate(`/pin/${w.id}`)} />
             ))}
-          </motion.div>
+          </div>
         )}
       </main>
     </div>
@@ -196,56 +181,65 @@ function WaiterCard({ waiter, onClick }: { waiter: Waiter; onClick: () => void }
   /* To'liq ism: Familiya Ismi — bir qatorda */
   const fullName = [waiter.lastName, waiter.firstName].filter(Boolean).join(' ')
 
+  const avatarGradient = isSpecial
+    ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+    : 'linear-gradient(135deg, #3b82f6, #2563eb)'
+
   return (
-    <motion.button
-      variants={cardVariants}
+    <button
       onClick={onClick}
-      whileHover={{ scale: 1.03, y: -3 }}
-      whileTap={{ scale: 0.97 }}
-      transition={{ duration: 0.14 }}
-      className={cn(
-        'group flex flex-col items-center gap-5 rounded-2xl border-2 bg-white px-6 py-8 text-left shadow-card transition-shadow hover:shadow-card-hover',
-        isSpecial
-          ? 'border-amber-200 hover:border-amber-400'
-          : 'border-stone-100 hover:border-stone-300',
-      )}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: 16, padding: '28px 24px 24px',
+        background: '#ffffff',
+        borderRadius: 20,
+        border: '1px solid #f1f5f9',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+        cursor: 'pointer', textAlign: 'center', width: '100%',
+      }}
     >
       {/* Avatar */}
-      <div className="relative mt-1">
-        {isSpecial && (
-          <div className="absolute -inset-3 rounded-full border-2 border-dashed border-amber-300/70" />
-        )}
-        <div className={cn(
-          'flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold tracking-wide',
-          isSpecial
-            ? 'bg-amber-50 text-amber-700 ring-2 ring-amber-300'
-            : 'bg-stone-100 text-stone-600',
-        )}>
-          {initials(waiter.firstName, waiter.lastName)}
-        </div>
+      <div style={{
+        width: 88, height: 88, borderRadius: '50%',
+        background: avatarGradient,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: isSpecial
+          ? '0 8px 24px rgba(245,158,11,0.4)'
+          : '0 8px 24px rgba(37,99,235,0.35)',
+      }}>
+        <User size={38} color="#ffffff" strokeWidth={1.8} />
       </div>
 
-      {/* Ism (Familiya Ismi — bir qatorda) */}
-      <div className="w-full text-center">
-        <p className="text-[17px] font-bold text-stone-800 leading-snug">
+      {/* Ism */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>
           {fullName || '—'}
         </p>
 
+        {/* Check icon */}
+        <div style={{
+          width: 22, height: 22, borderRadius: '50%',
+          background: isSpecial ? '#f59e0b' : '#2563eb',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+
         {/* Role badge */}
-        <div className={cn(
-          'mt-2.5 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5',
-          isSpecial ? 'bg-amber-50' : 'bg-stone-50',
-        )}>
-          {isSpecial && <Shield size={11} className="text-amber-500 shrink-0" />}
-          <span className={cn(
-            'text-[11px] font-bold uppercase tracking-[0.15em]',
-            isSpecial ? 'text-amber-600' : 'text-stone-400',
-          )}>
-            {roleLabel}
-          </span>
+        <div style={{
+          padding: '5px 16px', borderRadius: 99,
+          background: 'rgba(0,0,0,0.06)',
+          fontSize: 11, fontWeight: 700,
+          color: isSpecial ? '#d97706' : '#64748b',
+          letterSpacing: '0.12em', textTransform: 'uppercase',
+        }}>
+          {isSpecial && <Shield size={10} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />}
+          {roleLabel}
         </div>
       </div>
-    </motion.button>
+    </button>
   )
 }
 
@@ -264,12 +258,14 @@ function IconButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={cn(
-        'flex h-9 w-9 items-center justify-center rounded-xl border transition-colors',
-        danger
-          ? 'border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
-          : 'border-stone-100 text-stone-400 hover:bg-stone-50 hover:text-stone-700 hover:border-stone-200',
-      )}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 36, height: 36, borderRadius: 10,
+        border: `1px solid ${danger ? 'rgba(255,100,100,0.3)' : 'rgba(255,255,255,0.15)'}`,
+        background: 'rgba(255,255,255,0.08)',
+        color: danger ? '#f87171' : 'rgba(255,255,255,0.75)',
+        cursor: 'pointer',
+      }}
     >
       {children}
     </button>

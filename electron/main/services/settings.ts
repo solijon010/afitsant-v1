@@ -13,10 +13,14 @@ const DEFAULTS: Settings = {
   printerIp: null,
   printerName: null,
   printerDevicePath: '/dev/usb/lp0',
-  organizationName: 'Restoran',
+  organizationName: '',
+  organizationAddress: null,
+  organizationPhone: null,
   serviceFeePercent: 0,
-  receiptHeader: 'Xush kelibsiz!',
-  receiptFooter: 'Tashrifingiz uchun rahmat!'
+  receiptHeader: null,
+  receiptFooter: null,
+  receiptQrText: null,
+  receiptQrLabel: null
 }
 
 export function getSettings(): Settings {
@@ -40,9 +44,13 @@ export function getSettings(): Settings {
     printerName: get('printerName', (v) => (v ? v : null)),
     printerDevicePath: get('printerDevicePath', (v) => v ?? DEFAULTS.printerDevicePath),
     organizationName: get('organizationName', (v) => v ?? DEFAULTS.organizationName),
+    organizationAddress: get('organizationAddress', (v) => (v ? v : DEFAULTS.organizationAddress)),
+    organizationPhone: get('organizationPhone', (v) => (v ? v : DEFAULTS.organizationPhone)),
     serviceFeePercent: get('serviceFeePercent', (v) => (v !== null && v !== '' ? Number(v) : DEFAULTS.serviceFeePercent)),
     receiptHeader: get('receiptHeader', (v) => (v ? v : DEFAULTS.receiptHeader)),
-    receiptFooter: get('receiptFooter', (v) => (v ? v : DEFAULTS.receiptFooter))
+    receiptFooter: get('receiptFooter', (v) => (v ? v : DEFAULTS.receiptFooter)),
+    receiptQrText: get('receiptQrText', (v) => (v ? v : DEFAULTS.receiptQrText)),
+    receiptQrLabel: get('receiptQrLabel', (v) => (v ? v : DEFAULTS.receiptQrLabel))
   }
 }
 

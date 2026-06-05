@@ -118,6 +118,7 @@ export interface BridgeAPI {
       notes?: string | null
     }) => Promise<Order>
     syncAll: (input: {
+      localOrderId?: number
       roomServerId: string
       items: Array<{ productServerId: string; count: number }>
     }) => Promise<{ serverId: string }>
@@ -152,7 +153,14 @@ export interface BridgeAPI {
   printer: {
     receipt: (payload: ReceiptPayload) => Promise<{ ok: true } | { ok: false; error: string }>
     test: () => Promise<{ ok: true } | { ok: false; error: string }>
-    listUsb: () => Promise<Array<{ vendorId: string; productId: string; manufacturer?: string; product?: string }>>
+    listUsb: () => Promise<Array<{
+      vendorId: string
+      productId: string
+      manufacturer?: string
+      product?: string
+      online?: boolean
+      statusText?: string
+    }>>
     fixPerms: () => Promise<{ ok: true } | { ok: false; error: string }>
   }
 

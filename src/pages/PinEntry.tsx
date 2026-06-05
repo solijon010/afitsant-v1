@@ -1,17 +1,122 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Delete } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useCart } from '@/stores/cart'
 import { PIN_LENGTH } from '@/components/PinPad'
-import { cn } from '@/lib/cn'
 import hisobchimLogo from '@/assets/logo.png'
+import manzaraFoto from '@/assets/rasmim.png'
 
-/* ─── Raqam tugmalari ─── */
 const DIGITS = ['1','2','3','4','5','6','7','8','9']
+const UZ_DAYS = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba']
+const UZ_MONTHS = ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentyabr','Oktyabr','Noyabr','Dekabr']
+
+function useTick() {
+  const [tick, setTick] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setTick(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return tick
+}
+
+function AnalogClock({ size = 180 }: { size?: number }): JSX.Element {
+  const tick = useTick()
+  const h = tick.getHours() % 12
+  const m = tick.getMinutes()
+  const s = tick.getSeconds()
+
+  const hourDeg   = (h + m / 60) * 30
+  const minuteDeg = (m + s / 60) * 6
+  const secondDeg = s * 6
+
+  const cx = size / 2
+  const r  = size / 2
+
+  const hand = (deg: number, len: number, width: number, color: string) => {
+    const rad = (deg - 90) * (Math.PI / 180)
+    const x2 = cx + len * Math.cos(rad)
+    const y2 = cx + len * Math.sin(rad)
+    return <line x1={cx} y1={cx} x2={x2} y2={y2} stroke={color} strokeWidth={width} strokeLinecap="round" />
+  }
+
+  const numbers = [1,2,3,4,5,6,7,8,9,10,11,12]
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {/* Soya */}
+      <defs>
+        <filter id="clock-shadow">
+          <feDropShadow dx="0" dy="4" stdDeviation="8" floodOpacity="0.12" />
+        </filter>
+      </defs>
+
+      {/* Yuz */}
+      <circle cx={cx} cy={cx} r={r - 2} fill="#ffffff" filter="url(#clock-shadow)" />
+      <circle cx={cx} cy={cx} r={r - 2} fill="none" stroke="#e5e7eb" strokeWidth={1} />
+
+      {/* Daqiqa belgilari */}
+      {Array.from({ length: 60 }).map((_, i) => {
+        const a = (i * 6 - 90) * (Math.PI / 180)
+        const isHour = i % 5 === 0
+        const inner = isHour ? r - 14 : r - 10
+        return (
+          <line
+            key={i}
+            x1={cx + inner * Math.cos(a)} y1={cx + inner * Math.sin(a)}
+            x2={cx + (r - 4) * Math.cos(a)} y2={cx + (r - 4) * Math.sin(a)}
+            stroke={isHour ? '#9ca3af' : '#d1d5db'}
+            strokeWidth={isHour ? 2 : 1}
+          />
+        )
+      })}
+
+      {/* Raqamlar */}
+      {numbers.map(n => {
+        const a = (n * 30 - 90) * (Math.PI / 180)
+        const nr = r - 26
+        return (
+          <text
+            key={n}
+            x={cx + nr * Math.cos(a)}
+            y={cx + nr * Math.sin(a)}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={size * 0.085}
+            fontWeight="500"
+            fill="#374151"
+            fontFamily="system-ui"
+          >
+            {n}
+          </text>
+        )
+      })}
+
+      {/* Soat mili */}
+      {hand(hourDeg,   r * 0.48, size * 0.038, '#1e293b')}
+      {/* Daqiqa mili */}
+      {hand(minuteDeg, r * 0.65, size * 0.028, '#1e293b')}
+      {/* Soniya mili (qizil) */}
+      {hand(secondDeg, r * 0.70, size * 0.016, '#ef4444')}
+
+      {/* Markaz doira */}
+      <circle cx={cx} cy={cx} r={size * 0.035} fill="#1e293b" />
+      <circle cx={cx} cy={cx} r={size * 0.015} fill="#ef4444" />
+    </svg>
+  )
+}
+
+function useClock() {
+  const tick = useTick()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    time: `${pad(tick.getHours())}:${pad(tick.getMinutes())}`,
+    secs: pad(tick.getSeconds()),
+    date: `${UZ_DAYS[tick.getDay()]}, ${tick.getDate()} ${UZ_MONTHS[tick.getMonth()]}`,
+  }
+}
 
 export default function PinEntry(): JSX.Element {
   const { waiterId } = useParams<{ waiterId: string }>()
@@ -25,8 +130,8 @@ export default function PinEntry(): JSX.Element {
   const [lockedUntil, setLockedUntil] = useState<number | null>(null)
   const [now, setNow] = useState(Date.now())
   const containerRef = useRef<HTMLDivElement>(null)
+  const clock = useClock()
 
-  /* Waiter yukla */
   useEffect(() => {
     const id = Number(waiterId)
     void window.afisant.auth.listWaiters().then((list) => {
@@ -36,7 +141,6 @@ export default function PinEntry(): JSX.Element {
     })
   }, [waiterId])
 
-  /* Blok sanash */
   useEffect(() => {
     if (!lockedUntil) return
     const t = setInterval(() => {
@@ -46,10 +150,8 @@ export default function PinEntry(): JSX.Element {
     return () => clearInterval(t)
   }, [lockedUntil])
 
-  /* Focus */
   useEffect(() => { containerRef.current?.focus() }, [])
 
-  /* Klaviatura */
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') navigate('/select-waiter')
@@ -103,149 +205,195 @@ export default function PinEntry(): JSX.Element {
   const del = (): void => { if (!busy) setPin(v => v.slice(0, -1)) }
   const disabled = busy || !!lockedUntil
 
-  const isSpecial = waiter?.role === 'manager' || waiter?.role === 'super_waiter'
-
   return (
     <div
       ref={containerRef}
       tabIndex={-1}
-      className="fixed inset-0 flex flex-col bg-[#F5F5F4] outline-none"
+      className="fixed inset-0 outline-none"
+      style={{ display: 'flex', background: '#D2D0D1' }}
     >
-      {/* ── Yuqori panel ── */}
-      <div className="flex h-14 shrink-0 items-center px-5">
-        <button
-          onClick={() => navigate('/select-waiter')}
-          className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-stone-500 transition-colors hover:bg-white hover:text-stone-900"
-        >
-          <ArrowLeft size={16} strokeWidth={2} />
-          Orqaga
-        </button>
-      </div>
+      {/* ── CHAP: PIN FORM ── */}
+      <div style={{
+        width: '52%', height: '100%',
+        display: 'flex', flexDirection: 'column',
+        position: 'relative',
+        background: '#D2D0D1',
+      }}>
 
-      {/* ── Asosiy kontent ── */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10">
+        {/* TOP BAR */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '20px 28px', flexShrink: 0,
+        }}>
+          {/* Orqaga */}
+          <button
+            onClick={() => navigate('/select-waiter')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: '#D2D0D1', border: 'none', borderRadius: 12,
+              padding: '9px 16px', cursor: 'pointer',
+              fontSize: 14, fontWeight: 600, color: '#374151',
+              boxShadow: '4px 4px 10px #aaa8a9, -3px -3px 8px #e8e6e7',
+            }}
+          >
+            <ArrowLeft size={15} strokeWidth={2.5} />
+            Orqaga
+          </button>
 
-        {/* Avatar — Logo */}
-        <motion.div
-          animate={shake ? { x: [-10, 10, -7, 7, -4, 4, 0] } : { x: 0 }}
-          transition={{ duration: 0.42, ease: 'easeOut' }}
-          className="mb-5"
-        >
-          <img
-            src={hisobchimLogo}
-            alt="Hisobchim"
-            className="h-52 w-52 object-contain"
-            style={{ mixBlendMode: 'multiply' }}
-            draggable={false}
-          />
-        </motion.div>
+          <div />
+        </div>
+
+      {/* ── MARKAZ ── */}
+      <div style={{
+        flex: 1,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        paddingBottom: 20,
+      }}>
+
+        {/* Logo */}
+        <div style={{
+          width: 160, height: 160, borderRadius: '50%',
+          background: '#ffffff',
+          boxShadow: '6px 6px 14px #aaa8a9, -5px -5px 12px #e8e6e7',
+          overflow: 'hidden',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: 20,
+        }}>
+          <img src={hisobchimLogo} alt="Hisobchim"
+            style={{ width: '92%', height: '92%', objectFit: 'contain' }}
+            draggable={false} />
+        </div>
 
         {/* Ism */}
-        <h1 className="mb-1 text-lg font-bold text-stone-900 tracking-wide">
+        <h1 style={{ margin: '0 0 4px', fontSize: 26, fontWeight: 800, color: '#111827', letterSpacing: '-0.5px' }}>
           {waiter ? `${waiter.lastName} ${waiter.firstName}`.trim() : ''}
         </h1>
 
-        {/* Holat matni */}
-        <AnimatePresence mode="wait">
-          {lockedUntil ? (
-            <motion.p
-              key="locked"
-              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="mb-6 text-xs font-semibold text-red-500 tracking-wider uppercase"
-            >
-              Bloklangan · {lockSecondsLeft}s
-            </motion.p>
-          ) : (
-            <motion.p
-              key="hint"
-              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="mb-6 text-[11px] font-medium uppercase tracking-[0.22em] text-stone-400"
-            >
-              PIN-kodni kiriting
-            </motion.p>
-          )}
-        </AnimatePresence>
+        {/* Holat */}
+        {lockedUntil ? (
+          <p style={{ margin: '0 0 18px', fontSize: 12, fontWeight: 700, color: '#ef4444', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            Bloklangan · {lockSecondsLeft}s
+          </p>
+        ) : (
+          <p style={{ margin: '0 0 18px', fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+            PIN-kodni kiriting
+          </p>
+        )}
 
         {/* PIN nuqtalar */}
-        <div className="mb-8 flex items-center gap-4">
+        <div style={{ display: 'flex', gap: 16, marginBottom: 28 }} className={shake ? 'animate-shake' : ''}>
           {Array.from({ length: PIN_LENGTH }).map((_, i) => {
             const filled = i < pin.length
             return (
-              <motion.div
-                key={i}
-                animate={{ scale: filled ? [1, 1.25, 1] : 1 }}
-                transition={{ duration: 0.15 }}
-                className={cn(
-                  'h-3 w-3 rounded-full transition-colors duration-150',
-                  filled
-                    ? isSpecial ? 'bg-amber-400' : 'bg-[#C2410C]'
-                    : 'bg-stone-200',
-                )}
-              />
+              <div key={i} style={{
+                width: 14, height: 14, borderRadius: '50%',
+                background: filled ? '#2563eb' : 'rgba(0,0,0,0.25)',
+                boxShadow: filled ? '0 2px 8px rgba(37,99,235,0.5)' : 'inset 2px 2px 4px rgba(0,0,0,0.15)',
+              }} />
             )
           })}
         </div>
 
-        {/* NumPad */}
-        <div className="grid w-full max-w-[280px] grid-cols-3 gap-2.5">
+        {/* Numpad */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: 14, justifyContent: 'center' }}>
           {DIGITS.map(n => (
-            <NumKey key={n} label={n} disabled={disabled} onClick={() => press(n)} />
+            <NumBtn key={n} disabled={disabled} onClick={() => press(n)}>
+              {n}
+            </NumBtn>
           ))}
 
-          {/* Bo'sh joy */}
           <div />
 
-          {/* 0 */}
-          <NumKey label="0" disabled={disabled} onClick={() => press('0')} />
+          <NumBtn disabled={disabled} onClick={() => press('0')}>0</NumBtn>
 
           {/* O'chirish */}
-          <button
-            type="button"
-            disabled={busy || pin.length === 0}
-            onClick={del}
-            className={cn(
-              'flex h-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-stone-100',
-              'transition-all duration-100 active:scale-95',
-              busy || pin.length === 0
-                ? 'cursor-default opacity-30'
-                : 'cursor-pointer text-red-400 hover:bg-red-50 hover:ring-red-100',
-            )}
-          >
-            <Delete size={20} strokeWidth={2} />
-          </button>
+          <NumBtn disabled={busy || pin.length === 0} onClick={del} muted>
+            ⌫
+          </NumBtn>
         </div>
 
-        {/* PIN unutilsa */}
-        {!lockedUntil && (
-          <p className="mt-7 text-[10px] text-stone-300">
-            PIN unutilsa — Sozlamalar → Afitsantlar
-          </p>
-        )}
+      </div>
+      </div>{/* chap panel yopildi */}
+
+      {/* ── O'NG: RASM PANEL ── */}
+      <div style={{
+        flex: 1, height: '100%', overflow: 'hidden',
+        position: 'relative',
+      }}>
+        <img
+          src={manzaraFoto}
+          alt="POS"
+          style={{
+            width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center',
+            display: 'block',
+          }}
+        />
+
+
+        {/* Chap tomondan yumshoq gradient */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(to right, rgba(210,208,209,0.85) 0%, rgba(210,208,209,0.2) 25%, rgba(210,208,209,0) 45%)',
+        }} />
+
+        {/* Soat — pastki o'ng burchak, kichikroq va toza */}
+        <div style={{
+          position: 'absolute', top: 24, right: 24,
+          background: 'rgba(255,255,255,0.88)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          padding: '14px 20px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          <AnalogClock size={140} />
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+              <span style={{ fontSize: 36, fontWeight: 800, color: '#1e293b', fontFamily: 'monospace', letterSpacing: '-1px' }}>
+                {clock.time}
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 600, color: '#94a3b8', fontFamily: 'monospace' }}>
+                :{clock.secs}
+              </span>
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b', fontWeight: 500 }}>
+              {clock.date}
+            </p>
+          </div>
+        </div>
+
       </div>
     </div>
   )
 }
 
-/* ─── Raqam tugma ─── */
-function NumKey({ label, disabled, onClick }: {
-  label: string
+function NumBtn({ children, disabled, onClick, muted }: {
+  children: React.ReactNode
   disabled: boolean
   onClick: () => void
+  muted?: boolean
 }): JSX.Element {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        'flex h-16 items-center justify-center rounded-2xl bg-white text-xl font-semibold text-stone-800',
-        'shadow-sm ring-1 ring-stone-100 transition-all duration-100',
-        disabled
-          ? 'cursor-default opacity-30'
-          : 'cursor-pointer hover:bg-stone-50 hover:ring-stone-200 active:scale-95',
-      )}
+      style={{
+        width: 72, height: 72, borderRadius: '50%',
+        background: '#D2D0D1',
+        border: 'none',
+        cursor: disabled ? 'default' : 'pointer',
+        fontSize: muted ? 20 : 22,
+        fontWeight: 600,
+        color: muted ? '#ef4444' : '#1e293b',
+        boxShadow: disabled
+          ? '2px 2px 5px #b3b1b2, -2px -2px 5px #ebebea'
+          : '6px 6px 12px #aaa8a9, -5px -5px 12px #e8e6e7',
+        opacity: disabled && !muted ? 0.5 : 1,
+      }}
     >
-      {label}
+      {children}
     </button>
   )
 }

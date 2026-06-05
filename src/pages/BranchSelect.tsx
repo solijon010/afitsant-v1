@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { Building2, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import type { BranchInfo } from '@shared/types'
@@ -55,11 +54,7 @@ export default function BranchSelectPage(): JSX.Element {
 
   return (
     <div className="flex h-full flex-col items-center justify-center px-8">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl"
-      >
+      <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-brand-primary/15 text-brand-primary">
             <Building2 size={26} />
@@ -70,15 +65,10 @@ export default function BranchSelectPage(): JSX.Element {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {branches.map((branch, idx) => (
-            <motion.button
+            <button
               key={branch.id}
               onClick={() => void handleSelect(branch)}
               disabled={loading}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
               className={cn(
                 'relative flex flex-col items-start gap-2 rounded-2xl border p-5 text-left transition-all',
                 selected === branch.id
@@ -104,10 +94,10 @@ export default function BranchSelectPage(): JSX.Element {
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-primary border-t-transparent" />
                 </div>
               )}
-            </motion.button>
+            </button>
           ))}
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

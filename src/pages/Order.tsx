@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
   ChefHat,
   CupSoda,
-  Delete,
   Flame,
   Leaf,
   Minus,
@@ -36,7 +34,7 @@ const CAT_ICON: Record<string, JSX.Element> = {
   plus: <Plus size={18} />,
   'cup-soda': <CupSoda size={18} />,
   flame: <Flame size={18} />,
-  'chef-hat': <ChefHat size={18} />
+  'chef-hat': <ChefHat size={18} />,
 }
 
 export default function OrderPage(): JSX.Element {
@@ -72,6 +70,52 @@ export default function OrderPage(): JSX.Element {
     let cancelled = false
     void (async () => {
       const fee = settings?.serviceFeePercent ?? 0
+      /*
+      const res = await window.afisant.printer.receipt(payload)
+      if (!res.ok) {
+        const title = settings?.printerType
+          ? "Chek chiqarib bo'lmadi"
+          : "Printer ulanmagan — buyurtma yopilmadi"
+        toast.error(title, { description: (res as any).error })
+        return
+      }
+
+      const histId = useOrderHistory.getState().push(buildHistoryEntry(printedAt))
+      useOrderHistory.getState().markPrinted(histId)
+      toast.success('Chek chiqdi')
+
+      try {
+        if (syncedServerOrderId) {
+          await window.afisant.orders.close(persistedOrderId, syncedServerOrderId)
+        } else {
+          await window.afisant.orders.close(persistedOrderId)
+        }
+      } catch (e: any) {
+        toast.error("Chek chiqdi, ammo buyurtmani yopib bo'lmadi", {
+          description: e?.message ?? 'Yopish vaqtida xatolik'
+        })
+        return
+      }
+
+      cart.clear()
+      cart.setOrder(null, null)
+      await refreshTable(tId)
+      navigate('/tables')
+      return
+      const persistedOrderId = await persistCartToLocalOrder(fee)
+
+      await syncCartToServer(persistedOrderId, roomServerId ?? null, 'save')
+
+      if (table) {
+        useOrderHistory.getState().push(buildHistoryEntry(Date.now()))
+      }
+
+      await refreshTable(tId)
+      cart.clear()
+      cart.setOrder(null, null)
+      navigate('/tables')
+      return
+      */
       useCart.setState({ serviceFeePercent: fee })
       const roomServerId = table.serverId
 
@@ -111,7 +155,7 @@ export default function OrderPage(): JSX.Element {
 
           // Local yoq — server buyurtmasini yuklaymiz
           const serverLines = existingOrder.items.map<CartLine>((it) => {
-            const product = products.find((p) => p.id === it.productId || p.serverId === it.serverId)
+            const product = products.find((p) => p.id === it.productId || (it.serverId != null && p.serverId === it.serverId))
             return {
               localUuid: it.localUuid,
               productId: it.productId,
@@ -181,10 +225,157 @@ export default function OrderPage(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tId, table, waiter?.id, settings?.serviceFeePercent])
 
-  const shownProducts = useMemo<Product[]>(
-    () => products.filter((p) => p.categoryId === activeCatId),
-    [products, activeCatId]
-  )
+  /* Kategoriya tartibi */
+  const CAT_ORDER = ['asosiy taomlar','asosiy mahsulotlar','zakaz taomlar','salatlar','ichimliklar','go\'sht va shashliklar','maxsus taomlar']
+  const sortedCategories = useMemo(() => {
+    const seen = new Set<string>()
+    return [...categories]
+      .filter(c => {
+        const key = (c.nameUzLatn ?? '').toLowerCase().trim()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .sort((a, b) => {
+        const ai = CAT_ORDER.indexOf((a.nameUzLatn ?? '').toLowerCase())
+        const bi = CAT_ORDER.indexOf((b.nameUzLatn ?? '').toLowerCase())
+        if (ai === -1 && bi === -1) return 0
+        if (ai === -1) return 1
+        if (bi === -1) return -1
+        return ai - bi
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories])
+
+  /* Mahsulotlar — dublikatsiz */
+  const shownProducts = useMemo<Product[]>(() => {
+    const list = products.filter((p) => p.categoryId === activeCatId)
+    const seen = new Set<string>()
+    return list.filter(p => {
+      const key = (p.nameUzLatn ?? '').toLowerCase().trim()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [products, activeCatId])
+
+  const buildLocalOrderItems = () =>
+    cart.lines.map((line) => ({
+      productId: line.productId,
+      productName: line.productName,
+      unitPrice: line.unitPrice,
+      quantity: line.quantity,
+      notes: line.notes ?? null,
+      localUuid: line.localUuid
+    }))
+
+  const buildReceiptItems = () =>
+    cart.lines.map((line) => ({
+      name: line.productName,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      total: Math.round(line.unitPrice * line.quantity)
+    }))
+
+  const buildHistoryEntry = (savedAt: number) => ({
+    tableId: tId,
+    tableName: table?.name ?? '',
+    waiterName: `${waiter.firstName} ${waiter.lastName}`,
+    savedAt,
+    items: buildReceiptItems(),
+    subtotal: cart.subtotal(),
+    serviceFee: cart.serviceFee(),
+    total: cart.total()
+  })
+
+  const ensureLocalOrder = async (serviceFeePercent: number): Promise<number> => {
+    let orderId = cart.orderId
+    if (!orderId) {
+      const baseOrder = await window.afisant.orders.upsert({
+        tableId: tId,
+        waiterId: waiter.id,
+        serviceFeePercent
+      })
+      orderId = baseOrder.id
+      useCart.setState({ orderId: baseOrder.id })
+    }
+    if (!orderId) throw new Error('Buyurtmani saqlab bo\'lmadi')
+    return orderId
+  }
+
+  const persistCartToLocalOrder = async (serviceFeePercent: number): Promise<number> => {
+    const orderId = await ensureLocalOrder(serviceFeePercent)
+    await window.afisant.orders.replaceItems(orderId, buildLocalOrderItems())
+    return orderId
+  }
+
+  const syncCartToServer = async (
+    orderId: number,
+    roomServerId: string | null,
+    mode: 'save' | 'close'
+  ): Promise<string | null> => {
+    let serverOrderId = useCart.getState().serverOrderId
+
+    if (!roomServerId) {
+      if (mode === 'save') {
+        toast.error("Xona server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
+      }
+      return serverOrderId
+    }
+
+    const itemsWithServerId = cart.lines.filter((line) => line.productServerId && line.quantity > 0)
+    const removedFromServer = initialServerItemsRef.current.filter(
+      (initialLine) =>
+        initialLine.productServerId &&
+        !cart.lines.some((line) => line.productServerId === initialLine.productServerId)
+    )
+    const syncItems = [
+      ...itemsWithServerId.map((line) => ({
+        productServerId: line.productServerId!,
+        count: Math.round(line.quantity)
+      })),
+      ...removedFromServer.map((line) => ({
+        productServerId: line.productServerId!,
+        count: 0
+      }))
+    ]
+
+    if (syncItems.length === 0) {
+      if (cart.lines.length > 0) {
+        toast.warning("Mahsulotlarda server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
+      }
+      return serverOrderId
+    }
+
+    try {
+      const res = await window.afisant.orders.syncAll({
+        localOrderId: orderId,
+        roomServerId,
+        items: syncItems
+      })
+      serverOrderId = res.serverId
+      useCart.setState({
+        serverOrderId: res.serverId,
+        lines: cart.lines.map((line) => ({ ...line, flushed: true }))
+      })
+      initialServerItemsRef.current = cart.lines.filter((line) => line.productServerId)
+      if (mode === 'save') toast.success('Buyurtma serverga yuborildi ✓')
+      return serverOrderId
+    } catch (e: any) {
+      const msg = e?.message ?? ''
+      if (mode === 'save') {
+        if (msg.includes('404') || msg.includes('mavjud emas') || msg.includes('inactive')) {
+          toast.warning('Ba\'zi mahsulotlar serverda yo\'q — mahalliy saqlandi')
+        } else {
+          toast.warning("Server bilan ulanib bo'lmadi — mahalliy saqlandi")
+        }
+        console.warn('[ORDER] syncAll xato (mahalliy saqlandi):', msg)
+      } else {
+        toast.warning(`Server sync xatosi: ${msg || 'ulanish yo\'q'}`)
+      }
+      return serverOrderId
+    }
+  }
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
@@ -195,31 +386,22 @@ export default function OrderPage(): JSX.Element {
     try {
       const roomServerId = useCart.getState().roomServerId
       const fee = settings?.serviceFeePercent ?? 0
+      const persistedOrderId = await persistCartToLocalOrder(fee)
 
-      // Lazy order creation — mahsulot qo'shilganda birinchi marta SQLite buyurtma yaratiladi
-      let orderId = cart.orderId
-      if (!orderId) {
-        const baseOrder = await window.afisant.orders.upsert({
-          tableId: tId,
-          waiterId: waiter.id,
-          serviceFeePercent: fee
-        })
-        orderId = baseOrder.id
-        useCart.setState({ orderId: baseOrder.id })
+      await syncCartToServer(persistedOrderId, roomServerId ?? null, 'save')
+
+      if (table) {
+        useOrderHistory.getState().push(buildHistoryEntry(Date.now()))
       }
 
-      // Har doim local SQLite ga saqlash (offline persistence uchun)
-      await window.afisant.orders.replaceItems(
-        orderId,
-        cart.lines.map((l) => ({
-          productId: l.productId,
-          productName: l.productName,
-          unitPrice: l.unitPrice,
-          quantity: l.quantity,
-          notes: l.notes ?? null,
-          localUuid: l.localUuid
-        }))
-      )
+      await refreshTable(tId)
+      cart.clear()
+      cart.setOrder(null, null)
+      navigate('/tables')
+      return
+
+      // Lazy order creation — mahsulot qo'shilganda birinchi marta SQLite buyurtma yaratiladi
+      const orderId = await persistCartToLocalOrder(fee)
 
       // Server sync — roomServerId bo'lsa yuboramiz (waiterServerId shart emas — JWT tokendan olinadi)
       if (!roomServerId) {
@@ -245,7 +427,8 @@ export default function OrderPage(): JSX.Element {
         if (syncItems.length > 0) {
           try {
             const res = await window.afisant.orders.syncAll({
-              roomServerId,
+              localOrderId: orderId ?? undefined,
+              roomServerId: roomServerId!,
               items: syncItems
             })
             useCart.setState({ serverOrderId: res.serverId })
@@ -261,7 +444,6 @@ export default function OrderPage(): JSX.Element {
             } else {
               toast.warning(`Server bilan ulanib bo'lmadi — mahalliy saqlandi`)
             }
-            console.warn('[ORDER] syncAll xato (mahalliy saqlandi):', msg)
           }
         } else if (cart.lines.length > 0) {
           // Mahsulotlarda server_id yo'q — fullPull kerak
@@ -273,7 +455,7 @@ export default function OrderPage(): JSX.Element {
       if (table) {
         useOrderHistory.getState().push({
           tableId: tId,
-          tableName: table.name,
+          tableName: table!.name,
           waiterName: `${waiter.firstName} ${waiter.lastName}`,
           savedAt: Date.now(),
           items: cart.lines.map((l) => ({
@@ -322,17 +504,69 @@ export default function OrderPage(): JSX.Element {
 
   const handleCloseAndPrint = async (): Promise<void> => {
     if (!table || !waiter) return
-    if (cart.lines.length === 0 && !cart.serverOrderId) {
+    if (cart.lines.length === 0) {
       toast.error("Savat bo'sh")
       return
     }
     setPrinting(true)
     try {
       const roomServerId = useCart.getState().roomServerId
-      let serverOrderId = useCart.getState().serverOrderId
       const fee = settings?.serviceFeePercent ?? 0
+      const persistedOrderId = await persistCartToLocalOrder(fee)
+      const syncedServerOrderId = await syncCartToServer(persistedOrderId, roomServerId ?? null, 'close')
+      const printedAt = Date.now()
+      const payload: ReceiptPayload = {
+        organizationName: settings?.organizationName ?? 'Restoran',
+        organizationAddress: settings?.organizationAddress ?? null,
+        organizationPhone: settings?.organizationPhone ?? null,
+        tableName: table.name,
+        waiterName: `${waiter.firstName} ${waiter.lastName}`,
+        orderLocalUuid: syncedServerOrderId ?? String(persistedOrderId),
+        items: buildReceiptItems(),
+        subtotal: cart.subtotal(),
+        serviceFeePercent: cart.serviceFeePercent,
+        serviceFee: cart.serviceFee(),
+        total: cart.total(),
+        printedAt,
+        receiptHeader: settings?.receiptHeader ?? null,
+        receiptFooter: settings?.receiptFooter ?? null,
+        receiptQrText: settings?.receiptQrText ?? null,
+        receiptQrLabel: settings?.receiptQrLabel ?? null
+      }
+      const res = await window.afisant.printer.receipt(payload)
+      if (!res.ok) {
+        const title = settings?.printerType
+          ? "Chek chiqarib bo'lmadi"
+          : "Printer ulanmagan — buyurtma yopilmadi"
+        toast.error(title, { description: (res as any).error })
+        return
+      }
+
+      const histId = useOrderHistory.getState().push(buildHistoryEntry(printedAt))
+      useOrderHistory.getState().markPrinted(histId)
+      toast.success('Chek chiqdi')
+
+      try {
+        if (syncedServerOrderId) {
+          await window.afisant.orders.close(persistedOrderId, syncedServerOrderId)
+        } else {
+          await window.afisant.orders.close(persistedOrderId)
+        }
+      } catch (e: any) {
+        toast.error("Chek chiqdi, ammo buyurtmani yopib bo'lmadi", {
+          description: e?.message ?? 'Yopish vaqtida xatolik'
+        })
+        return
+      }
+
+      cart.clear()
+      cart.setOrder(null, null)
+      await refreshTable(tId)
+      navigate('/tables')
+      return
 
       // Lazy order creation — mahsulot bor bo'lsa SQLite buyurtma yaratamiz
+      /*
       let orderId = cart.orderId
       if (!orderId && cart.lines.length > 0) {
         const baseOrder = await window.afisant.orders.upsert({
@@ -349,6 +583,7 @@ export default function OrderPage(): JSX.Element {
         if (itemsWithServerId.length > 0) {
           try {
             const res = await window.afisant.orders.syncAll({
+              localOrderId: orderId ?? undefined,
               roomServerId,
               items: itemsWithServerId.map((l) => ({
                 productServerId: l.productServerId!,
@@ -356,7 +591,6 @@ export default function OrderPage(): JSX.Element {
               }))
             })
             serverOrderId = res.serverId
-            console.log('[ORDER] Close sync OK, serverId:', serverOrderId)
           } catch (e: any) {
             toast.warning(`Server sync xatosi: ${e?.message ?? 'ulanish yo\'q'}`)
           }
@@ -367,6 +601,8 @@ export default function OrderPage(): JSX.Element {
 
       const payload: ReceiptPayload = {
         organizationName: settings?.organizationName ?? 'Restoran',
+        organizationAddress: settings?.organizationAddress ?? null,
+        organizationPhone: settings?.organizationPhone ?? null,
         tableName: table.name,
         waiterName: `${waiter.firstName} ${waiter.lastName}`,
         orderLocalUuid: serverOrderId ?? String(orderId ?? 'unkwn'),
@@ -382,7 +618,9 @@ export default function OrderPage(): JSX.Element {
         total: cart.total(),
         printedAt: Date.now(),
         receiptHeader: settings?.receiptHeader ?? null,
-        receiptFooter: settings?.receiptFooter ?? null
+        receiptFooter: settings?.receiptFooter ?? null,
+        receiptQrText: settings?.receiptQrText ?? null,
+        receiptQrLabel: settings?.receiptQrLabel ?? null
       }
 
       // Localda saqlash va chop etilgan deb belgilash
@@ -419,6 +657,7 @@ export default function OrderPage(): JSX.Element {
       cart.setOrder(null, null)
       await refreshTable(tId)
       navigate('/tables')
+      */
     } catch (e: any) {
       toast.error('Xatolik', { description: e?.message })
     } finally {
@@ -436,40 +675,64 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '1fr 420px' }}>
-      <section className="flex flex-col overflow-hidden" style={{ background: '#151728' }}>
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-stone-100 bg-white px-4 shadow-sm">
-          <button
-            onClick={() => void handleSave()}
-            className="btn-ghost"
-            disabled={saving || printing}
-          >
-            <ArrowLeft size={15} /> Orqaga
-          </button>
-          <div className="text-center">
-            <p className="text-base font-bold text-stone-800">{table.name}</p>
-          </div>
-          <div className="w-[80px]" />
-        </header>
+    <div className="grid h-full bg-[#F5F5F4]" style={{ gridTemplateColumns: 'minmax(172px, 196px) 1fr minmax(336px, 400px)' }}>
 
-        <nav className="flex gap-2 overflow-x-auto border-b border-stone-100 bg-white px-5 py-3 shrink-0">
-          {categories.map((c) => (
-            <CategoryPill
+      {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
+      <aside style={{ background: '#1C1917', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '16px 16px 12px', borderBottom: '2px solid rgba(0,0,0,0.2)' }}>
+          <button onClick={() => navigate('/tables')} disabled={printing}
+            style={{ 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, 
+              background: '#44403C', 
+              border: '1px solid #78716C', 
+              borderRadius: 8, 
+              cursor: 'pointer', color: '#fff', fontSize: 14, fontWeight: 800, 
+              padding: '12px', marginBottom: 12, width: '100%', 
+              boxShadow: '0 4px 0 #292524', 
+              transition: 'all 0.1s',
+              textTransform: 'uppercase', letterSpacing: '0.05em'
+            }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #292524' }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #292524' }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 0 #292524' }}
+          >
+            <ArrowLeft size={12} /> Orqaga
+          </button>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>{table.name}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Buyurtma</p>
+        </div>
+
+        {/* Kategoriyalar list */}
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {sortedCategories.map((c) => (
+            <CategoryBtn
               key={c.id}
-              cat={c}
+              label={c.nameUzLatn ?? ''}
               active={c.id === activeCatId}
               onClick={() => setActiveCatId(c.id)}
             />
           ))}
         </nav>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+        {/* User info */}
+        <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#ffffff', lineHeight: 1.3 }}>{waiter.firstName} {waiter.lastName}</p>
+          <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {waiter.role === 'manager' ? 'Manager' : 'Afitsant'}
+          </p>
+        </div>
+      </aside>
+
+      {/* ── MARKAZ: Mahsulotlar ── */}
+      <section className="flex flex-col overflow-hidden" style={{ background: '#F5F5F4' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
           {shownProducts.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-ink-dim">
+            <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#94a3b8' }}>
               Bu kategoriyada mahsulot yo'q
             </div>
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))' }}>
+            <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
               {shownProducts.map((p, idx) => (
                 <ProductCard key={p.id} product={p} idx={idx} />
               ))}
@@ -488,56 +751,87 @@ export default function OrderPage(): JSX.Element {
         saving={saving}
       />
 
-      <AnimatePresence>
-        {confirmClose && (
-          <ConfirmCloseModal
-            onCancel={() => setConfirmClose(false)}
-            onConfirm={handleCloseAndPrint}
-            total={cart.total()}
-            busy={printing}
-          />
-        )}
-        {confirmCancel && (
-          <ConfirmCancelModal
-            onCancel={() => setConfirmCancel(false)}
-            onConfirm={handleCancel}
-            busy={saving}
-          />
-        )}
-      </AnimatePresence>
+      {confirmClose && (
+        <ConfirmCloseModal
+          onCancel={() => setConfirmClose(false)}
+          onConfirm={handleCloseAndPrint}
+          total={cart.total()}
+          busy={printing}
+        />
+      )}
+      {confirmCancel && (
+        <ConfirmCancelModal
+          onCancel={() => setConfirmCancel(false)}
+          onConfirm={handleCancel}
+          busy={saving}
+        />
+      )}
     </div>
   )
 }
 
-function CategoryPill({
-  cat,
-  active,
-  onClick
-}: {
-  cat: Category
-  active: boolean
-  onClick: () => void
-}): JSX.Element {
+function CategoryBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }): JSX.Element {
   return (
     <button
       onClick={onClick}
-      className={cn(
-        'inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all',
-        active
-          ? 'border-[#C2410C] bg-[#C2410C] text-white shadow-sm'
-          : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-stone-700'
-      )}
-      style={
-        active && cat.color
-          ? { borderColor: cat.color, background: cat.color }
-          : undefined
+      style={{
+        width: '100%', padding: '11px 12px', borderRadius: 10,
+        border: active ? '1.5px solid #16a34a' : '1.5px solid rgba(255,255,255,0.08)',
+        cursor: 'pointer', textAlign: 'left', fontSize: 15, fontWeight: 700,
+        background: active ? '#16a34a' : 'rgba(255,255,255,0.05)',
+        color: '#fff', lineHeight: 1.3,
+        boxShadow: active ? '0 2px 10px rgba(22,163,74,0.4)' : 'none',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
+const TAB_COLORS = ['#C2410C','#2563eb','#059669','#7c3aed','#d97706','#0891b2','#be123c']
+
+function CategoryPill({
+  cat, active, onClick, idx
+}: {
+  cat: Category; active: boolean; onClick: () => void; idx: number
+}): JSX.Element {
+  const color = cat.color || TAB_COLORS[idx % TAB_COLORS.length]
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all"
+      style={active
+        ? { background: color, borderColor: color, color: 'white', boxShadow: `0 2px 8px ${color}50` }
+        : { background: 'white', borderColor: `${color}50`, color: '#374151' }
       }
     >
-      <span className={active ? 'text-white/80' : 'text-ink-dim'}>
+      <span style={{ color: active ? 'rgba(255,255,255,0.85)' : color }}>
         {CAT_ICON[cat.icon ?? ''] ?? <Package size={16} />}
       </span>
       {cat.nameUzLatn}
     </button>
+  )
+}
+
+function ProductImage({ imgSrc, name, emoji, qty }: { imgSrc: string | null; name: string; emoji?: string | null; qty: number }): JSX.Element {
+  const [failed, setFailed] = useState(false)
+  if (imgSrc && !failed) {
+    return (
+      <div className="relative aspect-square w-full overflow-hidden bg-white">
+        <img
+          src={imgSrc}
+          alt={name}
+          className="h-full w-full object-contain p-2"
+          onError={() => setFailed(true)}
+        />
+        {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-[#C2410C]" />}
+      </div>
+    )
+  }
+  return (
+    <div className={cn('flex aspect-square items-center justify-center text-5xl', qty > 0 ? 'bg-[#C2410C]/5' : 'bg-stone-50')}>
+      {emoji ?? '📦'}
+    </div>
   )
 }
 
@@ -546,6 +840,8 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
   const add = useCart((s) => s.add)
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
   const [showKgModal, setShowKgModal] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const imgSrc = useCachedImage(product.photo)
 
   const handleClick = (): void => {
@@ -559,65 +855,74 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
 
   return (
     <>
-      <motion.div
+      <div
         onClick={handleClick}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: idx * 0.015 }}
-        whileTap={{ scale: 0.97 }}
-        className={cn(
-          'relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border-2 transition-all select-none',
-          qty > 0
-            ? 'border-[#1EA4E9] bg-white shadow-glow-primary'
-            : 'border-stone-200 bg-white shadow-card hover:shadow-card-hover hover:border-stone-400'
-        )}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          borderRadius: 14,
+          cursor: 'pointer',
+          background: '#ffffff',
+          border: '2px solid #e2e8f0',
+          boxShadow: qty > 0 ? '0 4px 16px rgba(37,99,235,0.18)' : hovered ? '0 6px 20px rgba(37,99,235,0.15)' : '0 2px 6px rgba(0,0,0,0.07)',
+          transition: 'border .15s, box-shadow .18s',
+          userSelect: 'none',
+        }}
       >
+        {/* Aktiv holat — yuqori chiziq */}
+
         {/* Miqdor badge */}
         {qtyLabel && (
           <div style={{
-            position: 'absolute', top: 7, right: 7, zIndex: 2,
-            background: '#C2410C', color: 'white',
-            borderRadius: 20, padding: '2px 8px',
+            position: 'absolute', top: 8, right: 8, zIndex: 2,
+            background: '#2563eb', color: 'white',
+            borderRadius: 99, padding: '3px 9px',
             fontSize: 11, fontWeight: 800,
-            boxShadow: '0 2px 8px rgba(194,65,12,0.4)',
-            lineHeight: 1.5
+            boxShadow: '0 2px 8px rgba(37,99,235,0.4)',
           }}>
             {qtyLabel}
           </div>
         )}
 
-        {imgSrc ? (
-          <div className="relative aspect-square w-full overflow-hidden bg-white">
+        {imgSrc && !imgError ? (
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#f8fafc' }}>
             <img
               src={imgSrc}
               alt={product.nameUzLatn}
-              className="h-full w-full object-contain p-2"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 0 }}
+              onError={() => setImgError(true)}
             />
-            {qty > 0 && <div className="absolute inset-x-0 bottom-0 h-1 bg-[#C2410C]" />}
           </div>
         ) : (
-          <div className={cn('flex aspect-square items-center justify-center text-5xl', qty > 0 ? 'bg-[#C2410C]/5' : 'bg-stone-50')}>
+          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#f8fafc' }}>
             {product.emoji ?? '📦'}
           </div>
         )}
-        <div className="flex flex-col gap-2 p-3">
-          <p className="line-clamp-2 font-semibold leading-snug" style={{ fontSize: 14, color: '#1C1917' }}>{product.nameUzLatn}</p>
-          <p className="font-mono font-bold" style={{ fontSize: 14, color: '#1C1917' }}>
-            {fmtMoney(product.price)} so'm{product.unit === 'kg' ? ' / kg' : ''}
+
+        <div style={{ padding: '8px 10px 10px', background: '#1e293b' }}>
+          <p style={{ margin: '0 0 4px', color: '#ffffff', fontSize: 14, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            {product.nameUzLatn}
+          </p>
+          <p style={{ margin: 0, color: '#94a3b8', fontSize: 13, fontWeight: 600 }}>
+            {fmtMoney(product.price)}
+            <span style={{ fontSize: 11, fontWeight: 400, color: '#64748b', marginLeft: 2 }}>
+              so'm{product.unit === 'kg' ? ' / kg' : ''}
+            </span>
           </p>
         </div>
-      </motion.div>
+      </div>
 
-      <AnimatePresence>
-        {showKgModal && (
-          <KgModal
-            product={product}
-            onClose={() => setShowKgModal(false)}
-            onAdd={(weight) => { add(product, weight); setShowKgModal(false) }}
-          />
-        )}
-      </AnimatePresence>
+      {showKgModal && (
+        <KgModal
+          product={product}
+          onClose={() => setShowKgModal(false)}
+          onAdd={(weight) => { add(product, weight); setShowKgModal(false) }}
+        />
+      )}
     </>
   )
 }
@@ -674,11 +979,10 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.45)' }} onClick={onClose}>
-      <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }} transition={{ duration: 0.15 }}
+      <div
         onClick={(e) => e.stopPropagation()}
         style={{ width: 300, borderRadius: 20, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.28)', overflow: 'hidden' }}>
 
@@ -765,8 +1069,8 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
             + Qo'shish {canAdd ? `(${finalKg.toFixed(2).replace(/\.?0+$/, '')} kg)` : ''}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }
 
@@ -816,55 +1120,53 @@ function CartPanel({
   }, [lines.length, showHistory])
 
   return (
-    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#f2ff00' }}>
+    <aside style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderLeft: '1px solid #E7E5E4', background: '#F5F5F4' }}>
 
-      {/* Sinxronlash ogorish banneri */}
+      {/* Sync warning */}
       {syncWarning && lines.length > 0 && (
-        <div style={{ background: '#FEF3C7', borderBottom: '1px solid #FDE68A', padding: '8px 14px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
-          <p style={{ margin: 0, fontSize: 11, color: '#92400E', fontWeight: 600, lineHeight: 1.45 }}>
-            {!roomServerId
-              ? "Xona server bilan bog'lanmagan. Sozlamalar → To'liq sinxronlash bosing."
-              : "Mahsulotlar server bilan bog'lanmagan. Sozlamalar → To'liq sinxronlash bosing."}
+        <div style={{ background: '#fffbeb', borderBottom: '1px solid #fde68a', padding: '7px 12px', display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+          <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>⚠️</span>
+          <p style={{ margin: 0, fontSize: 10, color: '#92400e', fontWeight: 600, lineHeight: 1.4 }}>
+            {!roomServerId ? "Xona server bilan bog'lanmagan." : "Mahsulotlar server bilan bog'lanmagan."} Sozlamalar → To'liq sinxronlash.
           </p>
         </div>
       )}
 
       {/* Header */}
-      <div style={{ padding: '14px 16px', background: 'white', borderBottom: '1px solid #E7E5E4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '12px 14px', background: '#fff', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 12, background: '#C2410C', display: 'grid', placeItems: 'center', boxShadow: '0 4px 12px rgba(194,65,12,0.25)' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#16a34a', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(22,163,74,0.3)' }}>
             <ShoppingCart size={16} color="white" />
           </div>
           <div>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#1e293b' }}>Savat</p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Savat</p>
             <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>{table.name}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           {historyEntries.length > 0 && (
             <button
               onClick={() => setShowHistory((v) => !v)}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: showHistory ? '#fff7ed' : '#f1f5f9',
-                border: `1px solid ${showHistory ? '#C2410C' : '#e2e8f0'}`,
-                color: showHistory ? '#C2410C' : '#64748b',
-                borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer'
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: showHistory ? '#eff6ff' : '#f8fafc',
+                border: `1px solid ${showHistory ? '#bfdbfe' : '#e2e8f0'}`,
+                color: showHistory ? '#2563eb' : '#64748b',
+                borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
               }}
             >
               <Printer size={11} />
               Tarix ({historyEntries.length})
             </button>
           )}
-          <div style={{ minWidth: 28, height: 28, borderRadius: 99, background: lines.length > 0 ? '#C2410C' : '#E7E5E4', display: 'grid', placeItems: 'center', padding: '0 8px' }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: lines.length > 0 ? 'white' : '#A8A29E' }}>{lines.length}</span>
+          <div style={{ minWidth: 26, height: 26, borderRadius: 99, background: lines.length > 0 ? '#16a34a' : '#e2e8f0', display: 'grid', placeItems: 'center', padding: '0 7px' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: lines.length > 0 ? 'white' : '#94a3b8' }}>{lines.length}</span>
           </div>
         </div>
       </div>
 
       {/* Asosiy kontent — savat yoki tarix (almashinadi, footer doim ko'rinadi) */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 10px', background: '#F5F5F4' }}>
         <AnimatePresence mode="wait">
           {showHistory ? (
             /* ── Tarix paneli ── */
@@ -875,96 +1177,100 @@ function CartPanel({
               <p style={{ margin: '4px 0 10px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 {table.name} — Zakazlar tarixi
               </p>
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {historyEntries.map((entry) => (
                   <HistoryEntryRow key={entry.id} entry={entry} />
                 ))}
               </ul>
-            </motion.div>
-          ) : (
-            /* ── Savat ── */
-            <motion.div key="cart"
-              initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }}
-              transition={{ duration: 0.18 }}
-              style={{ height: lines.length === 0 ? '100%' : undefined }}
-            >
+          </div>
+        ) : (
+          <div style={{ height: lines.length === 0 ? '100%' : undefined }}>
               {lines.length === 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A8A29E', gap: 8 }}>
-                  <ShoppingCart size={32} style={{ opacity: 0.25 }} />
-                  <span style={{ fontSize: 13 }}>Mahsulotlarni tanlang</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 16, background: '#eff6ff', display: 'grid', placeItems: 'center' }}>
+                    <ShoppingCart size={22} color="#93c5fd" />
+                  </div>
+                  <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>Mahsulot tanlanmagan</span>
                 </div>
               ) : (
-                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {lines.map((l, idx) => (
-                    <li key={l.localUuid}
-                      style={{ background: 'white', borderRadius: 10, padding: '10px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #E7E5E4' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1C1917', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {idx + 1}. {l.productName}
-                        </p>
-                        <button onClick={() => rem(l.localUuid)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', padding: '2px 4px', borderRadius: 6, display: 'grid', placeItems: 'center', flexShrink: 0 }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#FEF2F2'; (e.currentTarget as HTMLButtonElement).style.color = '#DC2626' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#FCA5A5' }}>
-                          <Trash2 size={14} />
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {lines.map((l, i) => (
+                    <li key={l.localUuid} style={{
+                      background: 'white', borderRadius: 10, padding: '10px 12px',
+                      border: '1px solid #f1f5f9',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    }}>
+                      {/* Nomi + o'chirish */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', lineHeight: 1.3, flex: 1 }}>
+                          <span style={{ color: '#94a3b8', fontWeight: 500, marginRight: 4 }}>{i + 1}.</span>
+                          {l.productName}
+                        </span>
+                        <button onClick={() => rem(l.localUuid)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: '1px 3px', borderRadius: 5, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5' }}>
+                          <Trash2 size={13} />
                         </button>
                       </div>
+                      {/* Qty + narx */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F5F5F4', borderRadius: 8, padding: '2px 4px', border: '1px solid #E7E5E4' }}>
-                          <QtyBtn onClick={() => dec(l.localUuid)}><Minus size={10} /></QtyBtn>
-                          <span style={{ minWidth: 28, textAlign: 'center', fontSize: 16, fontWeight: 800, color: '#1C1917' }}>{fmtQty(l.quantity)}</span>
-                          <QtyBtn onClick={() => inc(l.localUuid)}><Plus size={10} /></QtyBtn>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', borderRadius: 8, padding: '3px 6px', border: '1px solid #e2e8f0' }}>
+                          <QtyBtn onClick={() => dec(l.localUuid)} color="red"><Minus size={9} /></QtyBtn>
+                          <span style={{ minWidth: 24, textAlign: 'center', fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{fmtQty(l.quantity)}</span>
+                          <QtyBtn onClick={() => inc(l.localUuid)} color="green"><Plus size={9} /></QtyBtn>
                         </div>
-                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>
-                          {fmtMoney(Math.round(l.unitPrice * l.quantity))} so'm
-                        </p>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                          {fmtMoney(Math.round(l.unitPrice * l.quantity))}
+                          <span style={{ fontSize: 10, fontWeight: 400, color: '#64748b', marginLeft: 2 }}>so'm</span>
+                        </span>
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
-      <div style={{ background: 'white', borderTop: '1px solid #E7E5E4', padding: '12px 14px', flexShrink: 0 }}>
-        {/* Jami */}
-        <div style={{ background: '#F5F5F4', borderRadius: 12, padding: '10px 14px', marginBottom: 10, border: '1px solid #E7E5E4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 11, color: '#78716C' }}>Mahsulotlar</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#57534E' }}>{fmtMoney(subtotal)} so'm</span>
+      <div style={{ background: '#fff', borderTop: '1px solid #e2e8f0', padding: '10px 12px 12px', flexShrink: 0 }}>
+        {/* Jami blok */}
+        <div style={{ background: '#f8fafc', borderRadius: 10, padding: '9px 12px', marginBottom: 9, border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: '#64748b' }}>Mahsulotlar</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{fmtMoney(subtotal)} so'm</span>
           </div>
           {fee > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: '#78716C' }}>Xizmat ({feePct}%)</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#57534E' }}>{fmtMoney(fee)} so'm</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
+              <span style={{ fontSize: 11, color: '#64748b' }}>Xizmat ({feePct}%)</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{fmtMoney(fee)} so'm</span>
             </div>
           )}
-          <div style={{ height: 1, background: '#E7E5E4', margin: '6px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1917' }}>Jami</span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: '#C2410C', fontFamily: 'JetBrains Mono, monospace' }}>{fmtMoney(total)} so'm</span>
+          <div style={{ height: 1, background: '#e2e8f0', margin: '7px 0 6px' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Jami</span>
+            <span style={{ fontSize: 20, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+              {fmtMoney(total)}
+              <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b', marginLeft: 3 }}>so'm</span>
+            </span>
           </div>
         </div>
 
         {/* Tugmalar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          <button onClick={onCancel} disabled={saving || printing || lines.length === 0}
-            style={{ width: '100%', height: 40, borderRadius: 10, border: '1.5px solid #fca5a5', background: lines.length === 0 ? '#f8fafc' : '#fff1f2', color: lines.length === 0 ? '#94a3b8' : '#ef4444', fontSize: 12, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <Ban size={13} /> Zakazni bekor qilish
+          <button onClick={() => void onSave()} disabled={saving || printing}
+            style={{ width: '100%', height: 42, borderRadius: 9, border: 'none', background: saving || printing ? '#bfdbfe' : '#2563eb', color: 'white', fontSize: 13, fontWeight: 700, cursor: saving || printing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: saving || printing ? 'none' : '0 2px 8px rgba(37,99,235,0.3)' }}>
+            <Save size={14} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </button>
-          <div style={{ display: 'flex', gap: 7 }}>
-            <button onClick={() => void onSave()} disabled={saving || printing}
-              style={{ flex: 1, height: 42, borderRadius: 10, border: '1.5px solid #D6D3D1', background: 'white', color: '#1C1917', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: saving || printing ? 0.6 : 1 }}>
-              <Save size={13} /> {saving ? 'Saqlanmoqda…' : 'Saqlash'}
-            </button>
-            <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
-              style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: lines.length === 0 ? '#e2e8f0' : 'linear-gradient(145deg,#22c55e,#15803d)', color: lines.length === 0 ? '#94a3b8' : 'white', fontSize: 13, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: lines.length > 0 ? '0 4px 12px rgba(34,197,94,0.35)' : 'none', opacity: printing || saving ? 0.6 : 1 }}>
-              <Printer size={13} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
-            </button>
-          </div>
+          <button onClick={onClosePrint} disabled={lines.length === 0 || printing || saving}
+            style={{ width: '100%', height: 42, borderRadius: 9, border: 'none', background: lines.length === 0 ? '#dcfce7' : '#16a34a', color: lines.length === 0 ? '#86efac' : 'white', fontSize: 13, fontWeight: 700, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: lines.length > 0 ? '0 2px 8px rgba(22,163,74,0.28)' : 'none' }}>
+            <Printer size={14} /> {printing ? 'Chiqarilmoqda…' : 'Chek & Yopish'}
+          </button>
+          <button onClick={onCancel} disabled={saving || printing || lines.length === 0}
+            style={{ width: '100%', height: 36, borderRadius: 9, border: '1px solid #fecaca', background: 'transparent', color: lines.length === 0 ? '#fca5a5' : '#ef4444', fontSize: 12, fontWeight: 600, cursor: lines.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <Ban size={12} /> Zakazni bekor qilish
+          </button>
         </div>
       </div>
     </aside>
@@ -990,36 +1296,31 @@ function HistoryEntryRow({ entry }: { entry: HistoryEntry }): JSX.Element {
         </div>
         <p className="shrink-0 text-sm font-bold text-brand-success">{fmtMoney(entry.total)} so'm</p>
       </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            exit={{ height: 0 }}
-            className="overflow-hidden border-t border-line"
-          >
-            <ul className="space-y-1 px-3 py-2">
-              {entry.items.map((item, i) => (
-                <li key={i} className="flex items-baseline justify-between text-xs">
-                  <span className="flex-1 truncate text-ink-soft">{item.name}</span>
-                  <span className="ml-2 shrink-0 font-medium">
-                    {item.quantity} × {fmtMoney(item.unitPrice)} = {fmtMoney(item.total)} so'm
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {open && (
+        <div className="overflow-hidden border-t border-line">
+          <ul className="space-y-1 px-3 py-2">
+            {entry.items.map((item, i) => (
+              <li key={i} className="flex items-baseline justify-between text-xs">
+                <span className="flex-1 truncate text-ink-soft">{item.name}</span>
+                <span className="ml-2 shrink-0 font-medium">
+                  {item.quantity} × {fmtMoney(item.unitPrice)} = {fmtMoney(item.total)} so'm
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </li>
   )
 }
 
-function QtyBtn({ children, onClick }: { children: React.ReactNode; onClick: () => void }): JSX.Element {
+function QtyBtn({ children, onClick, color }: { children: React.ReactNode; onClick: () => void; color?: 'red'|'green' }): JSX.Element {
+  const bg = color === 'red' ? '#dc2626' : color === 'green' ? '#16a34a' : '#000000'
   return (
     <button
       onClick={onClick}
-      className="grid h-5 w-5 place-items-center rounded border border-line bg-bg-soft text-ink hover:border-line-strong hover:bg-bg-elevated"
+      className="grid h-6 w-6 place-items-center rounded-lg font-bold"
+      style={{ background: bg, color: '#ffffff', border: 'none', fontSize: 14, flexShrink: 0 }}
     >
       {children}
     </button>
@@ -1057,17 +1358,11 @@ function ConfirmCancelModal({
   busy: boolean
 }): JSX.Element {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+    <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm"
       onClick={onCancel}
     >
-      <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
+      <div
         onClick={(e) => e.stopPropagation()}
         className="card w-full max-w-sm p-6"
       >
@@ -1090,8 +1385,8 @@ function ConfirmCancelModal({
             <Ban size={14} /> {busy ? 'Bekor qilinmoqda…' : 'Ha, bekor qilish'}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }
 
@@ -1107,17 +1402,11 @@ function ConfirmCloseModal({
   busy: boolean
 }): JSX.Element {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+    <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm"
       onClick={onCancel}
     >
-      <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
+      <div
         onClick={(e) => e.stopPropagation()}
         className="card-elevated w-full max-w-sm p-6"
       >
@@ -1140,7 +1429,7 @@ function ConfirmCloseModal({
             <Printer size={14} /> {busy ? 'Chiqarilmoqda…' : 'Tasdiqlash'}
           </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }
