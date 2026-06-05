@@ -1,12 +1,7 @@
-const formatter = new Intl.NumberFormat('uz-UZ')
-
 export function fmtMoney(n: number): string {
-  return formatter.format(Math.round(n))
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
-export function fmtMoneyWithUnit(n: number, unit = "so'm"): string {
-  return `${fmtMoney(n)} ${unit}`
-}
 
 export function fmtQty(n: number): string {
   if (Number.isInteger(n)) return String(n)

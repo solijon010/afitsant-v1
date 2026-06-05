@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { useMenu } from '@/stores/menu'
@@ -123,16 +122,8 @@ export default function App(): JSX.Element {
   }, [waiter, location.pathname, navigate])
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={location.pathname}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.18 }}
-        className="h-full"
-      >
-        <Routes location={location}>
+    <div className="h-full">
+      <Routes location={location}>
           {/* Smart redirect — token bo'lsa select-waiter, yo'q bo'lsa server-login */}
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<RootRedirect />} />
@@ -181,7 +172,6 @@ export default function App(): JSX.Element {
             }
           />
         </Routes>
-      </motion.div>
-    </AnimatePresence>
+    </div>
   )
 }

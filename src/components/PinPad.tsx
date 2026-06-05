@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { Delete } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { cn } from '@/lib/cn'
 
 export const PIN_LENGTH = 4
@@ -41,11 +40,7 @@ export default function PinPad({ pin, onChange, disabled = false, shake = false,
   return (
     <div className="flex flex-col items-center">
       {/* Nuqta indikatorlar */}
-      <motion.div
-        animate={shake ? { x: [-8, 8, -6, 6, -3, 3, 0] } : { x: 0 }}
-        transition={{ duration: 0.36 }}
-        className="mb-6 mt-4 flex gap-4"
-      >
+      <div className={`mb-6 mt-4 flex gap-4 ${shake ? 'animate-shake' : ''}`}>
         {Array.from({ length: PIN_LENGTH }).map((_, i) => {
           const filled = i < pin.length
           return retro ? (
@@ -72,7 +67,7 @@ export default function PinPad({ pin, onChange, disabled = false, shake = false,
             />
           )
         })}
-      </motion.div>
+      </div>
 
       {/* Klaviatura */}
       <div className="grid grid-cols-3 gap-3">
