@@ -8,7 +8,7 @@
     color-scheme: light;
 
     /* shadcn/ui uchun CSS variables (HSL format) */
-    --background: 60 5% 96%;           /* #F5F5F4 */
+    --background: 75 10% 100%;           /* #F5F5F4 */
     --foreground: 20 14% 11%;          /* #1C1917 */
     --card: 0 0% 100%;
     --card-foreground: 20 14% 11%;
@@ -87,7 +87,7 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #D6D3D1;
+    background: #6B6E72;
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
