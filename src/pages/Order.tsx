@@ -836,93 +836,105 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.45)' }} onClick={onClose}>
+      style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 300, borderRadius: 20, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.28)', overflow: 'hidden' }}>
+        style={{ width: 320, borderRadius: 26, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(20px)', boxShadow: '0 40px 100px rgba(0,0,0,0.50), 0 0 0 1px rgba(255,255,255,0.8)', overflow: 'hidden' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ background: 'linear-gradient(135deg, #1E2C46, #162038)', padding: '16px 18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{product.nameUzLatn}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#22c55e', fontWeight: 600 }}>{fmtMoney(product.price)} so'm / kg</p>
+            <p style={{ margin: 0, fontWeight: 900, fontSize: 15, color: '#ffffff', letterSpacing: '-0.2px' }}>{product.nameUzLatn}</p>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#4ade80', fontWeight: 700 }}>{fmtMoney(product.price)} so'm / kg</p>
           </div>
-          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', color: '#64748b' }}>
-            <X size={14} />
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.20)', cursor: 'pointer', width: 32, height: 32, borderRadius: 10, display: 'grid', placeItems: 'center', color: '#ffffff' }}>
+            <X size={15} />
           </button>
         </div>
 
-        {/* KG / So'm display — bosib almashish */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #f1f5f9' }}>
-          {/* KG tomoni */}
-          <button onClick={() => switchMode('kg')} style={{
-            flex: 1, padding: '12px 14px', textAlign: 'left', border: 'none', cursor: 'pointer',
-            background: mode === 'kg' ? '#f0fdf4' : 'white',
-            borderRight: '1px solid #f1f5f9',
-            borderBottom: mode === 'kg' ? '2px solid #22c55e' : '2px solid transparent',
-            transition: 'all 0.15s'
-          }}>
-            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>KG</p>
-            <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: mode === 'kg' ? '#15803d' : '#94a3b8', fontFamily: 'monospace' }}>
-              {mode === 'kg' ? (kgVal || '0') : (parsedSom > 0 ? (parsedSom / product.price).toFixed(3).replace(/\.?0+$/, '') : displayKg)}
-            </p>
-          </button>
-
-          {/* So'm tomoni */}
-          <button onClick={() => switchMode('som')} style={{
-            flex: 1, padding: '12px 14px', textAlign: 'left', border: 'none', cursor: 'pointer',
-            background: mode === 'som' ? '#eff6ff' : 'white',
-            borderBottom: mode === 'som' ? '2px solid #3b82f6' : '2px solid transparent',
-            transition: 'all 0.15s'
-          }}>
-            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>SO'M</p>
-            <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: mode === 'som' ? '#1d4ed8' : '#94a3b8', fontFamily: 'monospace' }}>
-              {mode === 'som' ? (somVal || '0') : displaySom}
-            </p>
-          </button>
-        </div>
-
-        {/* Raqamli klaviatura */}
-        <div style={{ padding: '10px 12px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
+        {/* Numpad */}
+        <div style={{ padding: '14px 14px 8px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {NUMPAD_KEYS.map((key) => (
             <button
               key={key}
               onClick={() => handleKey(key)}
               style={{
-                height: 52, borderRadius: 12, border: 'none', cursor: 'pointer',
-                fontSize: key === '⌫' ? 18 : 20,
-                fontWeight: key === '⌫' ? 400 : 700,
-                background: key === '⌫' ? '#fee2e2' : '#f8fafc',
-                color: key === '⌫' ? '#ef4444' : '#1e293b',
+                height: 56, borderRadius: 14,
+                border: key === '⌫' ? '2px solid #fecaca' : '2px solid #e8edf5',
+                cursor: 'pointer',
+                fontSize: key === '⌫' ? 20 : 23,
+                fontWeight: 900,
+                background: key === '⌫' ? '#fff0f0' : 'rgba(255,255,255,0.90)',
+                color: key === '⌫' ? '#ef4444' : '#0f172a',
                 display: 'grid', placeItems: 'center',
-                transition: 'background 0.1s',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,1)',
+                transition: 'all 0.10s',
               }}
-              onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.background = key === '⌫' ? '#fecaca' : '#e2e8f0' }}
-              onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.background = key === '⌫' ? '#fee2e2' : '#f8fafc' }}
+              onMouseDown={(e) => {
+                const el = e.currentTarget as HTMLButtonElement
+                el.style.background = key === '⌫' ? '#fecaca' : '#dbeafe'
+                el.style.transform = 'scale(0.94)'
+              }}
+              onMouseUp={(e) => {
+                const el = e.currentTarget as HTMLButtonElement
+                el.style.background = key === '⌫' ? '#fff0f0' : 'rgba(255,255,255,0.90)'
+                el.style.transform = 'scale(1)'
+              }}
             >
               {key}
             </button>
           ))}
         </div>
 
+        {/* KG / So'm display — numpad pastida */}
+        <div style={{ display: 'flex', margin: '6px 14px 0', borderRadius: 14, overflow: 'hidden', border: '2px solid #e2e8f0' }}>
+          <button onClick={() => switchMode('kg')} style={{
+            flex: 1, padding: '12px 14px', textAlign: 'left', border: 'none', cursor: 'pointer',
+            background: mode === 'kg' ? '#f0fdf4' : '#f8fafc',
+            borderRight: '2px solid #e2e8f0',
+            borderBottom: mode === 'kg' ? '3px solid #16a34a' : '3px solid transparent',
+            transition: 'all 0.15s'
+          }}>
+            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 800, color: mode === 'kg' ? '#16a34a' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.10em' }}>KG</p>
+            <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: mode === 'kg' ? '#14532d' : '#cbd5e1', fontFamily: 'monospace', letterSpacing: '-1px' }}>
+              {mode === 'kg' ? (kgVal || '0') : (parsedSom > 0 ? (parsedSom / product.price).toFixed(3).replace(/\.?0+$/, '') : displayKg)}
+            </p>
+          </button>
+          <button onClick={() => switchMode('som')} style={{
+            flex: 1, padding: '12px 14px', textAlign: 'left', border: 'none', cursor: 'pointer',
+            background: mode === 'som' ? '#eff6ff' : '#f8fafc',
+            borderBottom: mode === 'som' ? '3px solid #2563eb' : '3px solid transparent',
+            transition: 'all 0.15s'
+          }}>
+            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 800, color: mode === 'som' ? '#2563eb' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.10em' }}>SO'M</p>
+            <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: mode === 'som' ? '#1d4ed8' : '#cbd5e1', fontFamily: 'monospace', letterSpacing: '-1px' }}>
+              {mode === 'som' ? (somVal || '0') : displaySom}
+            </p>
+          </button>
+        </div>
+
         {/* Tugmalar */}
-        <div style={{ padding: '0 12px 14px', display: 'flex', gap: 8 }}>
-          <button onClick={onClose} style={{ flex: 1, height: 46, borderRadius: 12, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+        <div style={{ padding: '12px 14px 16px', display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{
+            flex: 1, height: 50, borderRadius: 14,
+            border: '2px solid #e2e8f0', background: '#f8fafc',
+            color: '#475569', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+          }}>
             Bekor
           </button>
           <button
             onClick={() => { if (canAdd && finalKg > 0) onAdd(finalKg) }}
             disabled={!canAdd || finalKg <= 0}
             style={{
-              flex: 1.6, height: 46, borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, cursor: canAdd ? 'pointer' : 'not-allowed',
-              background: canAdd ? 'linear-gradient(145deg,#22c55e,#16a34a)' : '#e2e8f0',
-              color: canAdd ? 'white' : '#94a3b8',
-              boxShadow: canAdd ? '0 4px 12px rgba(34,197,94,0.35)' : 'none'
+              flex: 1.8, height: 50, borderRadius: 14, border: 'none',
+              fontSize: 14, fontWeight: 900, cursor: canAdd ? 'pointer' : 'not-allowed',
+              background: canAdd ? 'linear-gradient(145deg, #22c55e, #15803d)' : '#e2e8f0',
+              color: canAdd ? '#ffffff' : '#94a3b8',
+              boxShadow: canAdd ? '0 6px 16px rgba(34,197,94,0.40)' : 'none',
             }}
           >
-            + Qo'shish {canAdd ? `(${finalKg.toFixed(2).replace(/\.?0+$/, '')} kg)` : ''}
+            {canAdd ? `+ Qo'shish (${finalKg.toFixed(2).replace(/\.?0+$/, '')} kg)` : `+ Qo'shish`}
           </button>
         </div>
       </div>
