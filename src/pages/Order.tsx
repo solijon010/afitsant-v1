@@ -14,7 +14,8 @@ import {
   ShoppingCart,
   Trash2,
   X,
-  Ban
+  Ban,
+  Tag
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Category, Product, ReceiptPayload, TableEntity } from '@shared/types'
@@ -521,30 +522,31 @@ export default function OrderPage(): JSX.Element {
   }
 
   return (
-    <div className="grid h-full" style={{ gridTemplateColumns: '210px 1fr 340px' }}>
+    <div className="grid h-full" style={{ gridTemplateColumns: 'clamp(130px, 14vw, 170px) 1fr clamp(260px, 26vw, 360px)' }}>
 
       {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
-      <aside style={{ background: '#1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      <aside style={{ background: '#1E2C46', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid rgba(0,0,0,0.25)' }}>
         {/* Header */}
-        <div style={{ padding: '14px 10px 12px', borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
+        <div style={{ padding: '10px 10px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <button onClick={() => void handleSave()} disabled={saving || printing}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              background: '#dc2626', border: 'none',
+              background: 'linear-gradient(145deg,#ef4444,#dc2626)',
+              border: 'none',
               borderRadius: 8, cursor: 'pointer', color: '#ffffff',
               fontSize: 12, fontWeight: 700,
               padding: '7px 10px', marginBottom: 10, width: '100%',
-              boxShadow: '0 2px 8px rgba(220,38,38,0.35)',
+              boxShadow: '0 3px 10px rgba(220,38,38,0.40)',
             }}
           >
             <ArrowLeft size={12} /> Orqaga
           </button>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>{table.name}</p>
-          <p style={{ margin: '2px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Buyurtma</p>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>{table.name}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Buyurtma</p>
         </div>
 
         {/* Kategoriyalar list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sortedCategories.map((c) => (
             <CategoryBtn
               key={c.id}
@@ -555,13 +557,6 @@ export default function OrderPage(): JSX.Element {
           ))}
         </nav>
 
-        {/* User info */}
-        <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-          <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#ffffff', lineHeight: 1.3 }}>{waiter.firstName} {waiter.lastName}</p>
-          <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            {waiter.role === 'manager' ? 'Manager' : 'Afitsant'}
-          </p>
-        </div>
       </aside>
 
       {/* ── MARKAZ: Mahsulotlar ── */}
@@ -572,7 +567,7 @@ export default function OrderPage(): JSX.Element {
               Bu kategoriyada mahsulot yo'q
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+            <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(140px, 18vw, 220px), 1fr))' }}>
               {shownProducts.map((p, idx) => (
                 <ProductCard key={p.id} product={p} idx={idx} />
               ))}
@@ -615,12 +610,29 @@ function CategoryBtn({ label, active, onClick }: { label: string; active: boolea
     <button
       onClick={onClick}
       style={{
-        width: '100%', padding: '11px 12px', borderRadius: 10,
-        border: active ? '1.5px solid #16a34a' : '1.5px solid rgba(255,255,255,0.08)',
-        cursor: 'pointer', textAlign: 'left', fontSize: 15, fontWeight: 700,
-        background: active ? '#16a34a' : 'rgba(255,255,255,0.05)',
-        color: '#fff', lineHeight: 1.3,
-        boxShadow: active ? '0 2px 10px rgba(22,163,74,0.4)' : 'none',
+        width: '100%',
+        padding: '15px 14px',
+        borderRadius: 14,
+        cursor: 'pointer',
+        textAlign: 'center',
+        fontSize: 15,
+        fontWeight: 900,
+        lineHeight: 1.25,
+        letterSpacing: '0.02em',
+        transition: 'all 0.15s ease',
+        ...(active ? {
+          background: '#ffffff',
+          border: '2.5px solid #ffffff',
+          color: '#0f172a',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25)',
+          textShadow: 'none',
+        } : {
+          background: 'linear-gradient(160deg, #22c55e 0%, #15803d 100%)',
+          border: '2.5px solid #16a34a',
+          color: '#ffffff',
+          boxShadow: '0 5px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28)',
+          textShadow: '0 1px 3px rgba(0,0,0,0.40)',
+        }),
       }}
     >
       {label}
@@ -704,12 +716,13 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          borderRadius: 14,
+          borderRadius: 18,
           cursor: 'pointer',
           background: '#ffffff',
-          border: '2px solid #e2e8f0',
-          boxShadow: qty > 0 ? '0 4px 16px rgba(37,99,235,0.18)' : hovered ? '0 6px 20px rgba(37,99,235,0.15)' : '0 2px 6px rgba(0,0,0,0.07)',
-          transition: 'border .15s, box-shadow .18s',
+          border: qty > 0 ? '2.5px solid #f59e0b' : hovered ? '2.5px solid #f59e0b' : '2px solid #ede8df',
+          boxShadow: qty > 0 ? '0 6px 20px rgba(245,158,11,0.30)' : hovered ? '0 10px 28px rgba(245,158,11,0.28)' : '0 3px 12px rgba(0,0,0,0.08)',
+          transform: hovered && qty === 0 ? 'translateY(-3px) scale(1.02)' : 'none',
+          transition: 'all .18s ease',
           userSelect: 'none',
         }}
       >
@@ -719,17 +732,17 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         {qtyLabel && (
           <div style={{
             position: 'absolute', top: 8, right: 8, zIndex: 2,
-            background: '#2563eb', color: 'white',
+            background: '#d97706', color: 'white',
             borderRadius: 99, padding: '3px 9px',
             fontSize: 11, fontWeight: 800,
-            boxShadow: '0 2px 8px rgba(37,99,235,0.4)',
+            boxShadow: '0 2px 8px rgba(217,119,6,0.45)',
           }}>
             {qtyLabel}
           </div>
         )}
 
         {imgSrc && !imgError ? (
-          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#f8fafc' }}>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#faf7f2' }}>
             <img
               src={imgSrc}
               alt={product.nameUzLatn}
@@ -738,21 +751,24 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             />
           </div>
         ) : (
-          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#f8fafc' }}>
+          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#faf7f2' }}>
             {product.emoji ?? '📦'}
           </div>
         )}
 
-        <div style={{ padding: '8px 10px 10px', background: '#1e293b' }}>
-          <p style={{ margin: '0 0 4px', color: '#ffffff', fontSize: 14, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        <div style={{ padding: '10px 12px 13px', background: '#f5efe4', borderTop: '1.5px solid #e8ddc8' }}>
+          <p style={{ margin: '0 0 6px', color: '#1a1209', fontSize: 12, fontWeight: 900, lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             {product.nameUzLatn}
           </p>
-          <p style={{ margin: 0, color: '#94a3b8', fontSize: 13, fontWeight: 600 }}>
-            {fmtMoney(product.price)}
-            <span style={{ fontSize: 11, fontWeight: 400, color: '#64748b', marginLeft: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ background: '#d97706', borderRadius: 6, width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(217,119,6,0.50)' }}><Tag size={13} color="#ffffff" strokeWidth={2.5} /></span>
+            <span style={{ fontSize: 15, fontWeight: 900, color: '#1a1209', letterSpacing: '-0.4px' }}>
+              {fmtMoney(product.price)}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#9c8a70' }}>
               so'm{product.unit === 'kg' ? ' / kg' : ''}
             </span>
-          </p>
+          </div>
         </div>
       </div>
 
@@ -1031,33 +1047,33 @@ function CartPanel({
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {lines.map((l, i) => (
                     <li key={l.localUuid} style={{
-                      background: 'white', borderRadius: 10, padding: '10px 12px',
-                      border: '1px solid #f1f5f9',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      background: 'white', borderRadius: 12, padding: '11px 13px',
+                      border: '2px solid #e2e8f0',
+                      boxShadow: '0 3px 10px rgba(0,0,0,0.07)',
                     }}>
                       {/* Nomi + o'chirish */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 6 }}>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', lineHeight: 1.3, flex: 1 }}>
-                          <span style={{ color: '#94a3b8', fontWeight: 500, marginRight: 4 }}>{i + 1}.</span>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 9, gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', lineHeight: 1.3, flex: 1, letterSpacing: '-0.2px' }}>
+                          <span style={{ color: '#94a3b8', fontWeight: 700, marginRight: 4 }}>{i + 1}.</span>
                           {l.productName}
                         </span>
                         <button onClick={() => rem(l.localUuid)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: '1px 3px', borderRadius: 5, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5' }}>
+                          style={{ background: '#fef2f2', border: '1.5px solid #fecaca', cursor: 'pointer', color: '#ef4444', padding: '4px 6px', borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0 }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fee2e2' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2' }}>
                           <Trash2 size={13} />
                         </button>
                       </div>
                       {/* Qty + narx */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', borderRadius: 8, padding: '3px 6px', border: '1px solid #e2e8f0' }}>
-                          <QtyBtn onClick={() => dec(l.localUuid)} color="red"><Minus size={9} /></QtyBtn>
-                          <span style={{ minWidth: 24, textAlign: 'center', fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{fmtQty(l.quantity)}</span>
-                          <QtyBtn onClick={() => inc(l.localUuid)} color="green"><Plus size={9} /></QtyBtn>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', borderRadius: 9, padding: '4px 7px', border: '1.5px solid #e2e8f0' }}>
+                          <QtyBtn onClick={() => dec(l.localUuid)} color="red"><Minus size={10} /></QtyBtn>
+                          <span style={{ minWidth: 26, textAlign: 'center', fontSize: 16, fontWeight: 900, color: '#0f172a' }}>{fmtQty(l.quantity)}</span>
+                          <QtyBtn onClick={() => inc(l.localUuid)} color="green"><Plus size={10} /></QtyBtn>
                         </div>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                        <span style={{ fontSize: 15, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
                           {fmtMoney(Math.round(l.unitPrice * l.quantity))}
-                          <span style={{ fontSize: 10, fontWeight: 400, color: '#64748b', marginLeft: 2 }}>so'm</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginLeft: 2 }}>so'm</span>
                         </span>
                       </div>
                     </li>
@@ -1071,23 +1087,23 @@ function CartPanel({
       {/* Footer */}
       <div style={{ background: '#fff', borderTop: '1px solid #e2e8f0', padding: '10px 12px 12px', flexShrink: 0 }}>
         {/* Jami blok */}
-        <div style={{ background: '#f8fafc', borderRadius: 10, padding: '9px 12px', marginBottom: 9, border: '1px solid #e2e8f0' }}>
+        <div style={{ background: '#f8fafc', borderRadius: 12, padding: '11px 14px', marginBottom: 9, border: '2px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: '#64748b' }}>Mahsulotlar</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{fmtMoney(subtotal)} so'm</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Mahsulotlar</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{fmtMoney(subtotal)} so'm</span>
           </div>
           {fee > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
-              <span style={{ fontSize: 11, color: '#64748b' }}>Xizmat ({feePct}%)</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{fmtMoney(fee)} so'm</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Xizmat ({feePct}%)</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{fmtMoney(fee)} so'm</span>
             </div>
           )}
-          <div style={{ height: 1, background: '#e2e8f0', margin: '7px 0 6px' }} />
+          <div style={{ height: 2, background: '#e2e8f0', margin: '8px 0 7px', borderRadius: 99 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Jami</span>
-            <span style={{ fontSize: 20, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+            <span style={{ fontSize: 14, fontWeight: 900, color: '#0f172a' }}>Jami</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace', letterSpacing: '-1px' }}>
               {fmtMoney(total)}
-              <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b', marginLeft: 3 }}>so'm</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginLeft: 3 }}>so'm</span>
             </span>
           </div>
         </div>

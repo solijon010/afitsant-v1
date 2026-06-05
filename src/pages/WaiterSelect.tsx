@@ -131,7 +131,7 @@ export default function WaiterSelect(): JSX.Element {
       </header>
 
       {/* ── KONTENT ── */}
-      <main className="flex-1 overflow-y-auto px-8 py-8">
+      <main className="flex-1 overflow-y-auto" style={{ padding: 'clamp(12px, 3vw, 32px)' }}>
 
         {loading ? (
           /* ── Skeleton ── */
@@ -159,7 +159,7 @@ export default function WaiterSelect(): JSX.Element {
           /* ── Afitsantlar grid ── */
           <div
             className="grid gap-5"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(180px, 22vw, 280px), 1fr))' }}
           >
             {waiters.map((w) => (
               <WaiterCard key={w.id} waiter={w} onClick={() => navigate(`/pin/${w.id}`)} />
@@ -190,9 +190,9 @@ function WaiterCard({ waiter, onClick }: { waiter: Waiter; onClick: () => void }
       onClick={onClick}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 16, padding: '28px 24px 24px',
+        gap: 12, padding: 'clamp(16px, 2.5vw, 28px) clamp(12px, 2vw, 24px)',
         background: '#ffffff',
-        borderRadius: 20,
+        borderRadius: 16,
         border: '1px solid #f1f5f9',
         boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
         cursor: 'pointer', textAlign: 'center', width: '100%',

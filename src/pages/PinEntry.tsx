@@ -214,7 +214,7 @@ export default function PinEntry(): JSX.Element {
     >
       {/* ── CHAP: PIN FORM ── */}
       <div style={{
-        width: '52%', height: '100%',
+        width: 'clamp(380px, 52%, 620px)', height: '100%',
         display: 'flex', flexDirection: 'column',
         position: 'relative',
         background: '#D2D0D1',
@@ -246,18 +246,18 @@ export default function PinEntry(): JSX.Element {
       {/* ── MARKAZ ── */}
       <div style={{
         flex: 1,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        paddingBottom: 20,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+        paddingTop: '1vh',
       }}>
 
         {/* Logo */}
         <div style={{
-          width: 160, height: 160, borderRadius: '50%',
+          width: 130, height: 130, borderRadius: '50%',
           background: '#ffffff',
           boxShadow: '6px 6px 14px #aaa8a9, -5px -5px 12px #e8e6e7',
           overflow: 'hidden',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: 20,
+          marginBottom: 12,
         }}>
           <img src={hisobchimLogo} alt="Hisobchim"
             style={{ width: '92%', height: '92%', objectFit: 'contain' }}
@@ -281,7 +281,7 @@ export default function PinEntry(): JSX.Element {
         )}
 
         {/* PIN nuqtalar */}
-        <div style={{ display: 'flex', gap: 16, marginBottom: 28 }} className={shake ? 'animate-shake' : ''}>
+        <div style={{ display: 'flex', gap: 14, marginBottom: 18 }} className={shake ? 'animate-shake' : ''}>
           {Array.from({ length: PIN_LENGTH }).map((_, i) => {
             const filled = i < pin.length
             return (
@@ -295,7 +295,7 @@ export default function PinEntry(): JSX.Element {
         </div>
 
         {/* Numpad */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: 14, justifyContent: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 64px)', gap: 10, justifyContent: 'center' }}>
           {DIGITS.map(n => (
             <NumBtn key={n} disabled={disabled} onClick={() => press(n)}>
               {n}
@@ -380,7 +380,7 @@ function NumBtn({ children, disabled, onClick, muted }: {
       disabled={disabled}
       onClick={onClick}
       style={{
-        width: 72, height: 72, borderRadius: '50%',
+        width: 64, height: 64, borderRadius: '50%',
         background: '#D2D0D1',
         border: 'none',
         cursor: disabled ? 'default' : 'pointer',
