@@ -1199,40 +1199,6 @@ async function printReceiptInternal(
 
 export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true } | { ok: false; error: string }> {
   return printReceiptInternal(payload, { useDailyReceiptNumber: payload.receiptNumber === undefined })
-
-  const s = getSettings()
-  if (!s.printerType) return { ok: false, error: 'Printer sozlanmagan' }
-
-  const dailyNo = nextDailyReceiptNo()
-  const p: ReceiptPayload = { ...payload, receiptNumber: dailyNo }
-
-  if (process.platform === 'win32') {
-    // Windows: template mavjud bo'lsa — FAQAT document yo'l (ikki marta chiqmasligi uchun USB parallel ishlatilmaydi)
-    const templatePath = resolveReceiptTemplatePath()
-    if (templatePath && s.printerName) {
-      return printViaWindowsDocument(p, s.printerName!)
-    }
-    // Template yo'q: raw ESC/POS USB portga
-    const rawPort = resolveWindowsRawPort()
-    if (rawPort) {
-      const receiptBuffer = await buildReceiptBuffer(p)
-      return printRawWindowsPort(receiptBuffer, rawPort!)
-    }
-    // Oxirgi fallback: Windows document (template siz)
-    if (s.printerName) {
-      return printViaWindowsDocument(p, s.printerName!)
-    }
-    return { ok: false, error: 'Printer sozlanmagan: USB port (USB001/USB002) yoki printer nomi kiritilmagan' }
-  }
-
-  // Linux USB
-  if (s.printerType === 'usb') {
-    const receiptBuffer = await buildReceiptBuffer(p)
-    return printRaw(receiptBuffer)
-  }
-
-  // Network
-  return printViaThermalLib(p)
 }
 
 export async function testPrint(): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -1257,35 +1223,10 @@ export async function testPrint(): Promise<{ ok: true } | { ok: false; error: st
     total: 123000,
     printedAt: Date.now(),
     receiptHeader: s.receiptHeader || 'CHOYXONA\nEST. 2005',
-    receiptFooter: s.receiptFooter || 'Sohil Choyxonasiga qaytib kelganingiz uchun rahmat!\nBiz bilan yana koвЂrishguncha!',
+    receiptFooter: s.receiptFooter || 'Sohil Choyxonasiga qaytib kelganingiz uchun rahmat!\nBiz bilan yana ko'rishguncha!',
     receiptQrText: s.receiptQrText || 'https://instagram.com/soxil.choyxona',
     receiptQrLabel: s.receiptQrLabel || '@soxil.choyxona'
   }, { useDailyReceiptNumber: false })
-
-  return printReceipt({
-    organizationName: s.organizationName || 'SOHIL',
-    organizationAddress: s.organizationAddress || 'Andijon viloyat, Shahrixon tumani',
-    organizationPhone: s.organizationPhone || '+99833 904 20 20',
-    tableName: '07',
-    waiterName: 'Bobirjon',
-    orderLocalUuid: 'test1234abcd',
-    items: [
-      { name: 'Norin', quantity: 2, unitPrice: 30000, total: 60000 },
-      { name: 'Manti (Qovurilgan)', quantity: 1, unitPrice: 35000, total: 35000 },
-      { name: 'Non', quantity: 2, unitPrice: 3000, total: 6000 },
-      { name: 'Choy (Dammalama)', quantity: 1, unitPrice: 12000, total: 12000 },
-      { name: 'Salat (Achchiq)', quantity: 1, unitPrice: 10000, total: 10000 }
-    ],
-    subtotal: 123000,
-    serviceFeePercent: 0,
-    serviceFee: 0,
-    total: 123000,
-    printedAt: Date.now(),
-    receiptHeader: s.receiptHeader || 'CHOYXONA\nEST. 2005',
-    receiptFooter: s.receiptFooter || 'Sohil Choyxonasiga qaytib kelganingiz uchun rahmat!\nBiz bilan yana ko‘rishguncha!',
-    receiptQrText: s.receiptQrText || 'https://instagram.com/soxil.choyxona',
-    receiptQrLabel: s.receiptQrLabel || '@soxil.choyxona'
-  })
 }
 
 export async function listUsbPrinters(): Promise<PrinterDiscoveryItem[]> {
