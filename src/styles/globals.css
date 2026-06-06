@@ -97,6 +97,28 @@
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; opacity: 0.5; }
 
+  /* Touch press effects */
+  .product-card:active {
+    transform: scale(0.97) !important;
+    transition: transform 80ms ease-out !important;
+  }
+  .category-btn:active {
+    transform: scale(0.97) !important;
+    transition: transform 80ms ease-out !important;
+  }
+  .action-btn:active {
+    transform: scale(0.98) !important;
+    transition: transform 80ms ease-out !important;
+  }
+  @keyframes addFlash {
+    0%   { background-color: #FFFFFF; }
+    40%  { background-color: #D1FAE5; }
+    100% { background-color: #FFFFFF; }
+  }
+  .product-card-flash {
+    animation: addFlash 200ms ease-out;
+  }
+
   /* Dark mode overrides — minimal */
   .dark body { background: #161311; color: #EDE9E5; }
   .dark .bg-white { background: #1E1916 !important; }
