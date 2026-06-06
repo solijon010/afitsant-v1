@@ -771,7 +771,7 @@ function ProductCard({ product, idx, catName = '' }: { product: Product; idx: nu
         )}
 
         <div style={{ padding: '10px 12px 13px', background: '#f5efe4', borderTop: '1.5px solid #e8ddc8' }}>
-          <p style={{ margin: '0 0 6px', color: '#1a1209', fontSize: 12, fontWeight: 900, lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <p style={{ margin: '0 0 6px', color: '#1a1209', fontSize: 16, fontWeight: 900, lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             {product.nameUzLatn}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
