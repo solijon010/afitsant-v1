@@ -14,7 +14,8 @@ import {
   ShoppingCart,
   Trash2,
   X,
-  Ban
+  Ban,
+  Tag
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Category, Product, ReceiptPayload, TableEntity } from '@shared/types'
@@ -733,51 +734,54 @@ function ProductCard({ product, idx, catName = '' }: { product: Product; idx: nu
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          borderRadius: 12,
+          borderRadius: 18,
           cursor: 'pointer',
           background: '#ffffff',
-          border: qty > 0 ? '2px solid #2563EB' : '1px solid #E5E7EB',
-          boxShadow: qty > 0 ? '0 4px 12px rgba(37,99,235,0.15)' : '0 2px 8px rgba(0,0,0,0.06)',
-          transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+          border: qty > 0 ? '2.5px solid #f59e0b' : '2px solid #ede8df',
+          boxShadow: qty > 0 ? '0 6px 20px rgba(245,158,11,0.30)' : '0 3px 12px rgba(0,0,0,0.08)',
+          transition: 'border-color .18s ease, box-shadow .18s ease',
           userSelect: 'none',
-          minHeight: 120,
         }}
       >
         {qtyLabel && (
           <div style={{
             position: 'absolute', top: 8, right: 8, zIndex: 2,
-            background: '#2563EB', color: 'white',
+            background: '#d97706', color: 'white',
             borderRadius: 99, padding: '3px 9px',
-            fontSize: 12, fontWeight: 700,
+            fontSize: 11, fontWeight: 800,
+            boxShadow: '0 2px 8px rgba(217,119,6,0.45)',
           }}>
             {qtyLabel}
           </div>
         )}
 
         {imgSrc && !imgError ? (
-          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#F9FAFB' }}>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#faf7f2' }}>
             <img
               src={imgSrc}
               alt={product.nameUzLatn}
-              style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 0 }}
               onError={() => setImgError(true)}
             />
           </div>
         ) : (
-          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#F9FAFB' }}>
+          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#faf7f2' }}>
             {product.emoji ?? '📦'}
           </div>
         )}
 
-        <div style={{ padding: '10px 12px 12px', background: '#ffffff', borderTop: '1px solid #E5E7EB', flex: 1 }}>
-          <p style={{ margin: '0 0 5px', color: '#111827', fontSize: 19, fontWeight: 500, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        <div style={{ padding: '10px 12px 13px', background: '#f5efe4', borderTop: '1.5px solid #e8ddc8' }}>
+          <p style={{ margin: '0 0 6px', color: '#1a1209', fontSize: 12, fontWeight: 900, lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             {product.nameUzLatn}
           </p>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#111827', letterSpacing: '-0.3px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ background: '#d97706', borderRadius: 6, width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(217,119,6,0.50)' }}>
+              <Tag size={13} color="#ffffff" strokeWidth={2.5} />
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 900, color: '#1a1209', letterSpacing: '-0.4px' }}>
               {fmtMoney(product.price)}
             </span>
-            <span style={{ fontSize: 11, fontWeight: 400, color: '#6B7280' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#9c8a70' }}>
               so'm{(product.unit === 'kg' || isLitr) ? ` / ${isLitr ? 'L' : 'kg'}` : ''}
             </span>
           </div>
