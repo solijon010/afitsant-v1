@@ -39,7 +39,7 @@ function sortTables(list: TableWithOrder[]): TableWithOrder[] {
   return [...list].sort((a, b) => {
     const pa = getPrefix(a.table.name)
     const pb = getPrefix(b.table.name)
-    if (pa !== pb) return pb.localeCompare(pa, 'uz')
+    if (pa !== pb) return pa.localeCompare(pb, 'uz')
     const na = parseInt(a.table.name.replace(/\D/g, '')) || 0
     const nb = parseInt(b.table.name.replace(/\D/g, '')) || 0
     return na - nb
@@ -271,7 +271,7 @@ export default function TablesPage(): JSX.Element {
                       <div style={{ flex: 1, height: 1, background: '#D6D3D1' }} />
                       <span style={{ fontSize: 15, color: '#78716C', fontWeight: 600 }}>{activeCount}/{tables.length} ta</span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(178px, 1fr))', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(140px, 16vw, 200px), 1fr))', gap: 12 }}>
                       {tables.map((tw, i) => (
                         <TableCard key={tw.table.id} tw={tw} idx={i} onClick={() => navigate(`/order/${tw.table.id}`)} />
                       ))}
@@ -297,29 +297,42 @@ function AreaButton({ label, count, active, onClick }: { label: string; count: n
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 14px',
-        borderRadius: 12,
-        border: active ? '1.5px solid #16a34a' : '1.5px solid rgba(255,255,255,0.08)',
+        padding: '15px 16px',
+        borderRadius: 14,
         cursor: 'pointer',
-        background: active ? '#16a34a' : 'rgba(255,255,255,0.05)',
-        color: '#ffffff',
-        fontSize: 14,
-        fontWeight: 700,
+        fontSize: 15,
+        fontWeight: 900,
         textAlign: 'left',
-        boxShadow: active ? '0 2px 10px rgba(22,163,74,0.4)' : 'none',
+        transition: 'all 0.15s ease',
+        letterSpacing: '0.02em',
+        ...(active ? {
+          background: '#ffffff',
+          border: '2.5px solid #ffffff',
+          color: '#0f172a',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25)',
+          textShadow: 'none',
+        } : {
+          background: 'linear-gradient(160deg, #22c55e 0%, #15803d 100%)',
+          border: '2.5px solid #16a34a',
+          color: '#ffffff',
+          boxShadow: '0 5px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28)',
+          textShadow: '0 1px 3px rgba(0,0,0,0.40)',
+        }),
       }}
     >
       <span>{label}</span>
       {count > 0 && (
         <span style={{
-          background: active ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
-          color: '#fff',
+          background: active ? '#1E2C46' : 'rgba(0,0,0,0.22)',
+          color: '#ffffff',
           borderRadius: 99,
-          fontSize: 11,
-          fontWeight: 800,
-          padding: '2px 8px',
-          minWidth: 22,
+          fontSize: 12,
+          fontWeight: 900,
+          padding: '3px 10px',
+          minWidth: 28,
           textAlign: 'center',
+          letterSpacing: '0',
+          boxShadow: active ? '0 2px 6px rgba(0,0,0,0.25)' : 'none',
         }}>
           {count}
         </span>
@@ -343,18 +356,18 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
         onClick={onClick}
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 12, background: '#ffffff', borderRadius: 18,
-          border: '1px solid #f3f4f6', padding: '28px 16px',
-          minHeight: 158, cursor: 'pointer', textAlign: 'center',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          gap: 10, background: '#ffffff', borderRadius: 16,
+          border: '2px dashed #d1d5db', padding: '24px 16px',
+          minHeight: 148, cursor: 'pointer', textAlign: 'center',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
         }}
       >
-        <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef2f2', border: '1.5px solid #fecaca', display: 'grid', placeItems: 'center' }}>
-          <Plus size={20} color="#f87171" />
+        <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', border: '2px solid #fca5a5', display: 'grid', placeItems: 'center' }}>
+          <Plus size={20} color="#ef4444" />
         </div>
         <div>
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111827', letterSpacing: '-0.3px' }}>{tw.table.name}</p>
-          <p style={{ margin: '3px 0 0', fontSize: 11, color: '#f87171', fontWeight: 500 }}>Bo'sh</p>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#111827', letterSpacing: '-0.3px' }}>{tw.table.name}</p>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#ef4444', fontWeight: 700 }}>Bo'sh</p>
         </div>
       </button>
     )
@@ -366,40 +379,41 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
       onClick={onClick}
       style={{
         position: 'relative', display: 'flex', flexDirection: 'column',
-        background: '#ffffff', borderRadius: 18,
-        border: '1px solid #e5e7eb',
+        background: '#ffffff', borderRadius: 16,
+        border: '2px solid #16a34a',
         padding: 0,
-        minHeight: 158, cursor: 'pointer', textAlign: 'left',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.07)', overflow: 'hidden',
+        minHeight: 148, cursor: 'pointer', textAlign: 'left',
+        boxShadow: '0 4px 16px rgba(22,163,74,0.20), 0 2px 8px rgba(0,0,0,0.10)',
+        overflow: 'hidden',
       }}
     >
       {/* Sarlavha */}
-      <div style={{ padding: '14px 16px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: '#f3f4f6', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-          <ShoppingBag size={17} color="#6b7280" />
+      <div style={{ padding: '14px 16px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #bbf7d0', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <ShoppingBag size={18} color="#16a34a" />
         </div>
-        <span style={{ fontSize: 16, fontWeight: 800, color: '#111827', flex: 1, letterSpacing: '-0.3px' }}>{tw.table.name}</span>
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0, boxShadow: '0 0 6px rgba(34,197,94,0.6)' }} />
+        <span style={{ fontSize: 17, fontWeight: 900, color: '#0f172a', flex: 1, letterSpacing: '-0.4px' }}>{tw.table.name}</span>
+        <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#22c55e', flexShrink: 0, boxShadow: '0 0 8px rgba(34,197,94,0.8)' }} />
       </div>
 
       {/* Info */}
-      <div style={{ padding: '4px 16px 12px', display: 'flex', flexDirection: 'column', flex: 1, gap: 6 }}>
+      <div style={{ padding: '2px 16px 12px', display: 'flex', flexDirection: 'column', flex: 1, gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <ShoppingBag size={12} color="#9ca3af" />
-          <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>{itemCount} ta mahsulot</span>
+          <ShoppingBag size={13} color="#6b7280" />
+          <span style={{ fontSize: 13, color: '#374151', fontWeight: 700 }}>{itemCount} ta mahsulot</span>
         </div>
         {openedAt && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Clock size={12} color="#9ca3af" />
-            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>{fmtTime(openedAt)}</span>
+            <Clock size={13} color="#6b7280" />
+            <span style={{ fontSize: 13, color: '#374151', fontWeight: 700 }}>{fmtTime(openedAt)}</span>
           </div>
         )}
       </div>
 
       {/* Yashil summa paneli */}
-      <div style={{ background: '#16a34a', padding: '11px 16px', display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontSize: 22, fontWeight: 900, color: '#ffffff', letterSpacing: '-0.5px', fontFamily: 'monospace' }}>{fmtMoney(total)}</span>
-        <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.8)' }}>so'm</span>
+      <div style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', padding: '12px 16px', display: 'flex', alignItems: 'baseline', gap: 4 }}>
+        <span style={{ fontSize: 24, fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', fontFamily: 'monospace', textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{fmtMoney(total)}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>so'm</span>
       </div>
     </button>
   )

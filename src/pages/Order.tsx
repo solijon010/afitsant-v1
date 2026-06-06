@@ -14,7 +14,8 @@ import {
   ShoppingCart,
   Trash2,
   X,
-  Ban
+  Ban,
+  Tag
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -700,12 +701,12 @@ export default function OrderPage(): JSX.Element {
           >
             <ArrowLeft size={12} /> Orqaga
           </button>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>{table.name}</p>
-          <p style={{ margin: '2px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Buyurtma</p>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>{table.name}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Buyurtma</p>
         </div>
 
         {/* Kategoriyalar list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sortedCategories.map((c) => (
             <CategoryBtn
               key={c.id}
@@ -716,13 +717,6 @@ export default function OrderPage(): JSX.Element {
           ))}
         </nav>
 
-        {/* User info */}
-        <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-          <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#ffffff', lineHeight: 1.3 }}>{waiter.firstName} {waiter.lastName}</p>
-          <p style={{ margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            {waiter.role === 'manager' ? 'Manager' : 'Afitsant'}
-          </p>
-        </div>
       </aside>
 
       {/* ── MARKAZ: Mahsulotlar ── */}
@@ -733,7 +727,7 @@ export default function OrderPage(): JSX.Element {
               Bu kategoriyada mahsulot yo'q
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+            <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(140px, 18vw, 220px), 1fr))' }}>
               {shownProducts.map((p, idx) => (
                 <ProductCard key={p.id} product={p} idx={idx} />
               ))}
@@ -776,12 +770,29 @@ function CategoryBtn({ label, active, onClick }: { label: string; active: boolea
     <button
       onClick={onClick}
       style={{
-        width: '100%', padding: '11px 12px', borderRadius: 10,
-        border: active ? '1.5px solid #16a34a' : '1.5px solid rgba(255,255,255,0.08)',
-        cursor: 'pointer', textAlign: 'left', fontSize: 15, fontWeight: 700,
-        background: active ? '#16a34a' : 'rgba(255,255,255,0.05)',
-        color: '#fff', lineHeight: 1.3,
-        boxShadow: active ? '0 2px 10px rgba(22,163,74,0.4)' : 'none',
+        width: '100%',
+        padding: '15px 14px',
+        borderRadius: 14,
+        cursor: 'pointer',
+        textAlign: 'center',
+        fontSize: 15,
+        fontWeight: 900,
+        lineHeight: 1.25,
+        letterSpacing: '0.02em',
+        transition: 'all 0.15s ease',
+        ...(active ? {
+          background: '#ffffff',
+          border: '2.5px solid #ffffff',
+          color: '#0f172a',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25)',
+          textShadow: 'none',
+        } : {
+          background: 'linear-gradient(160deg, #22c55e 0%, #15803d 100%)',
+          border: '2.5px solid #16a34a',
+          color: '#ffffff',
+          boxShadow: '0 5px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28)',
+          textShadow: '0 1px 3px rgba(0,0,0,0.40)',
+        }),
       }}
     >
       {label}
@@ -865,12 +876,13 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          borderRadius: 14,
+          borderRadius: 18,
           cursor: 'pointer',
           background: '#ffffff',
-          border: '2px solid #e2e8f0',
-          boxShadow: qty > 0 ? '0 4px 16px rgba(37,99,235,0.18)' : hovered ? '0 6px 20px rgba(37,99,235,0.15)' : '0 2px 6px rgba(0,0,0,0.07)',
-          transition: 'border .15s, box-shadow .18s',
+          border: qty > 0 ? '2.5px solid #f59e0b' : hovered ? '2.5px solid #f59e0b' : '2px solid #ede8df',
+          boxShadow: qty > 0 ? '0 6px 20px rgba(245,158,11,0.30)' : hovered ? '0 10px 28px rgba(245,158,11,0.28)' : '0 3px 12px rgba(0,0,0,0.08)',
+          transform: hovered && qty === 0 ? 'translateY(-3px) scale(1.02)' : 'none',
+          transition: 'all .18s ease',
           userSelect: 'none',
         }}
       >
@@ -880,17 +892,17 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
         {qtyLabel && (
           <div style={{
             position: 'absolute', top: 8, right: 8, zIndex: 2,
-            background: '#2563eb', color: 'white',
+            background: '#d97706', color: 'white',
             borderRadius: 99, padding: '3px 9px',
             fontSize: 11, fontWeight: 800,
-            boxShadow: '0 2px 8px rgba(37,99,235,0.4)',
+            boxShadow: '0 2px 8px rgba(217,119,6,0.45)',
           }}>
             {qtyLabel}
           </div>
         )}
 
         {imgSrc && !imgError ? (
-          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#f8fafc' }}>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#faf7f2' }}>
             <img
               src={imgSrc}
               alt={product.nameUzLatn}
@@ -899,21 +911,24 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
             />
           </div>
         ) : (
-          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#f8fafc' }}>
+          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#faf7f2' }}>
             {product.emoji ?? '📦'}
           </div>
         )}
 
-        <div style={{ padding: '8px 10px 10px', background: '#1e293b' }}>
-          <p style={{ margin: '0 0 4px', color: '#ffffff', fontSize: 14, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        <div style={{ padding: '10px 12px 13px', background: '#f5efe4', borderTop: '1.5px solid #e8ddc8' }}>
+          <p style={{ margin: '0 0 6px', color: '#1a1209', fontSize: 12, fontWeight: 900, lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             {product.nameUzLatn}
           </p>
-          <p style={{ margin: 0, color: '#94a3b8', fontSize: 13, fontWeight: 600 }}>
-            {fmtMoney(product.price)}
-            <span style={{ fontSize: 11, fontWeight: 400, color: '#64748b', marginLeft: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ background: '#d97706', borderRadius: 6, width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(217,119,6,0.50)' }}><Tag size={13} color="#ffffff" strokeWidth={2.5} /></span>
+            <span style={{ fontSize: 15, fontWeight: 900, color: '#1a1209', letterSpacing: '-0.4px' }}>
+              {fmtMoney(product.price)}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#9c8a70' }}>
               so'm{product.unit === 'kg' ? ' / kg' : ''}
             </span>
-          </p>
+          </div>
         </div>
       </div>
 
@@ -981,71 +996,78 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.45)' }} onClick={onClose}>
+      style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 300, borderRadius: 20, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.28)', overflow: 'hidden' }}>
+        style={{ width: 320, borderRadius: 26, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(20px)', boxShadow: '0 40px 100px rgba(0,0,0,0.50), 0 0 0 1px rgba(255,255,255,0.8)', overflow: 'hidden' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ background: 'linear-gradient(135deg, #1E2C46, #162038)', padding: '16px 18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{product.nameUzLatn}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#22c55e', fontWeight: 600 }}>{fmtMoney(product.price)} so'm / kg</p>
+            <p style={{ margin: 0, fontWeight: 900, fontSize: 15, color: '#ffffff', letterSpacing: '-0.2px' }}>{product.nameUzLatn}</p>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: '#4ade80', fontWeight: 700 }}>{fmtMoney(product.price)} so'm / kg</p>
           </div>
-          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', color: '#64748b' }}>
-            <X size={14} />
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.20)', cursor: 'pointer', width: 32, height: 32, borderRadius: 10, display: 'grid', placeItems: 'center', color: '#ffffff' }}>
+            <X size={15} />
           </button>
         </div>
 
-        {/* KG / So'm display — bosib almashish */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #f1f5f9' }}>
-          {/* KG tomoni */}
+        {/* KG / So'm display — tepada */}
+        <div style={{ display: 'flex', borderBottom: '2px solid #f1f5f9' }}>
           <button onClick={() => switchMode('kg')} style={{
-            flex: 1, padding: '12px 14px', textAlign: 'left', border: 'none', cursor: 'pointer',
-            background: mode === 'kg' ? '#f0fdf4' : 'white',
-            borderRight: '1px solid #f1f5f9',
-            borderBottom: mode === 'kg' ? '2px solid #22c55e' : '2px solid transparent',
+            flex: 1, padding: '14px 16px', textAlign: 'left', border: 'none', cursor: 'pointer',
+            background: mode === 'kg' ? '#f0fdf4' : '#fafafa',
+            borderRight: '2px solid #f1f5f9',
+            borderBottom: mode === 'kg' ? '3px solid #16a34a' : '3px solid transparent',
             transition: 'all 0.15s'
           }}>
-            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>KG</p>
-            <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: mode === 'kg' ? '#15803d' : '#94a3b8', fontFamily: 'monospace' }}>
+            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 800, color: mode === 'kg' ? '#16a34a' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.10em' }}>KG</p>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, color: mode === 'kg' ? '#14532d' : '#cbd5e1', fontFamily: 'monospace', letterSpacing: '-1px' }}>
               {mode === 'kg' ? (kgVal || '0') : (parsedSom > 0 ? (parsedSom / product.price).toFixed(3).replace(/\.?0+$/, '') : displayKg)}
             </p>
           </button>
-
-          {/* So'm tomoni */}
           <button onClick={() => switchMode('som')} style={{
-            flex: 1, padding: '12px 14px', textAlign: 'left', border: 'none', cursor: 'pointer',
-            background: mode === 'som' ? '#eff6ff' : 'white',
-            borderBottom: mode === 'som' ? '2px solid #3b82f6' : '2px solid transparent',
+            flex: 1, padding: '14px 16px', textAlign: 'left', border: 'none', cursor: 'pointer',
+            background: mode === 'som' ? '#eff6ff' : '#fafafa',
+            borderBottom: mode === 'som' ? '3px solid #2563eb' : '3px solid transparent',
             transition: 'all 0.15s'
           }}>
-            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>SO'M</p>
-            <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: mode === 'som' ? '#1d4ed8' : '#94a3b8', fontFamily: 'monospace' }}>
+            <p style={{ margin: '0 0 2px', fontSize: 10, fontWeight: 800, color: mode === 'som' ? '#2563eb' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.10em' }}>SO'M</p>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, color: mode === 'som' ? '#1d4ed8' : '#cbd5e1', fontFamily: 'monospace', letterSpacing: '-1px' }}>
               {mode === 'som' ? (somVal || '0') : displaySom}
             </p>
           </button>
         </div>
 
-        {/* Raqamli klaviatura */}
-        <div style={{ padding: '10px 12px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
+        {/* Numpad */}
+        <div style={{ padding: '12px 14px 8px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {NUMPAD_KEYS.map((key) => (
             <button
               key={key}
               onClick={() => handleKey(key)}
               style={{
-                height: 52, borderRadius: 12, border: 'none', cursor: 'pointer',
-                fontSize: key === '⌫' ? 18 : 20,
-                fontWeight: key === '⌫' ? 400 : 700,
-                background: key === '⌫' ? '#fee2e2' : '#f8fafc',
-                color: key === '⌫' ? '#ef4444' : '#1e293b',
+                height: 56, borderRadius: 14,
+                border: key === '⌫' ? '2px solid #fecaca' : '2px solid #e8edf5',
+                cursor: 'pointer',
+                fontSize: key === '⌫' ? 20 : 23,
+                fontWeight: 900,
+                background: key === '⌫' ? '#fff0f0' : 'rgba(255,255,255,0.90)',
+                color: key === '⌫' ? '#ef4444' : '#0f172a',
                 display: 'grid', placeItems: 'center',
-                transition: 'background 0.1s',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,1)',
+                transition: 'all 0.10s',
               }}
-              onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.background = key === '⌫' ? '#fecaca' : '#e2e8f0' }}
-              onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.background = key === '⌫' ? '#fee2e2' : '#f8fafc' }}
+              onMouseDown={(e) => {
+                const el = e.currentTarget as HTMLButtonElement
+                el.style.background = key === '⌫' ? '#fecaca' : '#dbeafe'
+                el.style.transform = 'scale(0.94)'
+              }}
+              onMouseUp={(e) => {
+                const el = e.currentTarget as HTMLButtonElement
+                el.style.background = key === '⌫' ? '#fff0f0' : 'rgba(255,255,255,0.90)'
+                el.style.transform = 'scale(1)'
+              }}
             >
               {key}
             </button>
@@ -1053,21 +1075,26 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
         </div>
 
         {/* Tugmalar */}
-        <div style={{ padding: '0 12px 14px', display: 'flex', gap: 8 }}>
-          <button onClick={onClose} style={{ flex: 1, height: 46, borderRadius: 12, border: '1px solid #e2e8f0', background: 'white', color: '#64748b', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+        <div style={{ padding: '12px 14px 16px', display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{
+            flex: 1, height: 50, borderRadius: 14,
+            border: '2px solid #e2e8f0', background: '#f8fafc',
+            color: '#475569', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+          }}>
             Bekor
           </button>
           <button
             onClick={() => { if (canAdd && finalKg > 0) onAdd(finalKg) }}
             disabled={!canAdd || finalKg <= 0}
             style={{
-              flex: 1.6, height: 46, borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, cursor: canAdd ? 'pointer' : 'not-allowed',
-              background: canAdd ? 'linear-gradient(145deg,#22c55e,#16a34a)' : '#e2e8f0',
-              color: canAdd ? 'white' : '#94a3b8',
-              boxShadow: canAdd ? '0 4px 12px rgba(34,197,94,0.35)' : 'none'
+              flex: 1.8, height: 50, borderRadius: 14, border: 'none',
+              fontSize: 14, fontWeight: 900, cursor: canAdd ? 'pointer' : 'not-allowed',
+              background: canAdd ? 'linear-gradient(145deg, #22c55e, #15803d)' : '#e2e8f0',
+              color: canAdd ? '#ffffff' : '#94a3b8',
+              boxShadow: canAdd ? '0 6px 16px rgba(34,197,94,0.40)' : 'none',
             }}
           >
-            + Qo'shish {canAdd ? `(${finalKg.toFixed(2).replace(/\.?0+$/, '')} kg)` : ''}
+            {canAdd ? `+ Qo'shish (${finalKg.toFixed(2).replace(/\.?0+$/, '')} kg)` : `+ Qo'shish`}
           </button>
         </div>
       </div>
@@ -1197,33 +1224,33 @@ function CartPanel({
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {lines.map((l, i) => (
                     <li key={l.localUuid} style={{
-                      background: 'white', borderRadius: 10, padding: '10px 12px',
-                      border: '1px solid #f1f5f9',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      background: 'white', borderRadius: 12, padding: '11px 13px',
+                      border: '2px solid #e2e8f0',
+                      boxShadow: '0 3px 10px rgba(0,0,0,0.07)',
                     }}>
                       {/* Nomi + o'chirish */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 6 }}>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', lineHeight: 1.3, flex: 1 }}>
-                          <span style={{ color: '#94a3b8', fontWeight: 500, marginRight: 4 }}>{i + 1}.</span>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 9, gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', lineHeight: 1.3, flex: 1, letterSpacing: '-0.2px' }}>
+                          <span style={{ color: '#94a3b8', fontWeight: 700, marginRight: 4 }}>{i + 1}.</span>
                           {l.productName}
                         </span>
                         <button onClick={() => rem(l.localUuid)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: '1px 3px', borderRadius: 5, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#fca5a5' }}>
+                          style={{ background: '#fef2f2', border: '1.5px solid #fecaca', cursor: 'pointer', color: '#ef4444', padding: '4px 6px', borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0 }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fee2e2' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2' }}>
                           <Trash2 size={13} />
                         </button>
                       </div>
                       {/* Qty + narx */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', borderRadius: 8, padding: '3px 6px', border: '1px solid #e2e8f0' }}>
-                          <QtyBtn onClick={() => dec(l.localUuid)} color="red"><Minus size={9} /></QtyBtn>
-                          <span style={{ minWidth: 24, textAlign: 'center', fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{fmtQty(l.quantity)}</span>
-                          <QtyBtn onClick={() => inc(l.localUuid)} color="green"><Plus size={9} /></QtyBtn>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', borderRadius: 9, padding: '4px 7px', border: '1.5px solid #e2e8f0' }}>
+                          <QtyBtn onClick={() => dec(l.localUuid)} color="red"><Minus size={10} /></QtyBtn>
+                          <span style={{ minWidth: 26, textAlign: 'center', fontSize: 16, fontWeight: 900, color: '#0f172a' }}>{fmtQty(l.quantity)}</span>
+                          <QtyBtn onClick={() => inc(l.localUuid)} color="green"><Plus size={10} /></QtyBtn>
                         </div>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                        <span style={{ fontSize: 15, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
                           {fmtMoney(Math.round(l.unitPrice * l.quantity))}
-                          <span style={{ fontSize: 10, fontWeight: 400, color: '#64748b', marginLeft: 2 }}>so'm</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginLeft: 2 }}>so'm</span>
                         </span>
                       </div>
                     </li>
@@ -1238,23 +1265,23 @@ function CartPanel({
       {/* Footer */}
       <div style={{ background: '#fff', borderTop: '1px solid #e2e8f0', padding: '10px 12px 12px', flexShrink: 0 }}>
         {/* Jami blok */}
-        <div style={{ background: '#f8fafc', borderRadius: 10, padding: '9px 12px', marginBottom: 9, border: '1px solid #e2e8f0' }}>
+        <div style={{ background: '#f8fafc', borderRadius: 12, padding: '11px 14px', marginBottom: 9, border: '2px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: '#64748b' }}>Mahsulotlar</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{fmtMoney(subtotal)} so'm</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Mahsulotlar</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{fmtMoney(subtotal)} so'm</span>
           </div>
           {fee > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
-              <span style={{ fontSize: 11, color: '#64748b' }}>Xizmat ({feePct}%)</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{fmtMoney(fee)} so'm</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Xizmat ({feePct}%)</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{fmtMoney(fee)} so'm</span>
             </div>
           )}
-          <div style={{ height: 1, background: '#e2e8f0', margin: '7px 0 6px' }} />
+          <div style={{ height: 2, background: '#e2e8f0', margin: '8px 0 7px', borderRadius: 99 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Jami</span>
-            <span style={{ fontSize: 20, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+            <span style={{ fontSize: 14, fontWeight: 900, color: '#0f172a' }}>Jami</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace', letterSpacing: '-1px' }}>
               {fmtMoney(total)}
-              <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b', marginLeft: 3 }}>so'm</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginLeft: 3 }}>so'm</span>
             </span>
           </div>
         </div>
