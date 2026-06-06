@@ -756,7 +756,7 @@ function ProductCard({ product, idx, catName = '' }: { product: Product; idx: nu
         )}
 
         {imgSrc && !imgError ? (
-          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#f5efe4' }}>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#faf7f2' }}>
             <img
               src={imgSrc}
               alt={product.nameUzLatn}
@@ -765,7 +765,7 @@ function ProductCard({ product, idx, catName = '' }: { product: Product; idx: nu
             />
           </div>
         ) : (
-          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#f5efe4' }}>
+          <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#faf7f2' }}>
             {product.emoji ?? '📦'}
           </div>
         )}
