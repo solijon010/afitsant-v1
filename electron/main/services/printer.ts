@@ -250,6 +250,21 @@ function resolveReceiptHeaderAssetPath(): string | null {
     if (existsSync(filePath)) return filePath
   }
 
+  // Packaged EXE: extraResources papkasidan qidirish
+  try {
+    const resPath = process.resourcesPath
+    if (resPath) {
+      const resCandidates = [
+        join(resPath, 'receipt-header-thermal-clean.png'),
+        join(resPath, 'receipt-header-thermal.png'),
+        join(resPath, 'receipt-header.png'),
+      ]
+      for (const filePath of resCandidates) {
+        if (existsSync(filePath)) return filePath
+      }
+    }
+  } catch { /* ignore */ }
+
   const assetDirs = roots.map((root) => join(root, 'out', 'renderer', 'assets'))
   for (const dir of assetDirs) {
     if (!existsSync(dir)) continue

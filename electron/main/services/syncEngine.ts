@@ -6,12 +6,14 @@ import { getDb } from '../db/connection'
 import { dequeueBatch, markDone, markFailed, queuedCount } from './syncQueue'
 import { syncWaitersForBranch } from './auth'
 import { applyProductCategoryOverrides } from './categoryConfig'
+import { syncAllItems, closeOrderOnServer, cancelOrderOnServer } from './orders'
 
 let socket: Socket | null = null
 let flushTimer: NodeJS.Timeout | null = null
 let online = false
 let lastSyncAt: number | null = null
 let mainWindowGetter: (() => BrowserWindow | null) | null = null
+let syncingPending = false
 
 const BATCH = 25
 const TICK_MS = 15_000
@@ -46,6 +48,8 @@ function setupSocket(getMainWindow: () => BrowserWindow | null): void {
   socket.on('connect', () => {
     online = true
     broadcastStatus(getMainWindow)
+    void flush().catch(() => undefined)
+    void syncPendingOrders().catch(() => undefined)
   })
 
   socket.on('disconnect', () => {
@@ -75,6 +79,7 @@ function startTicker(): void {
   if (flushTimer) clearInterval(flushTimer)
   flushTimer = setInterval(() => {
     void flush().catch(() => undefined)
+    if (online) void syncPendingOrders().catch(() => undefined)
   }, TICK_MS)
 }
 
@@ -333,6 +338,97 @@ export async function fullPull(): Promise<{
   } catch (e: any) {
     console.error('fullPull error:', e?.message)
     return { ok: false }
+  }
+}
+
+// Internet qaytganda offline yopilgan buyurtmalarni serverga yuborish
+async function syncPendingOrders(): Promise<void> {
+  if (syncingPending) return
+  syncingPending = true
+  try {
+    const s = getSettings()
+    if (!s.apiToken) return
+    const db = getDb()
+
+    const pending = db.prepare(`
+      SELECT o.*, t.server_id AS table_server_id
+      FROM orders o
+      JOIN tables t ON o.table_id = t.id
+      WHERE o.sync_status = 'pending'
+        AND o.status IN ('closed', 'cancelled')
+        AND t.server_id IS NOT NULL
+    `).all() as any[]
+
+    // 1-holat: serverga umuman yuborilmagan yopilgan buyurtmalar (sync_status='pending')
+    if (pending.length > 0) {
+      console.log(`[SYNC] ${pending.length} ta offline buyurtma topildi, yuborilmoqda...`)
+      for (const order of pending) {
+        try {
+          const items = db.prepare(`
+            SELECT oi.quantity, p.server_id AS product_server_id
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.id
+            WHERE oi.order_id = ?
+          `).all(order.id) as any[]
+
+          const activeItems = items
+            .filter((it: any) => it.product_server_id && it.quantity > 0)
+            .map((it: any) => ({ productServerId: it.product_server_id, count: Number(it.quantity) }))
+
+          if (activeItems.length === 0) continue
+
+          const result = await syncAllItems({
+            localOrderId: order.id,
+            roomServerId: order.table_server_id,
+            items: activeItems
+          })
+
+          if (result.serverId) {
+            if (order.status === 'closed') {
+              await closeOrderOnServer(result.serverId)
+            } else if (order.status === 'cancelled') {
+              await cancelOrderOnServer(result.serverId)
+            }
+          }
+          console.log(`[SYNC] offline order ${order.id} → server ${result.serverId} OK`)
+        } catch (e: any) {
+          console.warn(`[SYNC] offline order ${order.id} xato:`, e?.message)
+        }
+      }
+    }
+
+    // 2-holat: server_id bor (syncAll muvaffaqiyatli), lekin serverda yopilmagan
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000
+    const syncedClosed = db.prepare(`
+      SELECT id, server_id, status
+      FROM orders
+      WHERE status IN ('closed', 'cancelled')
+        AND sync_status = 'synced'
+        AND server_id IS NOT NULL
+        AND updated_at > ?
+    `).all(cutoff) as any[]
+
+    for (const order of syncedClosed) {
+      try {
+        if (order.status === 'closed') {
+          await closeOrderOnServer(order.server_id)
+        } else {
+          await cancelOrderOnServer(order.server_id)
+        }
+        db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
+        console.log(`[SYNC] server close OK: order ${order.id} → ${order.server_id}`)
+      } catch (e: any) {
+        const status = e?.response?.status
+        if (status === 400 || status === 404) {
+          // Server allaqachon yopgan
+          db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[SYNC] syncPendingOrders xato:', e?.message)
+  } finally {
+    syncingPending = false
   }
 }
 

@@ -50,7 +50,16 @@ export async function snapshot(): Promise<TableWithOrder[]> {
   return tables.map((table) => {
     const backendOrder = activeOrders.find((o: any) => o.room?.id === table.serverId)
     if (!backendOrder) {
-      // Server da topilmasa — local SQLite dan olish
+      return { table, order: getOpenOrderByTable(table.id) }
+    }
+
+    // Lokal DB da bu server buyurtma allaqachon yopilgan bo'lsa —
+    // server hali PENDING tursa ham stol bo'sh ko'rsatiladi.
+    // syncPendingOrders() serverga ham yopilishni yuboradi.
+    const localClosed = db
+      .prepare(`SELECT id FROM orders WHERE table_id = ? AND status IN ('closed','cancelled') AND server_id = ? LIMIT 1`)
+      .get(table.id, backendOrder.id) as any
+    if (localClosed) {
       return { table, order: getOpenOrderByTable(table.id) }
     }
 

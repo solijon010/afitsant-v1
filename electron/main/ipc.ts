@@ -49,14 +49,22 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.ordersSyncAll, (_e, input: any) => orders.syncAllItems(input))
   ipcMain.handle(IPC.ordersClose, async (_e, orderId: number, serverOrderId?: string) => {
     if (serverOrderId) {
-      await orders.closeOrderOnServer(serverOrderId)
+      try {
+        await orders.closeOrderOnServer(serverOrderId)
+      } catch (e: any) {
+        console.warn('[IPC] closeOrderOnServer xato (mahalliy yopiladi):', e?.message)
+      }
     }
     if (orderId > 0) return orders.closeOrder(orderId)
     return null
   })
   ipcMain.handle(IPC.ordersCancel, async (_e, orderId: number, serverOrderId?: string) => {
     if (serverOrderId) {
-      await orders.cancelOrderOnServer(serverOrderId)
+      try {
+        await orders.cancelOrderOnServer(serverOrderId)
+      } catch (e: any) {
+        console.warn('[IPC] cancelOrderOnServer xato (mahalliy bekor qilinadi):', e?.message)
+      }
     }
     if (orderId > 0) return orders.cancelOrder(orderId)
     return null
