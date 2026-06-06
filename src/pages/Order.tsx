@@ -11,7 +11,6 @@ import {
   Plus,
   Printer,
   Save,
-  ShoppingBag,
   ShoppingCart,
   Trash2,
   X,
@@ -526,7 +525,7 @@ export default function OrderPage(): JSX.Element {
     <div className="grid h-full" style={{ gridTemplateColumns: 'clamp(130px, 14vw, 170px) 1fr clamp(260px, 26vw, 360px)' }}>
 
       {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
-      <aside style={{ background: '#2C2C2D', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      <aside style={{ background: '#1E2C46', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid rgba(0,0,0,0.25)' }}>
         {/* Header */}
         <div style={{ padding: '10px 10px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <button onClick={() => void handleSave()} disabled={saving || printing}
@@ -561,10 +560,10 @@ export default function OrderPage(): JSX.Element {
       </aside>
 
       {/* ── MARKAZ: Mahsulotlar ── */}
-      <section style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#8685B4' }}>
+      <section style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#D2D0D1' }}>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px' }}>
           {shownProducts.length === 0 ? (
-            <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
+            <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#94a3b8' }}>
               Bu kategoriyada mahsulot yo'q
             </div>
           ) : (
@@ -622,17 +621,17 @@ function CategoryBtn({ label, active, onClick }: { label: string; active: boolea
         letterSpacing: '0.02em',
         transition: 'all 0.15s ease',
         ...(active ? {
+          background: '#ffffff',
+          border: '2.5px solid #ffffff',
+          color: '#0f172a',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25)',
+          textShadow: 'none',
+        } : {
           background: 'linear-gradient(160deg, #22c55e 0%, #15803d 100%)',
           border: '2.5px solid #16a34a',
           color: '#ffffff',
           boxShadow: '0 5px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28)',
           textShadow: '0 1px 3px rgba(0,0,0,0.40)',
-        } : {
-          background: 'rgba(255,255,255,0.06)',
-          border: '1.5px solid rgba(255,255,255,0.08)',
-          color: 'rgba(255,255,255,0.70)',
-          boxShadow: 'none',
-          textShadow: 'none',
         }),
       }}
     >
@@ -727,6 +726,8 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
           userSelect: 'none',
         }}
       >
+        {/* Aktiv holat — yuqori chiziq */}
+
         {/* Miqdor badge */}
         {qtyLabel && (
           <div style={{
@@ -742,9 +743,12 @@ function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.E
 
         {imgSrc && !imgError ? (
           <div style={{ position: 'relative', width: '100%', aspectRatio: '1', overflow: 'hidden', background: '#faf7f2' }}>
-            <img src={imgSrc} alt={product.nameUzLatn}
+            <img
+              src={imgSrc}
+              alt={product.nameUzLatn}
               style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 0 }}
-              onError={() => setImgError(true)} />
+              onError={() => setImgError(true)}
+            />
           </div>
         ) : (
           <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, background: '#faf7f2' }}>
@@ -945,7 +949,7 @@ function CartPanel({
   onClosePrint,
   onCancel,
   printing,
-  saving,
+  saving
 }: {
   table: TableEntity
   tableId: number
@@ -1055,14 +1059,14 @@ function CartPanel({
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {lines.map((l, i) => (
                     <li key={l.localUuid} style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      borderRadius: 12, padding: '11px 13px',
+                      background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '11px 13px',
                       border: '1.5px solid rgba(255,255,255,0.09)',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                     }}>
+                      {/* Nomi + o'chirish */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 9, gap: 6 }}>
-                        <span style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.3, flex: 1, letterSpacing: '-0.2px', color: '#ffffff' }}>
-                          <span style={{ fontWeight: 700, marginRight: 4, color: 'rgba(255,255,255,0.3)' }}>{i + 1}.</span>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: '#ffffff', lineHeight: 1.3, flex: 1, letterSpacing: '-0.2px' }}>
+                          <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 700, marginRight: 4 }}>{i + 1}.</span>
                           {l.productName}
                         </span>
                         <button onClick={() => rem(l.localUuid)}
@@ -1072,15 +1076,16 @@ function CartPanel({
                           <Trash2 size={13} />
                         </button>
                       </div>
+                      {/* Qty + narx */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 9, padding: '4px 7px', border: '1.5px solid rgba(255,255,255,0.10)' }}>
                           <QtyBtn onClick={() => dec(l.localUuid)} color="red"><Minus size={10} /></QtyBtn>
                           <span style={{ minWidth: 26, textAlign: 'center', fontSize: 16, fontWeight: 900, color: '#ffffff' }}>{fmtQty(l.quantity)}</span>
                           <QtyBtn onClick={() => inc(l.localUuid)} color="green"><Plus size={10} /></QtyBtn>
                         </div>
-                        <span style={{ fontSize: 15, fontWeight: 900, fontFamily: 'monospace', letterSpacing: '-0.5px', color: '#fbbf24' }}>
+                        <span style={{ fontSize: 15, fontWeight: 900, color: '#fbbf24', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
                           {fmtMoney(Math.round(l.unitPrice * l.quantity))}
-                          <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 2, color: 'rgba(255,255,255,0.4)' }}>so'm</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginLeft: 2 }}>so'm</span>
                         </span>
                       </div>
                     </li>
@@ -1093,6 +1098,7 @@ function CartPanel({
 
       {/* Footer */}
       <div style={{ background: '#2C2C2D', borderTop: '1px solid rgba(255,255,255,0.07)', padding: '10px 12px 12px', flexShrink: 0 }}>
+        {/* Jami blok */}
         <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '11px 14px', marginBottom: 9, border: '1.5px solid rgba(255,255,255,0.09)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>Mahsulotlar</span>
@@ -1107,9 +1113,9 @@ function CartPanel({
           <div style={{ height: 1, background: 'rgba(255,255,255,0.10)', margin: '8px 0 7px', borderRadius: 99 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <span style={{ fontSize: 14, fontWeight: 900, color: '#ffffff' }}>Jami</span>
-            <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'monospace', letterSpacing: '-1px', color: '#4ade80' }}>
+            <span style={{ fontSize: 22, fontWeight: 900, color: '#4ade80', fontFamily: 'monospace', letterSpacing: '-1px' }}>
               {fmtMoney(total)}
-              <span style={{ fontSize: 12, fontWeight: 700, marginLeft: 3, color: 'rgba(74,222,128,0.6)' }}>so'm</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(74,222,128,0.6)', marginLeft: 3 }}>so'm</span>
             </span>
           </div>
         </div>

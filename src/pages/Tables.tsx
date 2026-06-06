@@ -94,19 +94,20 @@ export default function TablesPage(): JSX.Element {
     : waiter?.role === 'manager' ? 'Manager' : 'Afitsant'
 
   const clock = useClock()
+
   /* ── Ranglar ── */
   const S = {
-    sidebar: '#2C2C2D',
-    sidebarBorder: 'rgba(255,255,255,0.06)',
-    pageBackground: '#8685B4',
-    topbar: '#2C2C2D',
-    primary: '#22c55e',
-    primaryMuted: 'rgba(34,197,94,0.12)',
-    success: '#22c55e',
-    successMuted: 'rgba(34,197,94,0.12)',
-    textPrimary: '#ffffff',
-    textMuted: 'rgba(255,255,255,0.45)',
-    border: 'rgba(255,255,255,0.08)',
+    sidebar: '#1e293b',
+    sidebarBorder: 'rgba(255,255,255,0.07)',
+    pageBackground: '#D2D0D1',
+    topbar: '#ffffff',
+    primary: '#2563eb',
+    primaryMuted: '#eff6ff',
+    success: '#16a34a',
+    successMuted: '#f0fdf4',
+    textPrimary: '#0f172a',
+    textMuted: '#64748b',
+    border: '#e2e8f0',
   }
 
   return (
@@ -116,10 +117,10 @@ export default function TablesPage(): JSX.Element {
       <aside style={{
         width: 196,
         flexShrink: 0,
-        background: S.sidebar,
+        background: '#1E2C46',
         display: 'flex',
         flexDirection: 'column',
-        borderRight: `1px solid ${S.sidebarBorder}`,
+        borderRight: '1px solid rgba(0,0,0,0.20)',
       }}>
         {/* Logo */}
         <div style={{ padding: '16px 14px 14px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -182,8 +183,8 @@ export default function TablesPage(): JSX.Element {
 
         {/* Top bar */}
         <div style={{
-          background: S.topbar,
-          borderBottom: `1px solid ${S.sidebarBorder}`,
+          background: '#1E2C46',
+          borderBottom: '1px solid rgba(0,0,0,0.18)',
           height: 60,
           display: 'flex',
           alignItems: 'center',
@@ -216,7 +217,7 @@ export default function TablesPage(): JSX.Element {
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginLeft: 8 }}>{clock.date}</span>
             </div>
 
-            {/* O'ng: onlayn + sozlamalar + tema */}
+            {/* O'ng: onlayn + sozlamalar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', padding: '5px 10px', borderRadius: 8 }}>
                 <Wifi size={13} color="#ffffff" />
@@ -270,28 +271,49 @@ function AreaButton({ label, count, active, onClick }: { label: string; count: n
     <button
       onClick={onClick}
       style={{
-        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '15px 16px', borderRadius: 14, cursor: 'pointer',
-        fontSize: 15, fontWeight: 900, textAlign: 'left',
-        transition: 'all 0.15s ease', letterSpacing: '0.02em',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '15px 16px',
+        borderRadius: 14,
+        cursor: 'pointer',
+        fontSize: 15,
+        fontWeight: 900,
+        textAlign: 'left',
+        transition: 'all 0.15s ease',
+        letterSpacing: '0.02em',
         ...(active ? {
-          background: 'linear-gradient(160deg, #22c55e 0%, #15803d 100%)',
-          border: '2px solid rgba(34,197,94,0.4)', color: '#ffffff',
-          boxShadow: '0 4px 16px rgba(22,163,74,0.35)', textShadow: 'none',
+          background: '#ffffff',
+          border: '2.5px solid #ffffff',
+          color: '#0f172a',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25)',
+          textShadow: 'none',
         } : {
-          background: 'rgba(255,255,255,0.08)',
-          border: '1.5px solid rgba(255,255,255,0.12)',
-          color: 'rgba(255,255,255,0.8)', boxShadow: 'none', textShadow: 'none',
+          background: 'linear-gradient(160deg, #22c55e 0%, #15803d 100%)',
+          border: '2.5px solid #16a34a',
+          color: '#ffffff',
+          boxShadow: '0 5px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28)',
+          textShadow: '0 1px 3px rgba(0,0,0,0.40)',
         }),
       }}
     >
       <span>{label}</span>
       {count > 0 && (
         <span style={{
-          background: active ? 'rgba(0,0,0,0.2)' : 'rgba(34,197,94,0.3)',
-          color: '#ffffff', borderRadius: 99, fontSize: 12, fontWeight: 900,
-          padding: '3px 10px', minWidth: 28, textAlign: 'center',
-        }}>{count}</span>
+          background: active ? '#1E2C46' : 'rgba(0,0,0,0.22)',
+          color: '#ffffff',
+          borderRadius: 99,
+          fontSize: 12,
+          fontWeight: 900,
+          padding: '3px 10px',
+          minWidth: 28,
+          textAlign: 'center',
+          letterSpacing: '0',
+          boxShadow: active ? '0 2px 6px rgba(0,0,0,0.25)' : 'none',
+        }}>
+          {count}
+        </span>
       )}
     </button>
   )
@@ -308,13 +330,16 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
   /* ── BO'SH ── */
   if (!isActive) {
     return (
-      <button onClick={onClick} style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: 10, background: '#ffffff', borderRadius: 16,
-        border: '2px dashed #d1d5db', padding: '24px 16px',
-        minHeight: 148, cursor: 'pointer', textAlign: 'center',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
-      }}>
+      <button
+        onClick={onClick}
+        style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 10, background: '#ffffff', borderRadius: 16,
+          border: '2px dashed #d1d5db', padding: '24px 16px',
+          minHeight: 148, cursor: 'pointer', textAlign: 'center',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
+        }}
+      >
         <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', border: '2px solid #fca5a5', display: 'grid', placeItems: 'center' }}>
           <Plus size={20} color="#ef4444" />
         </div>
@@ -328,15 +353,19 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
 
   /* ── BAND ── */
   return (
-    <button onClick={onClick} style={{
-      position: 'relative', display: 'flex', flexDirection: 'column',
-      background: '#ffffff', borderRadius: 16,
-      border: '2px solid #16a34a',
-      padding: 0,
-      minHeight: 148, cursor: 'pointer', textAlign: 'left',
-      boxShadow: '0 4px 16px rgba(22,163,74,0.20), 0 2px 8px rgba(0,0,0,0.10)',
-      overflow: 'hidden',
-    }}>
+    <button
+      onClick={onClick}
+      style={{
+        position: 'relative', display: 'flex', flexDirection: 'column',
+        background: '#ffffff', borderRadius: 16,
+        border: '2px solid #16a34a',
+        padding: 0,
+        minHeight: 148, cursor: 'pointer', textAlign: 'left',
+        boxShadow: '0 4px 16px rgba(22,163,74,0.20), 0 2px 8px rgba(0,0,0,0.10)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Sarlavha */}
       <div style={{ padding: '14px 16px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: '#f0fdf4', border: '1.5px solid #bbf7d0', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
           <ShoppingBag size={18} color="#16a34a" />
@@ -344,6 +373,8 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
         <span style={{ fontSize: 17, fontWeight: 900, color: '#0f172a', flex: 1, letterSpacing: '-0.4px' }}>{tw.table.name}</span>
         <div style={{ width: 11, height: 11, borderRadius: '50%', background: '#22c55e', flexShrink: 0, boxShadow: '0 0 8px rgba(34,197,94,0.8)' }} />
       </div>
+
+      {/* Info */}
       <div style={{ padding: '2px 16px 12px', display: 'flex', flexDirection: 'column', flex: 1, gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <ShoppingBag size={13} color="#6b7280" />
@@ -356,6 +387,8 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
           </div>
         )}
       </div>
+
+      {/* Yashil summa paneli */}
       <div style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', padding: '12px 16px', display: 'flex', alignItems: 'baseline', gap: 4 }}>
         <span style={{ fontSize: 24, fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', fontFamily: 'monospace', textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{fmtMoney(total)}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>so'm</span>
