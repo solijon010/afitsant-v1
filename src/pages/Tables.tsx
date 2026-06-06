@@ -136,14 +136,14 @@ export default function TablesPage(): JSX.Element {
         </div>
 
         {/* Xona turlari label */}
-        <div style={{ padding: '14px 14px 6px' }}>
+        <div style={{ padding: '18px 14px 6px' }}>
           <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
             Xona turlari
           </p>
         </div>
 
         {/* Area list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '0 10px 14px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <AreaButton
             label="Barchasi"
             count={totalOccupied}
@@ -185,7 +185,7 @@ export default function TablesPage(): JSX.Element {
         <div style={{
           background: '#1E2C46',
           borderBottom: '1px solid rgba(0,0,0,0.18)',
-          height: 60,
+          height: 84,
           display: 'flex',
           alignItems: 'center',
           padding: '0 24px',
@@ -195,23 +195,43 @@ export default function TablesPage(): JSX.Element {
             {/* Chap: band stollar summasi */}
             <div>
               {totalOccupied > 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.7)' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 16, padding: '10px 20px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.2)',
+                  transform: 'translateY(-2px)',
+                  backdropFilter: 'blur(12px)',
+                }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 0 3px rgba(34,197,94,0.3), 0 0 14px rgba(34,197,94,0.7)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#ffffff', letterSpacing: '0.01em' }}>
                     {totalOccupied} ta band
                   </span>
-                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>·</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#ffffff' }}>
-                    {totalSum.toLocaleString()} so'm
+                  <div style={{ width: 1, height: 18, background: 'rgba(74,222,128,0.3)' }} />
+                  <span style={{ fontSize: 16, fontWeight: 900, color: '#4ade80', letterSpacing: '-0.5px', fontFamily: 'monospace', textShadow: '0 0 16px rgba(74,222,128,0.6)' }}>
+                    {totalSum.toLocaleString()} <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(74,222,128,0.75)' }}>so'm</span>
                   </span>
                 </div>
               ) : (
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>Barcha stollar bo'sh</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '10px 18px' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.3)' }} />
+                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>Barcha stollar bo'sh</span>
+                </div>
               )}
             </div>
 
-            {/* Markaz: soat — kattaroq */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+            {/* Markaz: soat */}
+            <div style={{
+              display: 'flex', alignItems: 'baseline', gap: 3,
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 16, padding: '10px 22px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              transform: 'translateY(-2px)',
+            }}>
               <span style={{ fontSize: 30, fontWeight: 800, color: '#ffffff', fontFamily: 'monospace', letterSpacing: '2px' }}>{clock.time}</span>
               <span style={{ fontSize: 17, fontWeight: 600, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>:{clock.secs}</span>
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginLeft: 8 }}>{clock.date}</span>
@@ -219,16 +239,16 @@ export default function TablesPage(): JSX.Element {
 
             {/* O'ng: onlayn + sozlamalar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', padding: '5px 10px', borderRadius: 8 }}>
-                <Wifi size={13} color="#ffffff" />
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#ffffff' }}>Onlayn</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', padding: '6px 12px', borderRadius: 9 }}>
+                <Wifi size={13} color="#4ade80" />
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#4ade80' }}>Onlayn</span>
               </div>
               <button
                 onClick={() => navigate('/settings')}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', borderRadius: 8, cursor: 'pointer', transition: 'background .15s' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', borderRadius: 9, cursor: 'pointer', transition: 'background .15s' }}
               >
-                <Settings size={14} color="rgba(255,255,255,0.85)" />
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>Sozlamalar</span>
+                <Settings size={14} color="rgba(255,255,255,0.75)" />
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>Sozlamalar</span>
               </button>
             </div>
         </div>
@@ -241,7 +261,18 @@ export default function TablesPage(): JSX.Element {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-              {Array.from(groupedByPrefix.entries()).map(([prefix, tables]) => {
+              {Array.from(groupedByPrefix.entries()).sort(([a], [b]) => {
+                const order = (k: string) => {
+                  const l = k.toLowerCase()
+                  if (l.startsWith('xona')) return 0
+                  if (l.startsWith('tepa')) return 1
+                  if (l.startsWith('kapa')) return 2
+                  if (l.startsWith('otra')) return 3
+                  if (l.startsWith('ong')) return 4
+                  return 5
+                }
+                return order(a) - order(b)
+              }).map(([prefix, tables]) => {
                 const activeCount = tables.filter((t) => !!t.order).length
                 return (
                   <section key={prefix}>

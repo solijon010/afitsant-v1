@@ -546,7 +546,7 @@ export default function OrderPage(): JSX.Element {
         </div>
 
         {/* Kategoriyalar list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '22px 8px 10px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {sortedCategories.map((c) => (
             <CategoryBtn
               key={c.id}
