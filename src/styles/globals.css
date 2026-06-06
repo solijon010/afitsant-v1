@@ -8,7 +8,7 @@
     color-scheme: light;
 
     /* shadcn/ui uchun CSS variables (HSL format) */
-    --background: 75 10% 100%;           /* #F5F5F4 */
+    --background: 60 5% 96%;           /* #F5F5F4 */
     --foreground: 20 14% 11%;          /* #1C1917 */
     --card: 0 0% 100%;
     --card-foreground: 20 14% 11%;
@@ -38,30 +38,6 @@
     --table-waiting-border: #FCA5A5;
   }
 
-  /* ─── Dark mode ─── */
-  .dark {
-    color-scheme: dark;
-    --background: 20 14% 9%;           /* #161311 */
-    --foreground: 30 15% 92%;          /* #EDE9E5 */
-    --card: 20 12% 12%;                /* #1E1916 */
-    --card-foreground: 30 15% 92%;
-    --popover: 20 12% 12%;
-    --popover-foreground: 30 15% 92%;
-    --primary: 16 88% 52%;             /* #E05A22 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 20 10% 16%;
-    --secondary-foreground: 30 15% 85%;
-    --muted: 20 10% 16%;
-    --muted-foreground: 25 8% 55%;
-    --accent: 38 80% 45%;
-    --accent-foreground: 20 14% 9%;
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 20 8% 20%;               /* #2E2623 */
-    --input: 20 8% 20%;
-    --ring: 16 88% 52%;
-  }
-
   html, body, #root {
     height: 100%;
   }
@@ -87,7 +63,7 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #6B6E72;
+    background: #D6D3D1;
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
@@ -96,25 +72,6 @@
 
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; opacity: 0.5; }
-
-  /* Dark mode overrides — minimal */
-  .dark body { background: #161311; color: #EDE9E5; }
-  .dark .bg-white { background: #1E1916 !important; }
-  .dark .bg-\[\#F5F5F4\] { background: #161311 !important; }
-  .dark .bg-stone-50 { background: #1E1916 !important; }
-  .dark .bg-stone-100 { background: #252019 !important; }
-  .dark .border-stone-100 { border-color: #2E2623 !important; }
-  .dark .border-stone-200 { border-color: #2E2623 !important; }
-  .dark .text-stone-900 { color: #EDE9E5 !important; }
-  .dark .text-stone-800 { color: #E5E1DC !important; }
-  .dark .text-stone-700 { color: #D6D0C9 !important; }
-  .dark .text-stone-600 { color: #A39D96 !important; }
-  .dark .text-stone-500 { color: #8C8079 !important; }
-  .dark .text-stone-400 { color: #6B6358 !important; }
-  .dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
-  .dark .shadow-md { box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; }
-  .dark .btn-ghost { background: #252019 !important; border-color: #2E2623 !important; color: #D6D0C9 !important; }
-  .dark .btn-ghost:hover { background: #2E2623 !important; }
 }
 
 /* ─── Komponent klasslar (mavjud kod bilan mos) ─── */

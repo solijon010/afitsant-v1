@@ -1223,7 +1223,7 @@ export async function testPrint(): Promise<{ ok: true } | { ok: false; error: st
     total: 123000,
     printedAt: Date.now(),
     receiptHeader: s.receiptHeader || 'CHOYXONA\nEST. 2005',
-    receiptFooter: s.receiptFooter || 'Sohil Choyxonasiga qaytib kelganingiz uchun rahmat!\nBiz bilan yana ko'rishguncha!',
+    receiptFooter: s.receiptFooter || "Sohil Choyxonasiga qaytib kelganingiz uchun rahmat!\nBiz bilan yana ko'rishguncha!",
     receiptQrText: s.receiptQrText || 'https://instagram.com/soxil.choyxona',
     receiptQrLabel: s.receiptQrLabel || '@soxil.choyxona'
   }, { useDailyReceiptNumber: false })
