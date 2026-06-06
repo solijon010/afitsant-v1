@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, Settings, Wifi, Clock, ShoppingBag, Plus, Sun, Moon } from 'lucide-react'
+import { LogOut, Settings, Wifi, Clock, ShoppingBag, Plus } from 'lucide-react'
 import hisobchimLogo from '@/assets/logo.png'
 import type { TableWithOrder } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
-import { useTheme } from '@/stores/theme'
 import { fmtMoney, fmtTime } from '@/lib/format'
 
 /* ─── Soat hook ─── */
@@ -95,13 +94,11 @@ export default function TablesPage(): JSX.Element {
     : waiter?.role === 'manager' ? 'Manager' : 'Afitsant'
 
   const clock = useClock()
-  const { dark, toggle } = useTheme()
-
   /* ── Ranglar ── */
   const S = {
     sidebar: '#2C2C2D',
     sidebarBorder: 'rgba(255,255,255,0.06)',
-    pageBackground: dark ? '#2C2C2D' : '#D2D0D1',
+    pageBackground: '#8685B4',
     topbar: '#2C2C2D',
     primary: '#22c55e',
     primaryMuted: 'rgba(34,197,94,0.12)',
@@ -232,17 +229,6 @@ export default function TablesPage(): JSX.Element {
                 <Settings size={14} color="rgba(255,255,255,0.85)" />
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>Sozlamalar</span>
               </button>
-              <button
-                onClick={toggle}
-                title={dark ? 'Yorug\' rejim' : 'To\'q rejim'}
-                style={{
-                  width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
-                  background: 'rgba(255,255,255,0.1)', cursor: 'pointer',
-                  display: 'grid', placeItems: 'center', transition: 'background .15s',
-                }}
-              >
-                {dark ? <Sun size={16} color="#fbbf24" /> : <Moon size={16} color="rgba(255,255,255,0.85)" />}
-              </button>
             </div>
         </div>
 
@@ -264,7 +250,7 @@ export default function TablesPage(): JSX.Element {
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(140px, 16vw, 200px), 1fr))', gap: 12 }}>
                       {tables.map((tw, i) => (
-                        <TableCard key={tw.table.id} tw={tw} idx={i} dark={dark} onClick={() => navigate(`/order/${tw.table.id}`)} />
+                        <TableCard key={tw.table.id} tw={tw} idx={i} onClick={() => navigate(`/order/${tw.table.id}`)} />
                       ))}
                     </div>
                   </section>
@@ -312,7 +298,7 @@ function AreaButton({ label, count, active, onClick }: { label: string; count: n
 }
 
 /* ─── Stol kartasi ─── */
-function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; dark: boolean; onClick: () => void }): JSX.Element {
+function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onClick: () => void }): JSX.Element {
   const status = getStatus(tw)
   const total = tw.order?.total ?? 0
   const itemCount = tw.order?.items.length ?? 0

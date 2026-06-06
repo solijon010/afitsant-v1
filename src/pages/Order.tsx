@@ -11,6 +11,7 @@ import {
   Plus,
   Printer,
   Save,
+  ShoppingBag,
   ShoppingCart,
   Trash2,
   X,
@@ -26,7 +27,6 @@ import { useMenu } from '@/stores/menu'
 import { useSettings } from '@/stores/settings'
 import { useTables } from '@/stores/tables'
 import { useOrderHistory, type HistoryEntry } from '@/stores/orderHistory'
-import { useTheme } from '@/stores/theme'
 import { fmtMoney, fmtQty, fmtDate } from '@/lib/format'
 import { cn } from '@/lib/cn'
 
@@ -47,7 +47,6 @@ export default function OrderPage(): JSX.Element {
   const { categories, products } = useMenu()
   const settings = useSettings((s) => s.settings)
   const refreshTable = useTables((s) => s.refreshTable)
-  const { dark } = useTheme()
 
   const cart = useCart()
 
@@ -529,39 +528,30 @@ export default function OrderPage(): JSX.Element {
       {/* ── CHAP SIDEBAR: Kategoriyalar ── */}
       <aside style={{ background: '#2C2C2D', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
         {/* Header */}
-        <div style={{ padding: '12px 10px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ padding: '10px 10px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <button onClick={() => void handleSave()} disabled={saving || printing}
             style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              background: 'linear-gradient(145deg,#ef4444,#dc2626)',
               border: 'none',
-              borderRadius: 10, cursor: 'pointer', color: '#ffffff',
-              fontSize: 13, fontWeight: 800,
-              padding: '10px 14px', marginBottom: 12, width: '100%',
-              boxShadow: '0 4px 14px rgba(220,38,38,0.45)',
-              letterSpacing: '0.01em',
+              borderRadius: 8, cursor: 'pointer', color: '#ffffff',
+              fontSize: 12, fontWeight: 700,
+              padding: '7px 10px', marginBottom: 10, width: '100%',
+              boxShadow: '0 3px 10px rgba(220,38,38,0.40)',
             }}
           >
-            <ArrowLeft size={14} /> Orqaga
+            <ArrowLeft size={12} /> Orqaga
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(34,197,94,0.15)', border: '1.5px solid rgba(34,197,94,0.3)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-              <ShoppingBag size={16} color="#4ade80" />
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>{table.name}</p>
-              <p style={{ margin: '2px 0 0', fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Buyurtma</p>
-            </div>
-          </div>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>{table.name}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Buyurtma</p>
         </div>
 
         {/* Kategoriyalar list */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sortedCategories.map((c) => (
             <CategoryBtn
               key={c.id}
               label={c.nameUzLatn ?? ''}
-              icon={CAT_ICON[c.icon ?? ''] ?? <Package size={18} />}
               active={c.id === activeCatId}
               onClick={() => setActiveCatId(c.id)}
             />
@@ -571,7 +561,7 @@ export default function OrderPage(): JSX.Element {
       </aside>
 
       {/* ── MARKAZ: Mahsulotlar ── */}
-      <section style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: dark ? '#2C2C2D' : '#D2D0D1' }}>
+      <section style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#8685B4' }}>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px' }}>
           {shownProducts.length === 0 ? (
             <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
@@ -595,7 +585,6 @@ export default function OrderPage(): JSX.Element {
         onCancel={() => setConfirmCancel(true)}
         printing={printing}
         saving={saving}
-        dark={dark}
       />
 
       {confirmClose && (
@@ -617,47 +606,37 @@ export default function OrderPage(): JSX.Element {
   )
 }
 
-function CategoryBtn({ label, icon, active, onClick }: { label: string; icon?: JSX.Element; active: boolean; onClick: () => void }): JSX.Element {
+function CategoryBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }): JSX.Element {
   return (
     <button
       onClick={onClick}
       style={{
         width: '100%',
-        padding: '11px 13px',
-        borderRadius: 12,
+        padding: '15px 14px',
+        borderRadius: 14,
         cursor: 'pointer',
-        textAlign: 'left',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 11,
-        fontSize: 13,
-        fontWeight: 700,
-        lineHeight: 1.3,
+        textAlign: 'center',
+        fontSize: 15,
+        fontWeight: 900,
+        lineHeight: 1.25,
+        letterSpacing: '0.02em',
         transition: 'all 0.15s ease',
-        border: 'none',
         ...(active ? {
-          background: 'linear-gradient(135deg, #16a34a, #15803d)',
+          background: 'linear-gradient(160deg, #22c55e 0%, #15803d 100%)',
+          border: '2.5px solid #16a34a',
           color: '#ffffff',
-          boxShadow: '0 4px 14px rgba(22,163,74,0.45)',
+          boxShadow: '0 5px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28)',
+          textShadow: '0 1px 3px rgba(0,0,0,0.40)',
         } : {
-          background: 'rgba(255,255,255,0.05)',
-          color: 'rgba(255,255,255,0.75)',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1.5px solid rgba(255,255,255,0.08)',
+          color: 'rgba(255,255,255,0.70)',
           boxShadow: 'none',
+          textShadow: 'none',
         }),
       }}
     >
-      <span style={{
-        width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-        display: 'grid', placeItems: 'center',
-        background: active ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)',
-        color: active ? '#ffffff' : 'rgba(255,255,255,0.55)',
-      }}>
-        {icon}
-      </span>
-      <span style={{ flex: 1 }}>{label}</span>
-      {active && (
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', flexShrink: 0, boxShadow: '0 0 8px rgba(74,222,128,0.8)' }} />
-      )}
+      {label}
     </button>
   )
 }
@@ -709,7 +688,7 @@ function ProductImage({ imgSrc, name, emoji, qty }: { imgSrc: string | null; nam
   )
 }
 
-function ProductCard({ product, idx }: { product: Product; idx: number; dark?: boolean }): JSX.Element {
+function ProductCard({ product, idx }: { product: Product; idx: number }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
@@ -967,7 +946,6 @@ function CartPanel({
   onCancel,
   printing,
   saving,
-  dark = false
 }: {
   table: TableEntity
   tableId: number
@@ -976,7 +954,6 @@ function CartPanel({
   onCancel: () => void
   printing: boolean
   saving: boolean
-  dark?: boolean
 }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const inc = useCart((s) => s.increment)
