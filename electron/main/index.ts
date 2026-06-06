@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, globalShortcut } from 'electron'
+import { app, BrowserWindow, shell, globalShortcut, screen } from 'electron'
 import { join } from 'node:path'
 import { appendFileSync, mkdirSync, existsSync } from 'node:fs'
 import { registerIpc } from './ipc'
@@ -32,13 +32,33 @@ function setupFileLogger(): void {
 
 let mainWindow: BrowserWindow | null = null
 
+function getWindowBounds(): {
+  width: number
+  height: number
+  minWidth: number
+  minHeight: number
+} {
+  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
+
+  const width = Math.min(1440, Math.max(1024, screenWidth))
+  const height = Math.min(900, Math.max(700, screenHeight))
+
+  return {
+    width,
+    height,
+    minWidth: Math.min(1100, screenWidth),
+    minHeight: Math.min(700, screenHeight)
+  }
+}
+
 function createWindow(): void {
   const isDev = !app.isPackaged
+  const bounds = getWindowBounds()
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1100,
-    minHeight: 700,
+    width: bounds.width,
+    height: bounds.height,
+    minWidth: bounds.minWidth,
+    minHeight: bounds.minHeight,
     backgroundColor: '#F5F5F4',
     show: false,
     autoHideMenuBar: true,
@@ -55,6 +75,9 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
+    if (!isDev) {
+      mainWindow?.maximize()
+    }
     mainWindow?.show()
     mainWindow?.setTitle('Hisobchim POS')
     if (isDev) mainWindow?.webContents.openDevTools({ mode: 'detach' })
