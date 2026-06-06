@@ -8,6 +8,10 @@ import { startSync, stopSync } from './services/syncEngine'
 import { setUnauthorizedHandler } from './services/apiClient'
 import { IPC } from '@shared/ipc'
 
+// Electron terminal pipe yopiq bo'lganda EPIPE xatosi chiqmasligi uchun
+process.stdout.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err })
+process.stderr.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') throw err })
+
 /* ─── File logger ─────────────────────────────────────── */
 function setupFileLogger(): void {
   const logDir = app.getPath('logs')
