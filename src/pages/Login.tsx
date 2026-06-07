@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/stores/auth'
 import { useMenu } from '@/stores/menu'
 import { useTables } from '@/stores/tables'
-import loginBg from '@/assets/cccccccc (1)11.png'
+import loginBg from '@/assets/rasm.png'
 import hisobchimLogo from '@/assets/logo.png'
 import LoginForm from '@/components/LoginForm'
 
@@ -59,12 +59,15 @@ export default function LoginPage(): JSX.Element {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+      <style>{`
+        @media (max-width: 768px) { .login-right { display: none !important; } .login-left { width: 100% !important; } }
+      `}</style>
 
       {/* ── ASOSIY QATOR ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         {/* ── CHAP: Login panel ── */}
-        <div style={{
+        <div className="login-left" style={{
           width: 380,
           minWidth: 320,
           flexShrink: 0,
@@ -138,7 +141,11 @@ export default function LoginPage(): JSX.Element {
         </div>
 
         {/* ── O'NG: Rasm ── */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
+        <div className="login-right" style={{
+          flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0,
+          background: '#0d0f0d',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
           <img
             src={loginBg}
             alt=""
@@ -146,11 +153,11 @@ export default function LoginPage(): JSX.Element {
               position: 'absolute', inset: 0,
               width: '100%', height: '100%',
               objectFit: 'cover',
-              objectPosition: 'center 20%',
-              filter: 'brightness(0.88) saturate(1.1)',
+              objectPosition: 'center center',
+              filter: 'brightness(0.92) saturate(1.1)',
             }}
           />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(8,10,8,0.5) 0%, transparent 35%)' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(8,10,8,0.4) 0%, transparent 30%)', pointerEvents: 'none' }} />
         </div>
       </div>
 
