@@ -11,6 +11,7 @@ import { initials } from '@/lib/format'
 import StatusBar from '@/components/StatusBar'
 import { cn } from '@/lib/cn'
 import hisobchimLogo from '@/assets/logo.png'
+import { clearImageCache } from '@/lib/imageCache'
 
 
 /* Afitsantlarni yaratilish vaqti bo'yicha tartiblaymiz (birinchi yaratilgan — birinchida) */
@@ -79,8 +80,9 @@ export default function WaiterSelect(): JSX.Element {
   }, [])
 
   const handleLogout = async (): Promise<void> => {
-    await window.afisant.auth.logout()   // DB dagi tokenni o'chiradi
-    logout()                              // Zustand state ni tozalaydi
+    clearImageCache()
+    await window.afisant.auth.logout()
+    logout()
     navigate('/server-login', { replace: true })
   }
 

@@ -59,6 +59,12 @@ const api: BridgeAPI = {
     set: (patch) => ipcRenderer.invoke(IPC.settingsSet, patch)
   },
 
+  imageCache: {
+    get: (photo: string) => ipcRenderer.invoke(IPC.imageCacheGet, photo),
+    set: (photo: string, dataUrl: string) => ipcRenderer.invoke(IPC.imageCacheSet, photo, dataUrl),
+    clear: () => ipcRenderer.invoke(IPC.imageCacheClear)
+  },
+
   category: {
     configGet: () => ipcRenderer.invoke(IPC.categoryConfigGet),
     configSave: (configs: any[]) => ipcRenderer.invoke(IPC.categoryConfigSave, configs),

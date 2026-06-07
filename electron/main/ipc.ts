@@ -10,6 +10,7 @@ import * as printer from './services/printer'
 import * as sync from './services/syncEngine'
 import * as settings from './services/settings'
 import * as catConfig from './services/categoryConfig'
+import * as imageCache from './services/imageCache'
 import { fetchVisibleOrders } from './services/orderApi'
 import { resetApi } from './services/apiClient'
 
@@ -29,6 +30,7 @@ export function registerIpc(): void {
     settings.setSettings({ apiToken: null, branchId: null })
     resetApi()
     sync.restartSync()
+    imageCache.clearDiskImageCache()
   })
 
   ipcMain.handle(IPC.menuGetCategories, () => menu.getCategories())
@@ -86,6 +88,10 @@ export function registerIpc(): void {
     sync.restartSync()
     return updated
   })
+
+  ipcMain.handle(IPC.imageCacheGet, (_e, photo: string) => imageCache.getImageFromDisk(photo))
+  ipcMain.handle(IPC.imageCacheSet, (_e, photo: string, dataUrl: string) => imageCache.saveImageToDisk(photo, dataUrl))
+  ipcMain.handle(IPC.imageCacheClear, () => imageCache.clearDiskImageCache())
 
   ipcMain.handle(IPC.categoryConfigGet, () => catConfig.getCategoryConfigs())
   ipcMain.handle(IPC.categoryConfigSave, (_e, configs) => catConfig.saveCategoryConfigs(configs))

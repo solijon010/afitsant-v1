@@ -1,8 +1,3 @@
-/**
- * Mahsulot rasmlarini bir marta yuklab, blob URL sifatida xotirada saqlaydi.
- * Keyingi so'rovlarda serverga murojaat qilmasdan xotiradan qaytaradi.
- */
-
 const promises = new Map<string, Promise<string>>()
 const resolved = new Map<string, string>()
 
@@ -10,57 +5,75 @@ function fullUrl(photo: string): string {
   return `${import.meta.env.VITE_API_URL ?? ''}/image/${photo}`
 }
 
-/** Bitta rasmni background da yuklab cache ga saqlaydi */
-export function preloadImage(photo: string): void {
-  const url = fullUrl(photo)
-  if (promises.has(url)) return
-
-  const p = fetch(url)
-    .then((r) => r.blob())
-    .then((blob) => {
-      const blobUrl = URL.createObjectURL(blob)
-      resolved.set(url, blobUrl)
-      return blobUrl
-    })
-    .catch(() => {
-      // Yuklanmasa original URL ni fallback sifatida qo'yamiz
-      resolved.set(url, url)
-      return url
-    })
-
-  promises.set(url, p)
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
 }
 
-/** Ko'p rasmlarni background da yuklab cache ga saqlaydi */
+async function fetchOrLoad(photo: string): Promise<string> {
+  if (resolved.has(photo)) return resolved.get(photo)!
+
+  // 1. Disk cache (internet yo'q bo'lsa ham ishlaydi)
+  try {
+    const diskUrl = await window.afisant.imageCache.get(photo)
+    if (diskUrl) {
+      resolved.set(photo, diskUrl)
+      return diskUrl
+    }
+  } catch {}
+
+  // 2. Network fetch
+  try {
+    const r = await fetch(fullUrl(photo))
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const blob = await r.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    resolved.set(photo, blobUrl)
+
+    // Diskka saqlash (fon rejimida)
+    blobToDataUrl(blob)
+      .then((dataUrl) => window.afisant.imageCache.set(photo, dataUrl))
+      .catch(() => {})
+
+    return blobUrl
+  } catch {
+    // Fallback — original URL (yuklanmasa ham ko'rinadi xato sifatida)
+    resolved.set(photo, fullUrl(photo))
+    return fullUrl(photo)
+  }
+}
+
+export function preloadImage(photo: string): void {
+  if (promises.has(photo)) return
+  promises.set(photo, fetchOrLoad(photo))
+}
+
 export function preloadImages(photos: Array<string | null | undefined>): void {
   for (const photo of photos) {
     if (photo) preloadImage(photo)
   }
 }
 
-/**
- * Agar rasm cache da bo'lsa — darhol blob URL qaytaradi.
- * Bo'lmasa — original URL qaytaradi (loading davomida).
- */
 export function getResolvedUrl(photo: string): string {
-  const url = fullUrl(photo)
-  return resolved.get(url) ?? url
+  return resolved.get(photo) ?? fullUrl(photo)
 }
 
-/** Cache da bo'lsa darhol, bo'lmasa yuklab blob URL qaytaradigan Promise */
 export async function getCachedImageUrl(photo: string): Promise<string> {
-  const url = fullUrl(photo)
-  if (!promises.has(url)) preloadImage(photo)
-  return promises.get(url)!
+  if (!promises.has(photo)) preloadImage(photo)
+  return promises.get(photo)!
 }
 
-/** Cache ni tozalash (logout yoki sync da) */
 export function clearImageCache(): void {
   for (const blobUrl of resolved.values()) {
-    if (blobUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(blobUrl)
-    }
+    if (blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl)
   }
   promises.clear()
   resolved.clear()
+  try {
+    void window.afisant?.imageCache?.clear()
+  } catch {}
 }
