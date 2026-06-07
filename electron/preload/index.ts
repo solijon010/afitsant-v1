@@ -15,6 +15,7 @@ const api: BridgeAPI = {
 
   menu: {
     getCategories: () => ipcRenderer.invoke(IPC.menuGetCategories),
+    getAllCategories: () => ipcRenderer.invoke(IPC.menuGetAllCategories),
     getProducts: (categoryId) => ipcRenderer.invoke(IPC.menuGetProducts, categoryId),
     getSnapshot: () => ipcRenderer.invoke(IPC.menuGetSnapshot)
   },

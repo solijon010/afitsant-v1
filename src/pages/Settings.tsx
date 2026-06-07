@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, ClipboardList, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Printer, RefreshCw, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -66,6 +66,7 @@ export default function SettingsPage(): JSX.Element {
   const navigate = useNavigate()
   const { settings, load, patch } = useSettings()
   const waiter = useAuth((s) => s.waiter)
+  const serverUser = useAuth((s) => s.serverUser)
   const [form, setForm] = useState<Settings | null>(null)
   const [saving, setSaving] = useState(false)
   const [usbDevices, setUsbDevices] = useState<PrinterOption[]>([])
@@ -83,7 +84,47 @@ export default function SettingsPage(): JSX.Element {
   const [catSaving, setCatSaving] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  const catRowsContainerRef = useRef<HTMLDivElement>(null)
   const loadMenu = useMenu((s) => s.load)
+
+  const handleGripMouseDown = useCallback((e: React.MouseEvent, fromIdx: number): void => {
+    e.preventDefault()
+    setDragIdx(fromIdx)
+    let overIdx: number | null = null
+
+    const onMove = (ev: MouseEvent): void => {
+      if (!catRowsContainerRef.current) return
+      const children = Array.from(catRowsContainerRef.current.children) as HTMLElement[]
+      for (let i = 0; i < children.length; i++) {
+        const rect = children[i].getBoundingClientRect()
+        if (ev.clientY >= rect.top && ev.clientY < rect.bottom) {
+          if (overIdx !== i) {
+            overIdx = i
+            setDragOverIdx(i)
+          }
+          break
+        }
+      }
+    }
+
+    const onUp = (): void => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      if (overIdx !== null && overIdx !== fromIdx) {
+        setCatRows((prev) => {
+          const next = [...prev]
+          const [removed] = next.splice(fromIdx, 1)
+          next.splice(overIdx!, 0, removed)
+          return next
+        })
+      }
+      setDragIdx(null)
+      setDragOverIdx(null)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
 
   useEffect(() => {
     void window.afisant.auth.listWaiters().then(setWaiters)
@@ -93,7 +134,7 @@ export default function SettingsPage(): JSX.Element {
 
   const loadCatRows = async (): Promise<void> => {
     const [cats, configs] = await Promise.all([
-      window.afisant.menu.getCategories(),
+      window.afisant.menu.getAllCategories(),
       window.afisant.category.configGet()
     ])
     const configMap = new Map(configs.map((c) => [c.serverId, c]))
@@ -143,8 +184,9 @@ export default function SettingsPage(): JSX.Element {
 
   if (!form) return <div className="grid h-full place-items-center"><div className="card h-24 w-72 animate-pulse" /></div>
 
-  /* Manager yoki hech kim kirmagan (admin rejim) → texnik ma'lumotlar ko'rsatiladi */
-  const isAdmin = !waiter || waiter.role === 'manager' || waiter.role === 'super_waiter'
+  /* Faqat SUPERADMIN server foydalanuvchisi yoki manager/super_waiter afitsanti texnik ma'lumotlarni ko'radi */
+  const isAdmin = serverUser?.role === 'SUPERADMIN' ||
+    (waiter !== null && (waiter.role === 'manager' || waiter.role === 'super_waiter'))
 
   const update = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
     setForm((f) => (f ? { ...f, [key]: value } : f))
@@ -643,48 +685,32 @@ export default function SettingsPage(): JSX.Element {
           {catRows.length === 0 ? (
             <p className="text-sm text-ink-soft">Kategoriyalar topilmadi. Avval sinxronlang.</p>
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" ref={catRowsContainerRef}>
               {catRows.map((row, i) => (
                 <div
                   key={row.cat.id}
-                  draggable
-                  onDragStart={(e) => {
-                    setDragIdx(i)
-                    e.dataTransfer.effectAllowed = 'move'
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    setDragOverIdx(i)
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    if (dragIdx !== null && dragIdx !== i) {
-                      const next = [...catRows]
-                      const [removed] = next.splice(dragIdx, 1)
-                      next.splice(i, 0, removed)
-                      setCatRows(next)
-                    }
-                    setDragIdx(null)
-                    setDragOverIdx(null)
-                  }}
-                  onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
                   className={cn(
-                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-all cursor-grab active:cursor-grabbing select-none',
+                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-all select-none',
                     dragIdx === i
                       ? 'opacity-30 border-line bg-bg-card'
                       : dragOverIdx === i
                         ? 'border-brand-primary bg-brand-primary/5 shadow-sm'
-                        : 'border-line bg-bg-card hover:border-line-strong'
+                        : row.isHidden
+                          ? 'border-brand-danger/30 bg-brand-danger/5'
+                          : 'border-line bg-bg-card hover:border-line-strong'
                   )}
                 >
-                  {/* Drag handle — ko'rinma uchun, asl drag div dan ishlaydi */}
-                  <GripVertical size={15} className="shrink-0 text-ink-dim pointer-events-none" />
+                  {/* Drag handle — onMouseDown orqali tortib o'tkazish */}
+                  <GripVertical
+                    size={15}
+                    className="shrink-0 text-ink-dim cursor-grab active:cursor-grabbing"
+                    onMouseDown={(e) => handleGripMouseDown(e, i)}
+                  />
 
                   {/* Nom */}
                   <input
                     className="input flex-1 py-1.5 text-sm cursor-text select-text"
                     value={row.localName}
-                    onMouseDown={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       const next = [...catRows]
                       next[i] = { ...next[i], localName: e.target.value }

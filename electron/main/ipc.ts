@@ -34,6 +34,7 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.menuGetCategories, () => menu.getCategories())
+  ipcMain.handle(IPC.menuGetAllCategories, () => menu.getAllCategories())
   ipcMain.handle(IPC.menuGetProducts, (_e, categoryId?: number) => menu.getProducts(categoryId))
   ipcMain.handle(IPC.menuGetSnapshot, () => menu.getSnapshot())
 

@@ -55,6 +55,8 @@ export default function OrderPage(): JSX.Element {
   const { categories, products } = useMenu()
   const settings = useSettings((s) => s.settings)
   const refreshTable = useTables((s) => s.refreshTable)
+  const lang = settings?.language ?? 'uz-latn'
+  const dn = (latn: string, cyrl: string | null): string => (lang === 'uz-cyrl' && cyrl) ? cyrl : latn
 
   const cart = useCart()
 
@@ -592,7 +594,7 @@ export default function OrderPage(): JSX.Element {
           {sortedCategories.map((c) => (
             <CategoryBtn
               key={c.id}
-              label={c.nameUzLatn ?? ''}
+              label={dn(c.nameUzLatn ?? '', c.nameUzCyrl ?? null)}
               active={c.id === activeCatId}
               onClick={() => setActiveCatId(c.id)}
             />
@@ -690,6 +692,8 @@ function CategoryPill({
   cat: Category; active: boolean; onClick: () => void; idx: number
 }): JSX.Element {
   const color = cat.color || TAB_COLORS[idx % TAB_COLORS.length]
+  const lang = useSettings((s) => s.settings?.language ?? 'uz-latn')
+  const label = (lang === 'uz-cyrl' && cat.nameUzCyrl) ? cat.nameUzCyrl : cat.nameUzLatn
   return (
     <button
       onClick={onClick}
@@ -702,7 +706,7 @@ function CategoryPill({
       <span style={{ color: active ? 'rgba(255,255,255,0.85)' : color }}>
         {CAT_ICON[cat.icon ?? ''] ?? <Package size={16} />}
       </span>
-      {cat.nameUzLatn}
+      {label}
     </button>
   )
 }
@@ -732,6 +736,8 @@ function ProductImage({ imgSrc, name, emoji, qty }: { imgSrc: string | null; nam
 function ProductCard({ product, idx, catName = '' }: { product: Product; idx: number; catName?: string }): JSX.Element {
   const lines = useCart((s) => s.lines)
   const add = useCart((s) => s.add)
+  const lang = useSettings((s) => s.settings?.language ?? 'uz-latn')
+  const displayName = (lang === 'uz-cyrl' && product.nameUzCyrl) ? product.nameUzCyrl : product.nameUzLatn
   const qty = lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0)
   const [showKgModal, setShowKgModal] = useState(false)
   const [flashing, setFlashing] = useState(false)
@@ -804,7 +810,7 @@ function ProductCard({ product, idx, catName = '' }: { product: Product; idx: nu
 
         <div style={{ padding: '10px 12px 13px', background: '#F5F5F5', borderTop: '1px solid #EBEBEB' }}>
           <p style={{ margin: '0 0 6px', color: '#1a1209', fontSize: 16, fontWeight: 900, lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {product.nameUzLatn}
+            {displayName}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ background: '#d97706', borderRadius: 6, width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(217,119,6,0.50)' }}>

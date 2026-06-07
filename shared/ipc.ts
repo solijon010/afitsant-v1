@@ -26,6 +26,7 @@ export const IPC = {
   authLogout: 'auth:logout',
 
   menuGetCategories: 'menu:getCategories',
+  menuGetAllCategories: 'menu:getAllCategories',
   menuGetProducts: 'menu:getProducts',
   menuGetSnapshot: 'menu:getSnapshot',
 
@@ -99,6 +100,7 @@ export interface BridgeAPI {
 
   menu: {
     getCategories: () => Promise<Category[]>
+    getAllCategories: () => Promise<Category[]>
     getProducts: (categoryId?: number) => Promise<Product[]>
     getSnapshot: () => Promise<{ categories: Category[]; products: Product[] }>
   }
