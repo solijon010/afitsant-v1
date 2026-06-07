@@ -230,18 +230,25 @@ export default function SettingsPage(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between px-6 py-4">
-        <button onClick={handleBack} className="btn-ghost">
+    <div className="flex h-full flex-col" style={{ background: '#D2D0D1' }}>
+      <header style={{ background: 'linear-gradient(135deg, #1E2C46, #162038)' }} className="flex items-center justify-between px-6 py-4 shadow-md">
+        <button
+          onClick={handleBack}
+          className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-white/20"
+        >
           <ArrowLeft size={16} /> Orqaga
         </button>
-        <h1 className="text-lg font-semibold">Sozlamalar</h1>
-        <button onClick={() => void save()} className="btn-primary" disabled={saving}>
+        <h1 className="text-lg font-semibold text-white">Sozlamalar</h1>
+        <button
+          onClick={() => void save()}
+          disabled={saving}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-success px-6 py-2 text-sm font-medium text-white shadow-[0_2px_8px_rgba(22,163,74,0.4)] transition-all hover:bg-[#15803D] active:scale-[0.98] disabled:opacity-50"
+        >
           {saving ? 'Saqlanmoqda…' : 'Saqlash'}
         </button>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-6 pb-10">
+      <main className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-6 pb-10" style={{ background: '#D2D0D1' }}>
         <Section title="Server" icon={<Globe size={16} />}>
           {isAdmin ? (
             /* ── Admin: to'liq server sozlamalari ── */
@@ -436,15 +443,15 @@ export default function SettingsPage(): JSX.Element {
             isWindows ? (
               /* Windows: USB port orqali driver siz chop etish */
               <Field label="USB Port">
-                <p className="mb-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+                <p className="mb-2 text-xs text-brand-success bg-brand-success/10 rounded-lg px-3 py-2 border border-brand-success/30">
                   ✅ Driver kerak emas! Windows USB port orqali to'g'ridan chop etiladi.
                   Printer ulangan bo'lsa "Aniqlash" tugmasini bosing.
                 </p>
-                <p className="mb-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+                <p className="mb-2 text-xs text-brand-warn bg-brand-warn/10 rounded-lg px-3 py-2 border border-brand-warn/30">
                   Faqat ESC/POS thermal chek printer uchun. Canon, HP, Epson A4 printerlar bu rejimda ishlamaydi.
                 </p>
                 {!!form.printerDevicePath && !form.printerName && (
-                  <p className="mb-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 border border-red-200">
+                  <p className="mb-2 text-xs text-brand-danger bg-brand-danger/10 rounded-lg px-3 py-2 border border-brand-danger/30">
                     Printer nomi birikmagan. "Aniqlash" orqali XP-80C ni qayta tanlang.
                   </p>
                 )}
@@ -538,7 +545,7 @@ export default function SettingsPage(): JSX.Element {
           )}
           {form.printerType === 'windows' && (
             <Field label="Printer nomi (Windows)">
-              <p className="mb-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">
+              <p className="mb-2 text-xs text-brand-warn bg-brand-warn/10 rounded-lg px-3 py-2 border border-brand-warn/30">
                 Thermal printer tanlang. Oddiy A4 printerlarda POS chek formati to'g'ri chiqmasligi mumkin.
               </p>
               <div className="flex gap-2">
@@ -724,7 +731,7 @@ export default function SettingsPage(): JSX.Element {
               <button
                 onClick={() => void saveCatConfigs()}
                 disabled={catSaving}
-                className="btn-primary mt-2 w-full"
+                className="btn-success mt-2 w-full"
               >
                 {catSaving ? 'Saqlanmoqda…' : 'Kategoriyalarni saqlash'}
               </button>
@@ -933,7 +940,7 @@ export default function SettingsPage(): JSX.Element {
                           </p>
                         )}
                         {section.sample.map((item, i) => (
-                          <div key={`${section.label}-${item.id}-${i}`} className="mt-1 bg-stone-50 rounded p-1.5 text-[10px] font-mono">
+                          <div key={`${section.label}-${item.id}-${i}`} className="mt-1 bg-bg-elevated rounded-lg p-1.5 text-[10px] font-mono">
                             <p><span className="text-ink-soft">id:</span> {item.id}</p>
                             <p><span className="text-ink-soft">name:</span> {item.name}</p>
                             <p><span className="text-ink-soft">status:</span> {item.status ?? "yo'q"}</p>
@@ -1018,9 +1025,9 @@ function Section({
   children: React.ReactNode
 }): JSX.Element {
   return (
-    <section className="card mt-4 p-5">
-      <h2 className="mb-4 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-ink-soft">
-        {icon}
+    <section className="mt-4 rounded-2xl border border-line bg-bg-card p-5 shadow-card">
+      <h2 className="mb-4 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-soft">
+        <span className="text-brand-primary">{icon}</span>
         {title}
       </h2>
       <div className="space-y-3">{children}</div>
@@ -1031,7 +1038,7 @@ function Section({
 function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
     <div>
-      <span className="label">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-ink-soft">{label}</span>
       {children}
     </div>
   )
