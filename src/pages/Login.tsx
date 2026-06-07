@@ -6,15 +6,7 @@ import { useTables } from '@/stores/tables'
 import loginBg from '@/assets/cccccccc (1)11.png'
 import hisobchimLogo from '@/assets/logo.png'
 import LoginForm from '@/components/LoginForm'
-import { BarChart2, FileText, Users, Settings, ShieldCheck, UserCheck, Zap, TrendingUp } from 'lucide-react'
-
-const BOTTOM_FEATURES = [
-  { icon: <BarChart2 size={20} />, title: 'Sotuvlar nazorati', desc: 'Real vaqtda kuzatuv' },
-  { icon: <FileText size={20} />, title: 'Hisobotlar', desc: 'Aniq va batafsil' },
-  { icon: <Users size={20} />, title: 'Mijozlar bazasi', desc: 'Sodiqlikni oshiring' },
-  { icon: <Settings size={20} />, title: 'Oson sozlash', desc: 'Tez va qulay ishga tushirish' },
-  { icon: <ShieldCheck size={20} />, title: 'Xavfsiz va ishonchli', desc: "Ma'lumotlaringiz himoyada" },
-]
+import { UserCheck, Zap, TrendingUp } from 'lucide-react'
 
 const RIGHT_FEATURES = [
   { icon: <UserCheck size={22} />, title: 'Oson boshqaruv' },
@@ -259,34 +251,6 @@ export default function LoginPage(): JSX.Element {
         </div>
       </div>
 
-      {/* ── PASTKI BAR ── */}
-      <div style={{
-        flexShrink: 0,
-        height: 'clamp(54px, 7vh, 70px)',
-        background: 'rgba(6,8,6,0.92)',
-        backdropFilter: 'blur(12px)',
-        borderTop: '1px solid rgba(245,200,66,0.20)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 'clamp(16px, 3vw, 40px)',
-        padding: '0 clamp(20px, 3vw, 48px)',
-        overflow: 'hidden',
-      }}>
-        {BOTTOM_FEATURES.map((f, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 0.8vw, 10px)', flexShrink: 0 }}>
-            <span style={{ color: '#f5c842', flexShrink: 0, opacity: 0.9 }}>{f.icon}</span>
-            <div>
-              <p style={{ margin: 0, fontSize: 'clamp(10px, 1.1vw, 13px)', fontWeight: 700, color: '#ffffff', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
-                {f.title}
-              </p>
-              <p style={{ margin: 0, fontSize: 'clamp(8px, 0.8vw, 10px)', color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
-                {f.desc}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
 
     </div>
   )
