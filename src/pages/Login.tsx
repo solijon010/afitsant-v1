@@ -137,25 +137,29 @@ export default function LoginPage(): JSX.Element {
           </p>
         </div>
 
-        {/* ── O'NG: Rasm + marketing ── */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
-
-          {/* Fon rasm */}
+        {/* ── O'NG: Rasm ── */}
+        <div style={{
+          flex: 1,
+          background: '#0d0f0d',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          padding: 24,
+          minWidth: 0,
+        }}>
           <img
             src={loginBg}
             alt=""
             style={{
-              position: 'absolute', inset: 0,
-              width: '100%', height: '100%',
-              objectFit: 'cover',
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
               objectPosition: 'center center',
-              filter: 'brightness(0.82) saturate(1.15)',
+              borderRadius: 16,
+              filter: 'brightness(0.90) saturate(1.1)',
             }}
           />
-          {/* Gradient overlay */}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(8,10,8,0.55) 0%, rgba(0,0,0,0.08) 30%, transparent 70%)' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.30) 0%, transparent 40%, rgba(0,0,0,0.15) 100%)' }} />
-
         </div>
       </div>
 
