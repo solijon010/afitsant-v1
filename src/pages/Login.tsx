@@ -6,13 +6,6 @@ import { useTables } from '@/stores/tables'
 import loginBg from '@/assets/cccccccc (1)11.png'
 import hisobchimLogo from '@/assets/logo.png'
 import LoginForm from '@/components/LoginForm'
-import { UserCheck, Zap, TrendingUp } from 'lucide-react'
-
-const RIGHT_FEATURES = [
-  { icon: <UserCheck size={22} />, title: 'Oson boshqaruv' },
-  { icon: <Zap size={22} />, title: 'Tez va ishonchli' },
-  { icon: <TrendingUp size={22} />, title: 'Sotuvlar nazorati' },
-]
 
 export default function LoginPage(): JSX.Element {
   const navigate = useNavigate()
@@ -163,91 +156,6 @@ export default function LoginPage(): JSX.Element {
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(8,10,8,0.55) 0%, rgba(0,0,0,0.08) 30%, transparent 70%)' }} />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.30) 0%, transparent 40%, rgba(0,0,0,0.15) 100%)' }} />
 
-          {/* Marketing kontent — o'ng yuqori */}
-          <div style={{
-            position: 'absolute',
-            top: 'clamp(20px, 5vh, 50px)',
-            right: 'clamp(20px, 5vw, 80px)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 'clamp(8px, 1.5vh, 16px)',
-            textAlign: 'center',
-          }}>
-            {/* Logo */}
-            <div style={{
-              width: 'clamp(70px, 9vw, 110px)',
-              height: 'clamp(70px, 9vw, 110px)',
-              borderRadius: '50%',
-              overflow: 'hidden',
-              border: '2.5px solid rgba(245,200,66,0.7)',
-              boxShadow: '0 0 24px rgba(245,200,66,0.25), 0 8px 32px rgba(0,0,0,0.5)',
-            }}>
-              <img src={hisobchimLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-
-            {/* Sarlavha */}
-            <div>
-              <p style={{
-                margin: 0,
-                fontSize: 'clamp(16px, 2.2vw, 28px)',
-                fontWeight: 800,
-                color: '#ffffff',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                textShadow: '0 2px 16px rgba(0,0,0,0.8)',
-                lineHeight: 1.2,
-              }}>
-                Biznesingiz uchun
-              </p>
-              <p style={{
-                margin: '4px 0 0',
-                fontSize: 'clamp(18px, 2.6vw, 32px)',
-                fontWeight: 900,
-                color: '#f5c842',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                textShadow: '0 0 20px rgba(245,200,66,0.5), 0 2px 16px rgba(0,0,0,0.8)',
-              }}>
-                Aqlli yechim!
-              </p>
-            </div>
-
-            {/* 3 xususiyat */}
-            <div style={{ display: 'flex', gap: 'clamp(12px, 2vw, 28px)', marginTop: 'clamp(4px, 1vh, 10px)' }}>
-              {RIGHT_FEATURES.map((f) => (
-                <div key={f.title} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <div style={{
-                    width: 'clamp(44px, 5.5vw, 66px)',
-                    height: 'clamp(44px, 5.5vw, 66px)',
-                    borderRadius: '50%',
-                    background: 'rgba(245,200,66,0.15)',
-                    border: '1.5px solid rgba(245,200,66,0.45)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#f5c842',
-                    backdropFilter: 'blur(8px)',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-                  }}>
-                    {f.icon}
-                  </div>
-                  <p style={{
-                    margin: 0,
-                    fontSize: 'clamp(9px, 1vw, 12px)',
-                    fontWeight: 600,
-                    color: '#ffffff',
-                    textShadow: '0 1px 8px rgba(0,0,0,0.8)',
-                    textAlign: 'center',
-                    maxWidth: 80,
-                    lineHeight: 1.3,
-                  }}>
-                    {f.title}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
