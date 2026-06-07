@@ -1216,10 +1216,13 @@ export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true 
   const s = getSettings()
   const augmented: ReceiptPayload = {
     ...payload,
-    receiptHeader:   payload.receiptHeader   || s.receiptHeader   || null,
-    receiptFooter:   payload.receiptFooter   || s.receiptFooter   || null,
-    receiptQrText:   payload.receiptQrText   || s.receiptQrText   || null,
-    receiptQrLabel:  payload.receiptQrLabel  || s.receiptQrLabel  || null,
+    organizationName:    payload.organizationName    || s.organizationName    || 'SOHIL',
+    organizationAddress: payload.organizationAddress || s.organizationAddress || 'Andijon viloyat, Shahrixon tumani',
+    organizationPhone:   payload.organizationPhone   || s.organizationPhone   || '+99833 904 20 20',
+    receiptHeader:       payload.receiptHeader       || s.receiptHeader       || 'CHOYXONA\nEST. 2005',
+    receiptFooter:       payload.receiptFooter       || s.receiptFooter       || "Sohil Choyxonasiga qaytib kelganingiz uchun rahmat!\nBiz bilan yana ko'rishguncha!",
+    receiptQrText:       payload.receiptQrText       || s.receiptQrText       || 'https://instagram.com/soxil.choyxona',
+    receiptQrLabel:      payload.receiptQrLabel      || s.receiptQrLabel      || '@soxil.choyxona',
   }
   return printReceiptInternal(augmented, { useDailyReceiptNumber: payload.receiptNumber === undefined })
 }

@@ -359,11 +359,23 @@ async function syncPendingOrders(): Promise<void> {
         AND t.server_id IS NOT NULL
     `).all() as any[]
 
-    // 1-holat: serverga umuman yuborilmagan yopilgan buyurtmalar (sync_status='pending')
-    if (pending.length > 0) {
-      console.log(`[SYNC] ${pending.length} ta offline buyurtma topildi, yuborilmoqda...`)
-      for (const order of pending) {
-        try {
+    if (pending.length === 0) return
+    console.log(`[SYNC] ${pending.length} ta pending buyurtma tekshirilmoqda...`)
+
+    for (const order of pending) {
+      try {
+        if (order.server_id) {
+          // Server_id bor — buyurtma serverda mavjud, faqat yopish kerak
+          // syncAllItems CHAQIRMAYMIZ — aks holda yangi order yaratiladi (duplicate bug)
+          if (order.status === 'closed') {
+            await closeOrderOnServer(order.server_id)
+          } else {
+            await cancelOrderOnServer(order.server_id)
+          }
+          db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
+          console.log(`[SYNC] server close OK: order ${order.id} → ${order.server_id}`)
+        } else {
+          // Server_id yo'q — offline yaratilgan, serverga yuborish kerak
           const items = db.prepare(`
             SELECT oi.quantity, p.server_id AS product_server_id
             FROM order_items oi
@@ -375,7 +387,10 @@ async function syncPendingOrders(): Promise<void> {
             .filter((it: any) => it.product_server_id && it.quantity > 0)
             .map((it: any) => ({ productServerId: it.product_server_id, count: Number(it.quantity) }))
 
-          if (activeItems.length === 0) continue
+          if (activeItems.length === 0) {
+            db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
+            continue
+          }
 
           const result = await syncAllItems({
             localOrderId: order.id,
@@ -384,44 +399,18 @@ async function syncPendingOrders(): Promise<void> {
           })
 
           if (result.serverId) {
-            if (order.status === 'closed') {
-              await closeOrderOnServer(result.serverId)
-            } else if (order.status === 'cancelled') {
-              await cancelOrderOnServer(result.serverId)
-            }
+            if (order.status === 'closed') await closeOrderOnServer(result.serverId)
+            else await cancelOrderOnServer(result.serverId)
+            db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
           }
-          console.log(`[SYNC] offline order ${order.id} → server ${result.serverId} OK`)
-        } catch (e: any) {
-          console.warn(`[SYNC] offline order ${order.id} xato:`, e?.message)
+          console.log(`[SYNC] offline order ${order.id} → server ${result?.serverId} OK`)
         }
-      }
-    }
-
-    // 2-holat: server_id bor (syncAll muvaffaqiyatli), lekin serverda yopilmagan
-    const cutoff = Date.now() - 48 * 60 * 60 * 1000
-    const syncedClosed = db.prepare(`
-      SELECT id, server_id, status
-      FROM orders
-      WHERE status IN ('closed', 'cancelled')
-        AND sync_status = 'synced'
-        AND server_id IS NOT NULL
-        AND updated_at > ?
-    `).all(cutoff) as any[]
-
-    for (const order of syncedClosed) {
-      try {
-        if (order.status === 'closed') {
-          await closeOrderOnServer(order.server_id)
-        } else {
-          await cancelOrderOnServer(order.server_id)
-        }
-        db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
-        console.log(`[SYNC] server close OK: order ${order.id} → ${order.server_id}`)
       } catch (e: any) {
-        const status = e?.response?.status
+        const status = (e as any)?.response?.status
         if (status === 400 || status === 404) {
-          // Server allaqachon yopgan
           db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
+        } else {
+          console.warn(`[SYNC] order ${order.id} sync xato:`, e?.message)
         }
       }
     }

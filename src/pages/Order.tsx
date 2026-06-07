@@ -499,6 +499,7 @@ export default function OrderPage(): JSX.Element {
       })
       useOrderHistory.getState().markPrinted(histId)
 
+      // 1-nusxa: mijozga
       const res = await window.afisant.printer.receipt(payload)
       if (!res.ok) {
         if (settings?.printerType) {
@@ -507,7 +508,9 @@ export default function OrderPage(): JSX.Element {
           toast.message("Printer ulanmagan — chek o'tkazib yuborildi")
         }
       } else {
-        toast.success('Chek chiqdi')
+        // 2-nusxa: oshpazga (avtomatik)
+        await window.afisant.printer.receipt(payload)
+        toast.success('Chek chiqdi (2 nusxa)')
       }
 
       if (serverOrderId) {
