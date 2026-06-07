@@ -65,14 +65,15 @@ export default function LoginPage(): JSX.Element {
 
         {/* ── CHAP: Login panel ── */}
         <div style={{
-          width: 'clamp(280px, 26vw, 390px)',
+          width: 380,
+          minWidth: 320,
           flexShrink: 0,
           background: '#080a08',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 'clamp(20px, 3vh, 40px) clamp(18px, 2.5vw, 36px)',
+          padding: '36px 32px',
           position: 'relative',
           zIndex: 2,
           boxShadow: '6px 0 48px rgba(0,0,0,0.8)',
@@ -85,11 +86,10 @@ export default function LoginPage(): JSX.Element {
 
           {/* Logo */}
           <div style={{
-            width: 'clamp(80px, 9vw, 115px)',
-            height: 'clamp(80px, 9vw, 115px)',
+            width: 110, height: 110,
             borderRadius: '50%',
             overflow: 'hidden',
-            marginBottom: 'clamp(10px, 1.5vh, 16px)',
+            marginBottom: 14,
             flexShrink: 0,
             border: '3px solid #f5c842',
             boxShadow: '0 0 0 6px rgba(245,200,66,0.10), 0 0 32px rgba(245,200,66,0.20), 0 8px 32px rgba(0,0,0,0.9)',
@@ -99,8 +99,8 @@ export default function LoginPage(): JSX.Element {
 
           {/* Sarlavha */}
           <h1 style={{
-            margin: '0 0 3px',
-            fontSize: 'clamp(22px, 2.4vw, 32px)',
+            margin: '0 0 4px',
+            fontSize: 30,
             fontWeight: 900,
             textTransform: 'uppercase',
             letterSpacing: '0.16em',
@@ -111,8 +111,8 @@ export default function LoginPage(): JSX.Element {
             Hisobchim
           </h1>
           <p style={{
-            margin: '0 0 clamp(14px, 2.5vh, 26px)',
-            fontSize: 'clamp(7px, 0.75vw, 9px)',
+            margin: '0 0 22px',
+            fontSize: 9,
             fontWeight: 700,
             color: 'rgba(245,200,66,0.45)',
             letterSpacing: '0.28em',
@@ -127,7 +127,7 @@ export default function LoginPage(): JSX.Element {
           </div>
 
           <p style={{
-            marginTop: 'clamp(10px, 1.5vh, 18px)',
+            marginTop: 16,
             fontSize: 9,
             color: 'rgba(255,255,255,0.22)',
             letterSpacing: '0.05em',
