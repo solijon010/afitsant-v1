@@ -356,7 +356,7 @@ export default function OrderPage(): JSX.Element {
         useOrderHistory.getState().push({
           tableId: tId,
           tableName: table.name,
-          waiterName: `${waiter.firstName} ${waiter.lastName}`,
+          waiterName: [waiter.lastName, waiter.firstName].filter(Boolean).join(' '),
           savedAt: Date.now(),
           items: cart.lines.map((l) => ({
             name: l.productName,
@@ -467,7 +467,7 @@ export default function OrderPage(): JSX.Element {
         organizationAddress: settings?.organizationAddress ?? null,
         organizationPhone: settings?.organizationPhone ?? null,
         tableName: table.name,
-        waiterName: `${waiter.firstName} ${waiter.lastName}`,
+        waiterName: [waiter.lastName, waiter.firstName].filter(Boolean).join(' '),
         orderLocalUuid: serverOrderId ?? String(orderId ?? 'unkwn'),
         items: cart.lines.map((l) => ({
           name: l.productName,
@@ -490,7 +490,7 @@ export default function OrderPage(): JSX.Element {
       const histId = useOrderHistory.getState().push({
         tableId: tId,
         tableName: table.name,
-        waiterName: `${waiter.firstName} ${waiter.lastName}`,
+        waiterName: [waiter.lastName, waiter.firstName].filter(Boolean).join(' '),
         savedAt: Date.now(),
         items: payload.items,
         subtotal: payload.subtotal,
@@ -499,7 +499,6 @@ export default function OrderPage(): JSX.Element {
       })
       useOrderHistory.getState().markPrinted(histId)
 
-      // 1-nusxa: mijozga
       const res = await window.afisant.printer.receipt(payload)
       if (!res.ok) {
         if (settings?.printerType) {
@@ -508,8 +507,6 @@ export default function OrderPage(): JSX.Element {
           toast.message("Printer ulanmagan — chek o'tkazib yuborildi")
         }
       } else {
-        // 2-nusxa: oshpazga (avtomatik)
-        await window.afisant.printer.receipt(payload)
         toast.success('Chek chiqdi (2 nusxa)')
       }
 
