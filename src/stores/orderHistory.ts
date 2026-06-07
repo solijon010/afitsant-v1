@@ -26,6 +26,7 @@ interface OrderHistoryState {
   entries: HistoryEntry[]
   push: (e: Omit<HistoryEntry, 'id' | 'printCount' | 'printedAt'>) => string
   markPrinted: (id: string) => void
+  clearAll: () => void
 }
 
 export const useOrderHistory = create<OrderHistoryState>()(
@@ -42,7 +43,8 @@ export const useOrderHistory = create<OrderHistoryState>()(
           entries: get().entries.map((e) =>
             e.id === id ? { ...e, printCount: e.printCount + 1, printedAt: Date.now() } : e
           )
-        })
+        }),
+      clearAll: () => set({ entries: [] })
     }),
     { name: 'pos-order-history-v1' }
   )

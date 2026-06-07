@@ -6,6 +6,7 @@ import type { Category, Lang, Settings, Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useMenu } from '@/stores/menu'
 import { useSettings } from '@/stores/settings'
+import { useOrderHistory } from '@/stores/orderHistory'
 import { initials } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import PinPad from '@/components/PinPad'
@@ -83,6 +84,8 @@ export default function SettingsPage(): JSX.Element {
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
   const [restoringProds, setRestoringProds] = useState(false)
+  const [confirmClearHistory, setConfirmClearHistory] = useState(false)
+  const clearHistory = useOrderHistory((s) => s.clearAll)
   const loadMenu = useMenu((s) => s.load)
 
   const moveRow = (idx: number, dir: -1 | 1): void => {
@@ -960,6 +963,41 @@ export default function SettingsPage(): JSX.Element {
                   </div>
                   )
                 })}
+              </div>
+            )}
+
+            <div className="border-t border-line pt-3" />
+            {!confirmClearHistory ? (
+              <button
+                onClick={() => setConfirmClearHistory(true)}
+                className="btn-ghost w-full text-brand-danger hover:bg-brand-danger/10"
+              >
+                <X size={13} />
+                Mahalliy buyurtma tarixini tozalash
+              </button>
+            ) : (
+              <div className="rounded-xl border border-brand-danger/40 bg-brand-danger/5 p-3 space-y-2">
+                <p className="text-xs text-brand-danger font-semibold">
+                  ⚠️ Mahalliy tarix o'chib ketadi (server da saqlanib qoladi). Davom etasizmi?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      clearHistory()
+                      setConfirmClearHistory(false)
+                      toast.success('Mahalliy buyurtma tarixi tozalandi')
+                    }}
+                    className="btn-danger flex-1 text-xs"
+                  >
+                    Ha, tozala
+                  </button>
+                  <button
+                    onClick={() => setConfirmClearHistory(false)}
+                    className="btn-ghost flex-1 text-xs"
+                  >
+                    Bekor
+                  </button>
+                </div>
               </div>
             )}
           </Section>
