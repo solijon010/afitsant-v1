@@ -67,13 +67,19 @@ export default function LoginPage(): JSX.Element {
 
       {/* ── CHAP: Forma panel ── */}
       <div style={{
-        width: 400, flexShrink: 0,
+        width: 'clamp(300px, 30vw, 420px)',
+        flexShrink: 0,
         background: '#0a0d0a',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        padding: '40px 36px',
-        position: 'relative', zIndex: 2,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'clamp(24px, 4vh, 48px) clamp(20px, 3vw, 40px)',
+        position: 'relative',
+        zIndex: 2,
         boxShadow: '6px 0 40px rgba(0,0,0,0.7)',
       }}>
+
         {/* Oltin chiziqlar */}
         <div style={{ position: 'absolute', left: 0, top: 0, width: 3, height: '100%', background: 'linear-gradient(to bottom, transparent 5%, #f5c842 50%, transparent 95%)' }} />
         <div style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', background: 'linear-gradient(to bottom, transparent 5%, rgba(245,200,66,0.4) 50%, transparent 95%)' }} />
@@ -82,7 +88,12 @@ export default function LoginPage(): JSX.Element {
 
         {/* Logo */}
         <div style={{
-          width: 120, height: 120, borderRadius: '50%', overflow: 'hidden', marginBottom: 16, flexShrink: 0,
+          width: 'clamp(90px, 10vw, 120px)',
+          height: 'clamp(90px, 10vw, 120px)',
+          borderRadius: '50%',
+          overflow: 'hidden',
+          marginBottom: 'clamp(12px, 2vh, 18px)',
+          flexShrink: 0,
           border: '3px solid #f5c842',
           boxShadow: '0 0 0 7px rgba(245,200,66,0.12), 0 0 36px rgba(245,200,66,0.22), 0 10px 40px rgba(0,0,0,0.9)',
         }}>
@@ -91,29 +102,34 @@ export default function LoginPage(): JSX.Element {
 
         {/* Sarlavha */}
         <h1 style={{
-          margin: '0 0 4px', fontSize: 34, fontWeight: 900, textTransform: 'uppercase',
-          letterSpacing: '0.16em', color: '#f5c842',
+          margin: '0 0 4px',
+          fontSize: 'clamp(24px, 2.8vw, 34px)',
+          fontWeight: 900,
+          textTransform: 'uppercase',
+          letterSpacing: '0.16em',
+          color: '#f5c842',
           fontFamily: 'Georgia, serif',
           textShadow: '0 0 28px rgba(245,200,66,0.40), 0 3px 14px rgba(0,0,0,1)',
         }}>
           Hisobchim
         </h1>
-        <p style={{ margin: '0 0 26px', fontSize: 10, fontWeight: 700, color: 'rgba(245,200,66,0.50)', letterSpacing: '0.28em', textTransform: 'uppercase' }}>
+        <p style={{
+          margin: '0 0 clamp(16px, 3vh, 28px)',
+          fontSize: 'clamp(8px, 0.9vw, 10px)',
+          fontWeight: 700,
+          color: 'rgba(245,200,66,0.50)',
+          letterSpacing: '0.28em',
+          textTransform: 'uppercase',
+        }}>
           POS · Restoran tizimi
         </p>
 
-        {/* Forma */}
-        <div style={{
-          width: '100%',
-          background: 'rgba(255,255,255,0.04)',
-          border: '1.5px solid rgba(245,200,66,0.25)',
-          borderRadius: 18, padding: '26px 24px 22px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-        }}>
+        {/* Forma — to'g'ridan-to'g'ri, qo'shimcha card yo'q */}
+        <div style={{ width: '100%' }}>
           <LoginForm onSubmit={handleSubmit} />
         </div>
 
-        <p style={{ marginTop: 18, fontSize: 10, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.06em' }}>
+        <p style={{ marginTop: 'clamp(12px, 2vh, 20px)', fontSize: 10, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.06em', textAlign: 'center' }}>
           © 2025 Hisobchim · Barcha huquqlar himoyalangan
         </p>
       </div>
