@@ -72,40 +72,81 @@
 
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+  /* Touch press effects */
+  .product-card:active {
+    transform: scale(0.97) !important;
+    transition: transform 80ms ease-out !important;
+  }
+  .category-btn:active {
+    transform: scale(0.97) !important;
+    transition: transform 80ms ease-out !important;
+  }
+  .action-btn:active {
+    transform: scale(0.98) !important;
+    transition: transform 80ms ease-out !important;
+  }
+  @keyframes addFlash {
+    0%   { background-color: #FFFFFF; }
+    40%  { background-color: #D1FAE5; }
+    100% { background-color: #FFFFFF; }
+  }
+  .product-card-flash {
+    animation: addFlash 200ms ease-out;
+  }
+
+  /* Dark mode overrides — minimal */
+  .dark body { background: #161311; color: #EDE9E5; }
+  .dark .bg-white { background: #1E1916 !important; }
+  .dark .bg-\[\#F5F5F4\] { background: #161311 !important; }
+  .dark .bg-stone-50 { background: #1E1916 !important; }
+  .dark .bg-stone-100 { background: #252019 !important; }
+  .dark .border-stone-100 { border-color: #2E2623 !important; }
+  .dark .border-stone-200 { border-color: #2E2623 !important; }
+  .dark .text-stone-900 { color: #EDE9E5 !important; }
+  .dark .text-stone-800 { color: #E5E1DC !important; }
+  .dark .text-stone-700 { color: #D6D0C9 !important; }
+  .dark .text-stone-600 { color: #A39D96 !important; }
+  .dark .text-stone-500 { color: #8C8079 !important; }
+  .dark .text-stone-400 { color: #6B6358 !important; }
+  .dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
+  .dark .shadow-md { box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; }
+  .dark .btn-ghost { background: #252019 !important; border-color: #2E2623 !important; color: #D6D0C9 !important; }
+  .dark .btn-ghost:hover { background: #2E2623 !important; }
 }
 
 /* ─── Komponent klasslar (mavjud kod bilan mos) ─── */
 @layer components {
   /* Mavjud klasslar — o'zgartirmadik */
   .card {
-    @apply rounded-2xl border border-stone-200 bg-white shadow-sm;
+    @apply rounded-2xl border border-line bg-bg-card shadow-card;
   }
   .card-elevated {
-    @apply rounded-2xl border border-stone-200 bg-white shadow-md;
+    @apply rounded-2xl border border-line bg-bg-card shadow-md;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-2.5 py-1 text-xs text-stone-500;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs text-ink-soft;
   }
   .btn {
     @apply inline-flex select-none items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.98];
   }
   .btn-primary {
-    @apply btn bg-[#C2410C] text-white hover:bg-[#9A3412] shadow-sm;
+    @apply btn bg-brand-primary text-white hover:bg-[#9A3412] shadow-sm;
   }
   .btn-success {
-    @apply btn bg-[#16A34A] text-white hover:bg-[#15803D] shadow-sm;
+    @apply btn bg-brand-success text-white hover:bg-[#15803D] shadow-[0_2px_8px_rgba(22,163,74,0.35)] px-6;
   }
   .btn-ghost {
-    @apply btn border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-stone-300;
+    @apply btn border border-line bg-bg-card text-ink-soft hover:bg-bg-elevated hover:border-line-strong hover:text-ink;
   }
   .btn-danger {
-    @apply btn bg-red-50 text-red-600 hover:bg-red-100 border border-red-200;
+    @apply btn bg-brand-danger/10 text-brand-danger hover:bg-brand-danger/20 border border-brand-danger/30;
   }
   .input {
-    @apply w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 outline-none transition-colors focus:border-[#C2410C] focus:ring-2 focus:ring-[#C2410C]/10;
+    @apply w-full rounded-xl border border-line bg-bg-card px-4 py-3 text-sm text-ink placeholder:text-ink-dim outline-none transition-colors focus:border-brand-success focus:ring-2 focus:ring-brand-success/15;
   }
   .label {
-    @apply mb-1.5 block text-xs font-medium text-stone-600;
+    @apply mb-1.5 block text-xs font-medium text-ink-soft;
   }
 
   /* Yangi Hisobchim utility klasslar */
