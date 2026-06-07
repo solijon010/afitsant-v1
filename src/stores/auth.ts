@@ -12,6 +12,9 @@ interface AuthState {
   setServerAuth: (user: ServerUser, token: string, branchId: string | null) => void
   /** Restores token from persisted settings on cold start — no user info available */
   restoreSession: (token: string, branchId: string | null) => void
+  /** Faqat afitsantni chiqaradi — server token saqlanib qoladi */
+  logoutWaiter: () => void
+  /** To'liq chiqish — token ham tozalanadi (server-login ga yo'naltirish uchun) */
   logout: () => void
 }
 
@@ -26,6 +29,8 @@ export const useAuth = create<AuthState>((set) => ({
     set({ serverUser: user, serverToken: token, branchId }),
   restoreSession: (token, branchId) =>
     set({ serverToken: token, branchId }),
+  logoutWaiter: () =>
+    set({ waiter: null, shiftStartedAt: null }),
   logout: () =>
     set({ waiter: null, shiftStartedAt: null, serverUser: null, serverToken: null, branchId: null })
 }))

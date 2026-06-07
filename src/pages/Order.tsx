@@ -280,6 +280,23 @@ export default function OrderPage(): JSX.Element {
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
+      // Savat bo'sh — mavjud buyurtmani bekor qilamiz
+      const orderId = cart.orderId
+      const serverOrderId = useCart.getState().serverOrderId
+      if (orderId || serverOrderId) {
+        setSaving(true)
+        try {
+          await window.afisant.orders.cancel(orderId ?? 0, serverOrderId ?? undefined)
+          cart.clear()
+          cart.setOrder(null, null)
+          await refreshTable(tId)
+          toast.info("Savat bo'sh — buyurtma bekor qilindi")
+        } catch (e: any) {
+          toast.error('Bekor qilishda xatolik', { description: e?.message })
+        } finally {
+          setSaving(false)
+        }
+      }
       navigate('/tables')
       return
     }

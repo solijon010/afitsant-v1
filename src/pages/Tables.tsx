@@ -53,6 +53,7 @@ function getStatus(tw: TableWithOrder): TableStatus {
 export default function TablesPage(): JSX.Element {
   const navigate = useNavigate()
   const waiter = useAuth((s) => s.waiter)
+  const logoutWaiter = useAuth((s) => s.logoutWaiter)
   const settings = useSettings((s) => s.settings)
   const { areas, snapshot, load, activeAreaId, setActiveAreaId } = useTables()
 
@@ -170,7 +171,7 @@ export default function TablesPage(): JSX.Element {
             <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{roleLabel}</p>
           </div>
           <button
-            onClick={() => { useAuth.getState().logout(); navigate('/select-waiter', { replace: true }) }}
+            onClick={() => { logoutWaiter(); navigate('/select-waiter', { replace: true }) }}
             style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', cursor: 'pointer', color: 'rgba(255,255,255,0.85)', padding: 7, borderRadius: 8, display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'background .15s' }}
           >
             <LogOut size={15} />
