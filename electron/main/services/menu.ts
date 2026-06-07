@@ -21,7 +21,7 @@ export function getCategories(): Category[] {
        ORDER BY eff_order, eff_name`
     )
     .all() as any[]
-  return rows.map((r) => mapCategory({ ...r, name_uz_latn: r.eff_name }))
+  return rows.map((r) => mapCategory({ ...r, name_uz_latn: r.eff_name, sort_order: r.eff_order }))
 }
 
 /** Barcha kategoriyalar (yashirilganlar ham) — Sozlamalar sahifasi uchun */
@@ -43,7 +43,7 @@ export function getAllCategories(): Category[] {
        ORDER BY eff_order, eff_name`
     )
     .all() as any[]
-  return rows.map((r) => mapCategory({ ...r, name_uz_latn: r.eff_name }))
+  return rows.map((r) => mapCategory({ ...r, name_uz_latn: r.eff_name, sort_order: r.eff_order }))
 }
 
 export function getProducts(categoryId?: number): Product[] {

@@ -191,27 +191,16 @@ export default function OrderPage(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tId, table, waiter?.id, settings?.serviceFeePercent])
 
-  /* Kategoriya tartibi */
-  const CAT_ORDER = ['asosiy taomlar','asosiy mahsulotlar','salatlar','ichimliklar','maxsus taomlar','shashliklar','go\'sht va shashliklar','qanot va o\'rdak','zakaz taomlar']
-  const normCat = (s: string) => s.toLowerCase().trim().replace(/[''ʻ`]/g, "'")
+  /* Kategoriya tartibi — DB dagi sort_order_override dan keladi, qayta sort kerak emas */
   const sortedCategories = useMemo(() => {
     const seen = new Set<string>()
     return [...categories]
       .filter(c => {
-        const key = normCat(c.nameUzLatn ?? '')
+        const key = (c.nameUzLatn ?? '').toLowerCase().trim()
         if (seen.has(key)) return false
         seen.add(key)
         return true
       })
-      .sort((a, b) => {
-        const ai = CAT_ORDER.indexOf(normCat(a.nameUzLatn ?? ''))
-        const bi = CAT_ORDER.indexOf(normCat(b.nameUzLatn ?? ''))
-        if (ai === -1 && bi === -1) return 0
-        if (ai === -1) return 1
-        if (bi === -1) return -1
-        return ai - bi
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories])
 
   /* Mahsulotlar — dublikatsiz */
