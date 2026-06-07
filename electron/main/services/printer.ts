@@ -1213,7 +1213,15 @@ async function printReceiptInternal(
 }
 
 export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true } | { ok: false; error: string }> {
-  return printReceiptInternal(payload, { useDailyReceiptNumber: payload.receiptNumber === undefined })
+  const s = getSettings()
+  const augmented: ReceiptPayload = {
+    ...payload,
+    receiptHeader:   payload.receiptHeader   || s.receiptHeader   || null,
+    receiptFooter:   payload.receiptFooter   || s.receiptFooter   || null,
+    receiptQrText:   payload.receiptQrText   || s.receiptQrText   || null,
+    receiptQrLabel:  payload.receiptQrLabel  || s.receiptQrLabel  || null,
+  }
+  return printReceiptInternal(augmented, { useDailyReceiptNumber: payload.receiptNumber === undefined })
 }
 
 export async function testPrint(): Promise<{ ok: true } | { ok: false; error: string }> {

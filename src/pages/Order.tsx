@@ -426,6 +426,21 @@ export default function OrderPage(): JSX.Element {
         useCart.setState({ orderId: baseOrder.id })
       }
 
+      // Mahsulotlarni SQLite ga saqlaymiz — offline bo'lganda sync uchun zarur
+      if (orderId && cart.lines.length > 0) {
+        await window.afisant.orders.replaceItems(
+          orderId,
+          cart.lines.map((l) => ({
+            productId: l.productId,
+            productName: l.productName,
+            unitPrice: l.unitPrice,
+            quantity: l.quantity,
+            notes: l.notes ?? null,
+            localUuid: l.localUuid
+          }))
+        )
+      }
+
       if (roomServerId && cart.lines.length > 0) {
         const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
         if (itemsWithServerId.length > 0) {
