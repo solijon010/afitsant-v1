@@ -108,6 +108,16 @@ export async function loginWithServer(identifier: string, password: string): Pro
 
     await syncWaitersForBranch(branchId)
 
+    // Offline login uchun credentials saqlash
+    const passwordHash = await bcrypt.hash(password, 8)
+    setSettings({
+      offlineIdentifier: identifier,
+      offlinePasswordHash: passwordHash,
+      offlineUserJson: JSON.stringify({ ...user, branchId }),
+      offlineToken: accessToken,
+      offlineBranchId: branchId
+    })
+
     return { ok: true, token: accessToken, user, branches }
   } catch (e: any) {
     const status = e?.response?.status
@@ -118,6 +128,23 @@ export async function loginWithServer(identifier: string, password: string): Pro
     let text: string
     if (!e?.response) {
       text = `Server bilan ulanishda xatolik: ${errCode || errMsg}`
+
+      // Network xatosi — offline login tekshiruvi
+      const s = getSettings()
+      if (
+        s.offlineIdentifier === identifier &&
+        s.offlinePasswordHash &&
+        s.offlineToken
+      ) {
+        const matches = await bcrypt.compare(password, s.offlinePasswordHash)
+        if (matches) {
+          setSettings({ apiToken: s.offlineToken, branchId: s.offlineBranchId })
+          resetApi()
+          const savedUser = s.offlineUserJson ? JSON.parse(s.offlineUserJson) as ServerUser : null
+          console.log('[AUTH] Offline rejimda kirish muvaffaqiyatli')
+          return { ok: true, token: s.offlineToken, user: savedUser ?? undefined, branches: [], offline: true }
+        }
+      }
     } else if (Array.isArray(msg)) {
       text = msg[0]
     } else {

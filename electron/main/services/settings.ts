@@ -20,7 +20,12 @@ const DEFAULTS: Settings = {
   receiptHeader: null,
   receiptFooter: null,
   receiptQrText: null,
-  receiptQrLabel: null
+  receiptQrLabel: null,
+  offlineIdentifier: null,
+  offlinePasswordHash: null,
+  offlineUserJson: null,
+  offlineToken: null,
+  offlineBranchId: null
 }
 
 export function getSettings(): Settings {
@@ -50,7 +55,12 @@ export function getSettings(): Settings {
     receiptHeader: get('receiptHeader', (v) => (v ? v : DEFAULTS.receiptHeader)),
     receiptFooter: get('receiptFooter', (v) => (v ? v : DEFAULTS.receiptFooter)),
     receiptQrText: get('receiptQrText', (v) => (v ? v : DEFAULTS.receiptQrText)),
-    receiptQrLabel: get('receiptQrLabel', (v) => (v ? v : DEFAULTS.receiptQrLabel))
+    receiptQrLabel: get('receiptQrLabel', (v) => (v ? v : DEFAULTS.receiptQrLabel)),
+    offlineIdentifier: get('offlineIdentifier', (v) => (v ? v : null)),
+    offlinePasswordHash: get('offlinePasswordHash', (v) => (v ? v : null)),
+    offlineUserJson: get('offlineUserJson', (v) => (v ? v : null)),
+    offlineToken: get('offlineToken', (v) => (v ? v : null)),
+    offlineBranchId: get('offlineBranchId', (v) => (v ? v : null))
   }
 }
 

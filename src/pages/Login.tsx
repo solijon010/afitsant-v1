@@ -30,12 +30,20 @@ export default function LoginPage(): JSX.Element {
         role === 'SUPER_WAITER' ||
         role === 'MANAGER'
 
+      // Offline rejim: to'liq sync qilmasdan mahalliy bazadan yuklaymiz
+      if (result.offline) {
+        toast.info("Offline rejim — mahalliy ma'lumotlar ishlatilmoqda")
+        await Promise.all([loadMenu(), loadTables()])
+        navigate('/select-waiter', { replace: true })
+        return true
+      }
+
       const syncAll = async (): Promise<void> => {
         toast.loading("Ma'lumotlar yuklanmoqda…", { id: 'sync' })
         const res = await window.afisant.sync.fullPull()
         toast.dismiss('sync')
-        if (!res.ok) toast.error("Serverdan ma'lumot yuklab bo'lmadi")
-        else await Promise.all([loadMenu(), loadTables()])
+        if (!res.ok) toast.warning("Serverdan ma'lumot yuklab bo'lmadi — mahalliy ma'lumotlar")
+        await Promise.all([loadMenu(), loadTables()])
       }
 
       if (isSuperAdmin && !hasBranch) {

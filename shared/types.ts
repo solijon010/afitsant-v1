@@ -131,6 +131,11 @@ export interface Settings {
   receiptFooter: string | null
   receiptQrText: string | null
   receiptQrLabel: string | null
+  offlineIdentifier: string | null
+  offlinePasswordHash: string | null
+  offlineUserJson: string | null
+  offlineToken: string | null
+  offlineBranchId: string | null
 }
 
 export interface ReceiptPayload {
@@ -189,4 +194,5 @@ export interface ServerLoginResult {
   user?: ServerUser
   branches?: BranchInfo[]
   message?: string
+  offline?: boolean
 }
