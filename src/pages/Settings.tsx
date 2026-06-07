@@ -590,7 +590,7 @@ export default function SettingsPage(): JSX.Element {
           <Field label="Chek sarlavhasi">
             <textarea
               className="input min-h-[84px] resize-y"
-              placeholder={"CHOYXONA\nEST. 2010"}
+              placeholder={"CHOYXONA\nEST. 2005"}
               value={form.receiptHeader ?? ''}
               onChange={(e) => update('receiptHeader', e.target.value || null)}
             />

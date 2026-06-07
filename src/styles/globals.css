@@ -38,30 +38,6 @@
     --table-waiting-border: #FCA5A5;
   }
 
-  /* ─── Dark mode ─── */
-  .dark {
-    color-scheme: dark;
-    --background: 20 14% 9%;           /* #161311 */
-    --foreground: 30 15% 92%;          /* #EDE9E5 */
-    --card: 20 12% 12%;                /* #1E1916 */
-    --card-foreground: 30 15% 92%;
-    --popover: 20 12% 12%;
-    --popover-foreground: 30 15% 92%;
-    --primary: 16 88% 52%;             /* #E05A22 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 20 10% 16%;
-    --secondary-foreground: 30 15% 85%;
-    --muted: 20 10% 16%;
-    --muted-foreground: 25 8% 55%;
-    --accent: 38 80% 45%;
-    --accent-foreground: 20 14% 9%;
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 20 8% 20%;               /* #2E2623 */
-    --input: 20 8% 20%;
-    --ring: 16 88% 52%;
-  }
-
   html, body, #root {
     height: 100%;
   }

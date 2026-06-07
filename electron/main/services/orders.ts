@@ -383,23 +383,31 @@ export function removeItem(itemId: number): void {
   markOrderPending(existing.order_id, ts)
 }
 
-export function closeOrder(orderId: number): Order {
+export function closeOrder(orderId: number, printedAt: number | null = now()): Order {
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    throw new Error('Buyurtma ID noto\'g\'ri')
+  }
   const db = getDb()
   const ts = now()
   db.prepare(
     `UPDATE orders SET status = 'closed', closed_at = ?, printed_at = ?, sync_status = 'pending', updated_at = ? WHERE id = ?`
-  ).run(ts, ts, ts, orderId)
+  ).run(ts, printedAt, ts, orderId)
   const row = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId) as any
+  if (!row) throw new Error('Buyurtma topilmadi')
   return mapOrder(row)
 }
 
 export function cancelOrder(orderId: number): Order {
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    throw new Error('Buyurtma ID noto\'g\'ri')
+  }
   const db = getDb()
   const ts = now()
   db.prepare(
     `UPDATE orders SET status = 'cancelled', closed_at = ?, sync_status = 'pending', updated_at = ? WHERE id = ?`
   ).run(ts, ts, orderId)
   const row = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId) as any
+  if (!row) throw new Error('Buyurtma topilmadi')
   return mapOrder(row)
 }
 

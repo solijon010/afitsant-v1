@@ -140,6 +140,7 @@ export interface ReceiptPayload {
   tableName: string
   waiterName: string
   orderLocalUuid: string
+  receiptNumber?: number
   items: Array<{ name: string; quantity: number; unitPrice: number; total: number }>
   subtotal: number
   serviceFeePercent: number
