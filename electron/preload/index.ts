@@ -69,7 +69,8 @@ const api: BridgeAPI = {
   category: {
     configGet: () => ipcRenderer.invoke(IPC.categoryConfigGet),
     configSave: (configs: any[]) => ipcRenderer.invoke(IPC.categoryConfigSave, configs),
-    moveProducts: (fromId: string, toId: string) => ipcRenderer.invoke(IPC.categoryMoveProducts, fromId, toId)
+    moveProducts: (fromId: string, toId: string) => ipcRenderer.invoke(IPC.categoryMoveProducts, fromId, toId),
+    clearOverrides: () => ipcRenderer.invoke(IPC.categoryClearOverrides)
   },
 
   diag: {

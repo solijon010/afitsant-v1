@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, ClipboardList, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Printer, RefreshCw, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -82,49 +82,31 @@ export default function SettingsPage(): JSX.Element {
   const [loadingRooms, setLoadingRooms] = useState(false)
   const [catRows, setCatRows] = useState<CatRow[]>([])
   const [catSaving, setCatSaving] = useState(false)
-  const [dragIdx, setDragIdx] = useState<number | null>(null)
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
-  const catRowsContainerRef = useRef<HTMLDivElement>(null)
+  const [restoringProds, setRestoringProds] = useState(false)
   const loadMenu = useMenu((s) => s.load)
 
-  const handleGripMouseDown = useCallback((e: React.MouseEvent, fromIdx: number): void => {
-    e.preventDefault()
-    setDragIdx(fromIdx)
-    let overIdx: number | null = null
+  const moveRow = (idx: number, dir: -1 | 1): void => {
+    const next = [...catRows]
+    const target = idx + dir
+    if (target < 0 || target >= next.length) return
+    ;[next[idx], next[target]] = [next[target], next[idx]]
+    setCatRows(next)
+  }
 
-    const onMove = (ev: MouseEvent): void => {
-      if (!catRowsContainerRef.current) return
-      const children = Array.from(catRowsContainerRef.current.children) as HTMLElement[]
-      for (let i = 0; i < children.length; i++) {
-        const rect = children[i].getBoundingClientRect()
-        if (ev.clientY >= rect.top && ev.clientY < rect.bottom) {
-          if (overIdx !== i) {
-            overIdx = i
-            setDragOverIdx(i)
-          }
-          break
-        }
-      }
+  const restoreProductCategories = async (): Promise<void> => {
+    setRestoringProds(true)
+    try {
+      await window.afisant.category.clearOverrides()
+      const res = await window.afisant.sync.fullPull()
+      await loadMenu()
+      if (res.ok) toast.success('Mahsulotlar asl kategoriyalariga qaytarildi')
+      else toast.warning("Server bilan ulanib bo'lmadi — sinxronlash kerak")
+    } catch (e: any) {
+      toast.error('Xatolik', { description: e?.message })
+    } finally {
+      setRestoringProds(false)
     }
-
-    const onUp = (): void => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      if (overIdx !== null && overIdx !== fromIdx) {
-        setCatRows((prev) => {
-          const next = [...prev]
-          const [removed] = next.splice(fromIdx, 1)
-          next.splice(overIdx!, 0, removed)
-          return next
-        })
-      }
-      setDragIdx(null)
-      setDragOverIdx(null)
-    }
-
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }, [])
+  }
 
   useEffect(() => {
     void window.afisant.auth.listWaiters().then(setWaiters)
@@ -685,27 +667,36 @@ export default function SettingsPage(): JSX.Element {
           {catRows.length === 0 ? (
             <p className="text-sm text-ink-soft">Kategoriyalar topilmadi. Avval sinxronlang.</p>
           ) : (
-            <div className="space-y-1.5" ref={catRowsContainerRef}>
+            <div className="space-y-1.5">
               {catRows.map((row, i) => (
                 <div
                   key={row.cat.id}
                   className={cn(
-                    'flex items-center gap-2 rounded-xl border px-3 py-2 transition-all select-none',
-                    dragIdx === i
-                      ? 'opacity-30 border-line bg-bg-card'
-                      : dragOverIdx === i
-                        ? 'border-brand-primary bg-brand-primary/5 shadow-sm'
-                        : row.isHidden
-                          ? 'border-brand-danger/30 bg-brand-danger/5'
-                          : 'border-line bg-bg-card hover:border-line-strong'
+                    'flex items-center gap-1.5 rounded-xl border px-3 py-2 transition-all',
+                    row.isHidden
+                      ? 'border-brand-danger/30 bg-brand-danger/5'
+                      : 'border-line bg-bg-card hover:border-line-strong'
                   )}
                 >
-                  {/* Drag handle — onMouseDown orqali tortib o'tkazish */}
-                  <GripVertical
-                    size={15}
-                    className="shrink-0 text-ink-dim cursor-grab active:cursor-grabbing"
-                    onMouseDown={(e) => handleGripMouseDown(e, i)}
-                  />
+                  {/* ↑↓ tartib tugmalari */}
+                  <div className="flex flex-col shrink-0">
+                    <button
+                      onClick={() => moveRow(i, -1)}
+                      disabled={i === 0}
+                      className="flex h-5 w-5 items-center justify-center rounded text-ink-dim hover:text-ink hover:bg-bg-elevated disabled:opacity-20 transition-all"
+                      title="Yuqoriga"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => moveRow(i, 1)}
+                      disabled={i === catRows.length - 1}
+                      className="flex h-5 w-5 items-center justify-center rounded text-ink-dim hover:text-ink hover:bg-bg-elevated disabled:opacity-20 transition-all"
+                      title="Pastga"
+                    >
+                      ▼
+                    </button>
+                  </div>
 
                   {/* Nom */}
                   <input
@@ -726,41 +717,30 @@ export default function SettingsPage(): JSX.Element {
                       setCatRows(next)
                     }}
                     title={row.isHidden ? "Ko'rsatish" : "Yashirish"}
-                    className={cn('transition-colors', row.isHidden ? 'text-brand-danger' : 'text-ink-soft hover:text-ink')}
+                    className={cn('shrink-0 transition-colors', row.isHidden ? 'text-brand-danger' : 'text-ink-soft hover:text-ink')}
                   >
                     {row.isHidden ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
-
-                  {/* Mahsulotlarni ko'chirish */}
-                  <select
-                    className="rounded-lg border border-line bg-bg-card px-2 py-1 text-xs text-ink-soft"
-                    defaultValue=""
-                    onChange={async (e) => {
-                      const toId = e.target.value
-                      if (!toId || !row.cat.serverId) return
-                      const r = await window.afisant.category.moveProducts(row.cat.serverId, toId)
-                      toast.success(`${r.moved} mahsulot ko'chirildi`)
-                      e.target.value = ''
-                    }}
-                  >
-                    <option value="">Ko'chirish…</option>
-                    {catRows
-                      .filter((r) => r.cat.id !== row.cat.id && r.cat.serverId)
-                      .map((r) => (
-                        <option key={r.cat.id} value={r.cat.serverId!}>
-                          → {r.localName}
-                        </option>
-                      ))}
-                  </select>
                 </div>
               ))}
-              <button
-                onClick={() => void saveCatConfigs()}
-                disabled={catSaving}
-                className="btn-success mt-2 w-full"
-              >
-                {catSaving ? 'Saqlanmoqda…' : 'Kategoriyalarni saqlash'}
-              </button>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => void saveCatConfigs()}
+                  disabled={catSaving}
+                  className="btn-success flex-1"
+                >
+                  {catSaving ? 'Saqlanmoqda…' : 'Kategoriyalarni saqlash'}
+                </button>
+                <button
+                  onClick={() => void restoreProductCategories()}
+                  disabled={restoringProds}
+                  className="btn-ghost shrink-0"
+                  title="Mahsulotlarni serverdan asl kategoriyalariga qaytarish"
+                >
+                  <RefreshCw size={14} className={restoringProds ? 'animate-spin' : ''} />
+                  {restoringProds ? 'Qaytarilmoqda…' : 'Asl joyiga qaytarish'}
+                </button>
+              </div>
             </div>
           )}
         </Section>

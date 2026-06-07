@@ -422,7 +422,7 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
 
       {/* Yashil summa paneli */}
       <div style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', padding: '12px 16px', display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontSize: 24, fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', fontFamily: 'monospace', textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{fmtMoney(total)}</span>
+        <span style={{ fontSize: total >= 1000000 ? 17 : total >= 100000 ? 20 : 24, fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', fontFamily: 'monospace', textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{fmtMoney(total)}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>so'm</span>
       </div>
     </button>

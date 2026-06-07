@@ -99,6 +99,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.categoryMoveProducts, (_e, fromId: string, toId: string) =>
     catConfig.moveProductsToCategory(fromId, toId)
   )
+  ipcMain.handle(IPC.categoryClearOverrides, () => catConfig.clearAllProductCategoryOverrides())
 
   ipcMain.handle(IPC.diagGetInfo, () => {
     const s = settings.getSettings()

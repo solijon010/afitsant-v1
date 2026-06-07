@@ -82,6 +82,11 @@ export function moveProductsToCategory(
   return { moved }
 }
 
+/** Barcha mahsulot ko'chirish override larini o'chirish — asl joylarga qaytarish */
+export function clearAllProductCategoryOverrides(): void {
+  getDb().prepare(`DELETE FROM product_category_override`).run()
+}
+
 /** product_category_override'ni categories.category_id ga qo'llash */
 export function applyProductCategoryOverrides(): void {
   const db = getDb()
