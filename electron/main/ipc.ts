@@ -314,4 +314,29 @@ export function registerIpc(): void {
       }
     }
   )
+
+  ipcMain.handle(IPC.diagCancelAllServerOrders, async () => {
+    const { getApi } = await import('./services/apiClient')
+    const { fetchVisibleOrders } = await import('./services/orderApi')
+    const s = settings.getSettings()
+    if (!s.apiToken) return { cancelled: 0, failed: 0, total: 0 }
+    const api = getApi()
+    try {
+      const all = await fetchVisibleOrders(500)
+      const active = all.filter((o: any) => o.status === 'PENDING' || o.status === 'READY' || o.status === 'IN_PROGRESS')
+      let cancelled = 0, failed = 0
+      for (const o of active) {
+        try {
+          await api.patch(`/api/order/status/${o.id}`, null, { params: { status: 'CANCELED' } })
+          cancelled++
+        } catch {
+          failed++
+        }
+      }
+      return { cancelled, failed, total: active.length }
+    } catch (e: any) {
+      console.error('[DIAG] cancelAllServerOrders error:', e?.message)
+      return { cancelled: 0, failed: 0, total: 0 }
+    }
+  })
 }

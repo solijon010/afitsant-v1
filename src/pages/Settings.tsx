@@ -85,6 +85,8 @@ export default function SettingsPage(): JSX.Element {
   const [catSaving, setCatSaving] = useState(false)
   const [restoringProds, setRestoringProds] = useState(false)
   const [confirmClearHistory, setConfirmClearHistory] = useState(false)
+  const [confirmCancelServer, setConfirmCancelServer] = useState(false)
+  const [cancellingServer, setCancellingServer] = useState(false)
   const clearHistory = useOrderHistory((s) => s.clearAll)
   const loadMenu = useMenu((s) => s.load)
 
@@ -993,6 +995,52 @@ export default function SettingsPage(): JSX.Element {
                   </button>
                   <button
                     onClick={() => setConfirmClearHistory(false)}
+                    className="btn-ghost flex-1 text-xs"
+                  >
+                    Bekor
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-line pt-3" />
+            {!confirmCancelServer ? (
+              <button
+                onClick={() => setConfirmCancelServer(true)}
+                className="btn-ghost w-full text-brand-danger hover:bg-brand-danger/10"
+              >
+                <X size={13} />
+                Serverdagi barcha ochiq buyurtmalarni bekor qilish
+              </button>
+            ) : (
+              <div className="rounded-xl border border-brand-danger/40 bg-brand-danger/5 p-3 space-y-2">
+                <p className="text-xs text-brand-danger font-semibold">
+                  ⚠️ Serverdagi PENDING/READY buyurtmalar CANCELED bo'ladi. Bu amalni qaytarib bo'lmaydi!
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setCancellingServer(true)
+                      try {
+                        const res = await window.afisant.diag.cancelAllServerOrders()
+                        setConfirmCancelServer(false)
+                        if (res.total === 0) toast.info("Serverda ochiq buyurtma yo'q edi")
+                        else if (res.failed === 0) toast.success(`${res.cancelled} ta buyurtma bekor qilindi`)
+                        else toast.warning(`${res.cancelled} ta bekor qilindi, ${res.failed} ta xato`)
+                      } catch (e: any) {
+                        toast.error('Xatolik', { description: e?.message })
+                      } finally {
+                        setCancellingServer(false)
+                      }
+                    }}
+                    disabled={cancellingServer}
+                    className="btn-danger flex-1 text-xs"
+                  >
+                    {cancellingServer ? 'Bekor qilinmoqda…' : 'Ha, hammasini bekor qil'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmCancelServer(false)}
+                    disabled={cancellingServer}
                     className="btn-ghost flex-1 text-xs"
                   >
                     Bekor
