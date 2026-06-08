@@ -137,14 +137,9 @@ export default function OrderPage(): JSX.Element {
           })
           // Dastlabki server items ni eslab qolamiz — saqlashda o'chirilganlarni topish uchun
           initialServerItemsRef.current = serverLines
-
-          const baseOrder = await window.afisant.orders.upsert({
-            tableId: tId,
-            waiterId: waiter.id,
-            serviceFeePercent: fee
-          })
           if (cancelled) return
-          cart.setOrder(baseOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
+          // Local order YARATMAYMIZ — faqat ko'rsatamiz. Saqlashda lazy yaratiladi.
+          cart.setOrder(null, tId, existingOrder.serverId ?? null, roomServerId)
           cart.hydrateFromOrder(serverLines)
           return
         }
@@ -216,13 +211,14 @@ export default function OrderPage(): JSX.Element {
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
-      // Savat bo'sh — mavjud buyurtmani bekor qilamiz
+      // Savat bo'sh — faqat LOCAL order bo'lsa bekor qilamiz
+      // Server orderni tegmaymiz (foydalanuvchi faqat ko'rib chiqdi)
       const orderId = cart.orderId
       const serverOrderId = useCart.getState().serverOrderId
-      if (orderId || serverOrderId) {
+      if (orderId && orderId > 0) {
         setSaving(true)
         try {
-          await window.afisant.orders.cancel(orderId ?? 0, serverOrderId ?? undefined)
+          await window.afisant.orders.cancel(orderId, serverOrderId ?? undefined)
           cart.clear()
           cart.setOrder(null, null)
           await refreshTable(tId)
@@ -289,11 +285,17 @@ export default function OrderPage(): JSX.Element {
         ]
         if (syncItems.length > 0) {
           try {
-            const res = await window.afisant.orders.syncAll({
-              localOrderId: orderId ?? undefined,
-              roomServerId,
-              items: syncItems
-            })
+            // 5 soniyada server javob bermasa — mahalliy saqlanadi, qotib qolmaydi
+            const res = await Promise.race([
+              window.afisant.orders.syncAll({
+                localOrderId: orderId ?? undefined,
+                roomServerId,
+                items: syncItems
+              }),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('server_timeout')), 5000)
+              )
+            ])
             useCart.setState({ serverOrderId: res.serverId })
             useCart.setState({
               lines: cart.lines.map((l) => ({ ...l, flushed: true }))
@@ -305,32 +307,13 @@ export default function OrderPage(): JSX.Element {
             if (msg.includes('404') || msg.includes('mavjud emas') || msg.includes('inactive')) {
               toast.warning('Ba\'zi mahsulotlar serverda yo\'q — mahalliy saqlandi')
             } else {
-              toast.warning(`Server bilan ulanib bo'lmadi — mahalliy saqlandi`)
+              toast.warning("Server bilan ulanib bo'lmadi — mahalliy saqlandi")
             }
           }
         } else if (cart.lines.length > 0) {
           // Mahsulotlarda server_id yo'q — fullPull kerak
           toast.error("Mahsulotlarda server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
         }
-      }
-
-      // Localda saqlash (vaqt bilan)
-      if (table) {
-        useOrderHistory.getState().push({
-          tableId: tId,
-          tableName: table.name,
-          waiterName: [waiter.lastName, waiter.firstName].filter(Boolean).join(' '),
-          savedAt: Date.now(),
-          items: cart.lines.map((l) => ({
-            name: l.productName,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            total: Math.round(l.unitPrice * l.quantity)
-          })),
-          subtotal: cart.subtotal(),
-          serviceFee: cart.serviceFee(),
-          total: cart.total()
-        })
       }
 
       await refreshTable(tId)
