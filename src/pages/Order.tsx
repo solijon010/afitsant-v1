@@ -237,7 +237,7 @@ export default function OrderPage(): JSX.Element {
   const GOSHT_ORDER = ['qiyma', "go'sht", "qo'y"]
 
   const shownProducts = useMemo<Product[]>(() => {
-    const list = products.filter((p) => p.categoryId === activeCatId)
+    const list = products.filter((p) => p.categoryId === activeCatId && p.isAvailable)
     const seen = new Set<string>()
     const unique = list.filter(p => {
       const key = (p.nameUzLatn ?? '').toLowerCase().trim()
@@ -251,6 +251,10 @@ export default function OrderPage(): JSX.Element {
     return [...unique].sort((a, b) => {
       const an = (a.nameUzLatn ?? '').toLowerCase()
       const bn = (b.nameUzLatn ?? '').toLowerCase()
+
+      const aLast = an.includes('yarimta')
+      const bLast = bn.includes('yarimta')
+      if (aLast !== bLast) return aLast ? 1 : -1
 
       if (catName.includes('salat')) {
         const ai = exactOrder(an, SALATLAR_ORDER)
