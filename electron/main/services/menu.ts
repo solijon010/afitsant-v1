@@ -48,16 +48,19 @@ export function getAllCategories(): Category[] {
 
 export function getProducts(categoryId?: number): Product[] {
   const db = getDb()
+  const sql = `
+    SELECT p.*,
+      COALESCE(pso.sort_order_override, p.sort_order) AS eff_order
+    FROM products p
+    LEFT JOIN product_sort_override pso ON pso.product_server_id = p.server_id
+    WHERE p.is_available = 1
+      ${categoryId ? 'AND p.category_id = ?' : ''}
+    ORDER BY ${categoryId ? 'eff_order, p.name_uz_latn' : 'p.category_id, eff_order'}
+  `
   const rows = categoryId
-    ? (db
-        .prepare(
-          `SELECT * FROM products WHERE category_id = ? AND is_available = 1 ORDER BY sort_order, name_uz_latn`
-        )
-        .all(categoryId) as any[])
-    : (db
-        .prepare(`SELECT * FROM products WHERE is_available = 1 ORDER BY category_id, sort_order`)
-        .all() as any[])
-  return rows.map(mapProduct)
+    ? (db.prepare(sql).all(categoryId) as any[])
+    : (db.prepare(sql).all() as any[])
+  return rows.map((r) => mapProduct({ ...r, sort_order: r.eff_order }))
 }
 
 export function getSnapshot(): { categories: Category[]; products: Product[] } {

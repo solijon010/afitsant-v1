@@ -73,6 +73,11 @@ const api: BridgeAPI = {
     clearOverrides: () => ipcRenderer.invoke(IPC.categoryClearOverrides)
   },
 
+  product: {
+    sortGet: (categoryServerId: string) => ipcRenderer.invoke(IPC.productSortGet, categoryServerId),
+    sortSave: (overrides: any[]) => ipcRenderer.invoke(IPC.productSortSave, overrides)
+  },
+
   diag: {
     getInfo: () => ipcRenderer.invoke(IPC.diagGetInfo),
     openLogs: () => ipcRenderer.invoke(IPC.diagOpenLogs),

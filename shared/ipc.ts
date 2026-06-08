@@ -62,6 +62,9 @@ export const IPC = {
   categoryMoveProducts: 'category:moveProducts',
   categoryClearOverrides: 'category:clearOverrides',
 
+  productSortGet: 'product:sortGet',
+  productSortSave: 'product:sortSave',
+
   imageCacheGet: 'imageCache:get',
   imageCacheSet: 'imageCache:set',
   imageCacheClear: 'imageCache:clear',
@@ -188,6 +191,11 @@ export interface BridgeAPI {
     configSave: (configs: Array<{ serverId: string; localName: string | null; sortOrderOverride: number | null; isHidden: boolean }>) => Promise<void>
     moveProducts: (fromServerId: string, toServerId: string) => Promise<{ moved: number }>
     clearOverrides: () => Promise<void>
+  }
+
+  product: {
+    sortGet: (categoryServerId: string) => Promise<Array<{ serverId: string; name: string; sortOrder: number }>>
+    sortSave: (overrides: Array<{ serverId: string; sortOrder: number }>) => Promise<void>
   }
 
   imageCache: {

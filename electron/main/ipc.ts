@@ -101,6 +101,32 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IPC.categoryClearOverrides, () => catConfig.clearAllProductCategoryOverrides())
 
+  ipcMain.handle(IPC.productSortGet, (_e, categoryServerId: string) => {
+    const db = getDb()
+    const rows = db.prepare(`
+      SELECT p.server_id, p.name_uz_latn AS name,
+        COALESCE(pso.sort_order_override, p.sort_order) AS sort_order
+      FROM products p
+      JOIN categories c ON p.category_id = c.id
+      LEFT JOIN product_sort_override pso ON pso.product_server_id = p.server_id
+      WHERE c.server_id = ? AND p.is_available = 1
+      ORDER BY sort_order, p.name_uz_latn
+    `).all(categoryServerId) as any[]
+    return rows.map((r) => ({ serverId: r.server_id, name: r.name, sortOrder: r.sort_order }))
+  })
+
+  ipcMain.handle(IPC.productSortSave, (_e, overrides: Array<{ serverId: string; sortOrder: number }>) => {
+    const db = getDb()
+    const stmt = db.prepare(`
+      INSERT INTO product_sort_override (product_server_id, sort_order_override)
+      VALUES (?, ?)
+      ON CONFLICT(product_server_id) DO UPDATE SET sort_order_override = excluded.sort_order_override
+    `)
+    db.transaction(() => {
+      for (const o of overrides) stmt.run(o.serverId, o.sortOrder)
+    })()
+  })
+
   ipcMain.handle(IPC.diagGetInfo, () => {
     const s = settings.getSettings()
     const logPath = join(app.getPath('logs'), 'main.log')

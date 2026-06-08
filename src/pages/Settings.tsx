@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, ClipboardList, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Printer, RefreshCw, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ClipboardList, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Package, Printer, RefreshCw, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Category, Lang, Settings, Waiter } from '@shared/types'
 import { useAuth } from '@/stores/auth'
@@ -87,6 +87,9 @@ export default function SettingsPage(): JSX.Element {
   const [confirmClearHistory, setConfirmClearHistory] = useState(false)
   const [confirmCancelServer, setConfirmCancelServer] = useState(false)
   const [cancellingServer, setCancellingServer] = useState(false)
+  const [prodSortCatId, setProdSortCatId] = useState<string>('')
+  const [prodRows, setProdRows] = useState<Array<{ serverId: string; name: string; sortOrder: number }>>([])
+  const [prodSortSaving, setProdSortSaving] = useState(false)
   const clearHistory = useOrderHistory((s) => s.clearAll)
   const loadMenu = useMenu((s) => s.load)
 
@@ -748,6 +751,81 @@ export default function SettingsPage(): JSX.Element {
               </div>
             </div>
           )}
+        </Section>
+
+        <Section title="Mahsulot tartibi" icon={<Package size={16} />}>
+          <div className="space-y-2">
+            <select
+              value={prodSortCatId}
+              onChange={async (e) => {
+                const catId = e.target.value
+                setProdSortCatId(catId)
+                if (!catId) { setProdRows([]); return }
+                const rows = await window.afisant.product.sortGet(catId)
+                setProdRows(rows)
+              }}
+              className="w-full rounded-xl border border-line bg-bg-elevated px-3 py-2 text-sm text-ink"
+            >
+              <option value="">— Kategoriya tanlang —</option>
+              {catRows.filter((c) => c.cat.serverId).map((c) => (
+                <option key={c.cat.serverId!} value={c.cat.serverId!}>{c.localName}</option>
+              ))}
+            </select>
+
+            {prodRows.length > 0 && (
+              <>
+                <div className="space-y-1 max-h-72 overflow-y-auto">
+                  {prodRows.map((p, i) => (
+                    <div key={p.serverId} className="flex items-center gap-2 rounded-xl border border-line bg-bg-elevated px-3 py-2">
+                      <span className="w-5 text-center text-xs text-ink-dim font-mono">{i + 1}</span>
+                      <span className="flex-1 text-sm text-ink truncate">{p.name}</span>
+                      <div className="flex flex-col shrink-0">
+                        <button
+                          onClick={() => {
+                            const next = [...prodRows]
+                            if (i === 0) return
+                            ;[next[i], next[i - 1]] = [next[i - 1], next[i]]
+                            setProdRows(next)
+                          }}
+                          disabled={i === 0}
+                          className="flex h-5 w-5 items-center justify-center rounded text-ink-dim hover:text-ink hover:bg-bg-elevated disabled:opacity-20 transition-all"
+                        >▲</button>
+                        <button
+                          onClick={() => {
+                            const next = [...prodRows]
+                            if (i === prodRows.length - 1) return
+                            ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
+                            setProdRows(next)
+                          }}
+                          disabled={i === prodRows.length - 1}
+                          className="flex h-5 w-5 items-center justify-center rounded text-ink-dim hover:text-ink hover:bg-bg-elevated disabled:opacity-20 transition-all"
+                        >▼</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={async () => {
+                    setProdSortSaving(true)
+                    try {
+                      const overrides = prodRows.map((p, i) => ({ serverId: p.serverId, sortOrder: i }))
+                      await window.afisant.product.sortSave(overrides)
+                      await loadMenu()
+                      toast.success('Mahsulot tartibi saqlandi')
+                    } catch (e: any) {
+                      toast.error('Xatolik', { description: e?.message })
+                    } finally {
+                      setProdSortSaving(false)
+                    }
+                  }}
+                  disabled={prodSortSaving}
+                  className="btn-success w-full"
+                >
+                  {prodSortSaving ? 'Saqlanmoqda…' : 'Tartibni saqlash'}
+                </button>
+              </>
+            )}
+          </div>
         </Section>
 
         {isAdmin && (
