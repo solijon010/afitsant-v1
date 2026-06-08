@@ -273,6 +273,10 @@ export default function OrderPage(): JSX.Element {
         const bv = extractVolume(b.nameUzLatn ?? '')
         if (av !== bv) return bv - av  // katta hajm birinchi
       }
+      const aLast = an.includes('yarimta')
+      const bLast = bn.includes('yarimta')
+      if (aLast !== bLast) return aLast ? 1 : -1
+
       return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
