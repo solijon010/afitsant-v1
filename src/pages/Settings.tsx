@@ -1046,7 +1046,11 @@ export default function SettingsPage(): JSX.Element {
               </div>
             )}
 
-            <div className="border-t border-line pt-3" />
+          </Section>
+        )}
+
+        {diagInfo?.hasToken && (
+          <Section title="Ma'lumotlarni tozalash" icon={<X size={16} />}>
             {!confirmClearHistory ? (
               <button
                 onClick={() => setConfirmClearHistory(true)}
