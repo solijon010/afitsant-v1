@@ -359,6 +359,13 @@ export function registerIpc(): void {
           failed++
         }
       }
+      // Local DB dagi ochiq orderlarni ham tozalaymiz (server orderlardan yaratilgan phantom orderlar)
+      const db = getDb()
+      db.transaction(() => {
+        db.prepare(`DELETE FROM sync_queue`).run()
+        db.prepare(`DELETE FROM order_items`).run()
+        db.prepare(`DELETE FROM orders`).run()
+      })()
       return { cancelled, failed, total: active.length }
     } catch (e: any) {
       console.error('[DIAG] cancelAllServerOrders error:', e?.message)
