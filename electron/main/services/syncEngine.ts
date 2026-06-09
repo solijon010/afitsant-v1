@@ -126,11 +126,6 @@ export async function flush(): Promise<{ ok: boolean; flushed: number }> {
     lastSyncAt = Date.now()
   }
 
-  // Online bo'lganda pending buyurtmalarni sinxronlaymiz
-  if (online) {
-    void syncPendingOrders().catch((e: any) => console.warn('[SYNC] syncPendingOrders in flush error:', e?.message))
-  }
-
   return { ok: true, flushed }
 }
 
