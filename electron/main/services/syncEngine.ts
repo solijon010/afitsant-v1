@@ -81,7 +81,14 @@ function startTicker(): void {
   if (flushTimer) clearInterval(flushTimer)
   flushTimer = setInterval(() => {
     void flush().catch(() => undefined)
-    if (online) void syncPendingOrders().catch(() => undefined)
+    // Pending buyurtmalar bo'lsa har doim urinib ko'ramiz — WebSocket holatiga qaramasdan
+    const s = getSettings()
+    if (s.apiToken) {
+      const hasPending = getDb()
+        .prepare(`SELECT 1 FROM orders WHERE sync_status = 'pending' LIMIT 1`)
+        .get()
+      if (hasPending) void syncPendingOrders().catch(() => undefined)
+    }
   }, TICK_MS)
 }
 
@@ -197,14 +204,24 @@ async function syncPendingOrders(): Promise<void> {
         }
 
         if (serverId) {
-          if (order.status === 'closed') {
-            await closeOrderOnServer(serverId)
-          } else {
-            await cancelOrderOnServer(serverId)
+          try {
+            if (order.status === 'closed') {
+              await closeOrderOnServer(serverId)
+            } else {
+              await cancelOrderOnServer(serverId)
+            }
+          } catch (closeErr: any) {
+            const st = closeErr?.response?.status
+            if (st === 400 || st === 404) {
+              // Server da allaqachon yopilgan — mahalliy ham synced deb belgilaymiz
+              console.log(`[SYNC] Order ${order.id} already closed on server (${st}) — marking synced`)
+            } else {
+              throw closeErr
+            }
           }
           db.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(?, server_id), updated_at = ? WHERE id = ?`)
             .run(serverId, Date.now(), order.id)
-          console.log(`[SYNC] Pending ${order.status} order ${order.id} closed on server`)
+          console.log(`[SYNC] Pending ${order.status} order ${order.id} synced`)
         }
       } catch (e: any) {
         console.warn(`[SYNC] Pending closed order ${order.id} failed: ${e?.message}`)

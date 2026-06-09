@@ -432,7 +432,23 @@ export default function OrderPage(): JSX.Element {
         useCart.setState({ orderId: baseOrder.id })
       }
 
-      // Avval mahalliy yopamiz (tez, faqat SQLite) — navigatsiyani bloklash yo'q
+      // Items ni SQLite ga saqlash — offline bo'lganda sync uchun ZARUR
+      // Bu bo'lmasdan syncPendingOrders items topa olmaydi va server ga yubora olmaydi
+      if (orderId && savedLines.length > 0) {
+        await window.afisant.orders.replaceItems(
+          orderId,
+          savedLines.map((l) => ({
+            productId: l.productId,
+            productName: l.productName,
+            unitPrice: l.unitPrice,
+            quantity: l.quantity,
+            notes: l.notes ?? null,
+            localUuid: l.localUuid
+          }))
+        )
+      }
+
+      // Mahalliy yopamiz (tez, faqat SQLite) — navigatsiyani bloklash yo'q
       if (orderId && orderId > 0) {
         await window.afisant.orders.close(orderId)
       }
