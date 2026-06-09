@@ -18,6 +18,8 @@ asarUnpack:
   - '**/node_modules/bcryptjs/**'
 
 extraResources:
+  - from: src/assets/hisobchim-logo.ico
+    to: hisobchim-logo.ico
   - from: src/assets/receipt-header-thermal-clean.png
     to: receipt-header-thermal-clean.png
   - from: src/assets/receipt-header-thermal.png

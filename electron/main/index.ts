@@ -68,7 +68,9 @@ function createWindow(): void {
     autoHideMenuBar: true,
     titleBarStyle: 'default',
     frame: true,
-    icon: join(__dirname, '../../src/assets/hisobchim-logo.ico'),
+    icon: app.isPackaged
+      ? join(process.resourcesPath, 'hisobchim-logo.ico')
+      : join(__dirname, '../../src/assets/hisobchim-logo.ico'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
