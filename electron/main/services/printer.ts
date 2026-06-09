@@ -167,12 +167,11 @@ function buildReceiptLines(
   for (const lineText of footerLines) {
     for (const row of wrapText(lineText, width)) lines.push(center(row, width))
   }
-  if (includeQrLabel && payload.receiptQrLabel) {
-    for (const row of wrapText(payload.receiptQrLabel, width)) lines.push(center(row, width))
-  }
-  if (includeQrText && payload.receiptQrText) {
-    for (const row of wrapText(payload.receiptQrText, width)) lines.push(center(row, width))
-  }
+  lines.push(line)
+  lines.push(center("OBUNA BO'LING!", width))
+  lines.push(center('@sohil.choyxona', width))
+  lines.push(line)
+  lines.push(center('Loyiha Asoschisi: Hisobchim', width))
 
   return lines
 }
@@ -383,16 +382,6 @@ function buildEscPosSingle(payload: ReceiptPayload): Buffer {
       parts.push(bytes(ESC, 0x45, 0x00))
     } else {
       parts.push(textBytes(lineText + '\n'))
-    }
-  }
-  if (payload.receiptQrText) {
-    parts.push(bytes(ESC, 0x61, 0x01))
-    parts.push(bytes(ESC, 0x64, 1))
-    parts.push(buildQrEscPos(payload.receiptQrText))
-    parts.push(bytes(ESC, 0x64, 1))
-    if (payload.receiptQrLabel) {
-      parts.push(textBytes(sanitizeReceiptText(payload.receiptQrLabel) + '\n'))
-      parts.push(bytes(ESC, 0x64, 1))
     }
   }
   parts.push(bytes(ESC, 0x64, 3))
@@ -810,16 +799,6 @@ async function renderReceipt(printer: any, payload: ReceiptPayload): Promise<voi
     }
     printer.println(lineText)
   }
-  if (payload.receiptQrText) {
-    printer.alignCenter()
-    printer.newLine()
-    printer.printQR(payload.receiptQrText, { cellSize: 7, correction: 'M', model: 2 })
-    if (payload.receiptQrLabel) {
-      printer.newLine()
-      printer.println(sanitizeReceiptText(payload.receiptQrLabel))
-    }
-    printer.newLine()
-  }
   printer.cut()
 }
 
@@ -861,7 +840,6 @@ async function printViaWindowsDocument(payload: ReceiptPayload, printerName: str
   const jsonFile = join(tmpdir(), `afisant-receipt-${Date.now()}.json`)
   const scriptFile = join(tmpdir(), `afisant-receipt-${Date.now()}.ps1`)
   const headerImagePath = resolveReceiptLogoPath()
-  const qrImagePath = await buildQrImageFile(payload.receiptQrText)
   const safePrinterName = printerName.replace(/'/g, "''")
   const safeJsonFile = jsonFile.replace(/'/g, "''")
   const { date, time } = fmtDateTime(payload.printedAt)
@@ -900,14 +878,12 @@ async function printViaWindowsDocument(payload: ReceiptPayload, printerName: str
         itemRows.length * 24 +
         footerLines.length * 22 +
         (headerImagePath ? 120 : 0) +
-        (qrImagePath ? 150 : 0)
+        0
     )
   )
 
   const renderModel = {
     headerImagePath: headerImagePath ?? '',
-    qrImagePath: qrImagePath ?? '',
-    qrLabel: payload.receiptQrLabel ?? '',
     headerTextLines,
     organizationAddress: payload.organizationAddress ? sanitizeReceiptText(payload.organizationAddress) : '',
     waiterLine: sanitizeReceiptText(`Xizmatda: ${payload.waiterName}`),
@@ -957,7 +933,6 @@ async function printViaWindowsDocument(payload: ReceiptPayload, printerName: str
     '  $sumLeft = $qtyLeft + 42.0 + 6.0',
     '  $y = 6.0',
     '  $headerImage = if ($data.headerImagePath -and (Test-Path ([string]$data.headerImagePath))) { [System.Drawing.Image]::FromFile([string]$data.headerImagePath) } else { $null }',
-    '  $qrImage = if ($data.qrImagePath -and (Test-Path ([string]$data.qrImagePath))) { [System.Drawing.Image]::FromFile([string]$data.qrImagePath) } else { $null }',
     '  try {',
     '    $black = [System.Drawing.Brushes]::Black',
     '    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::Black, 1)',
@@ -1045,18 +1020,21 @@ async function printViaWindowsDocument(payload: ReceiptPayload, printerName: str
     '        $e.Graphics.DrawString([string]$line, $bodyFont, $black, $rect, $center)',
     '        $y += 20',
     '      }',
-    '      if ($qrImage) {',
-    '        $y += 6',
-    '        $qrSize = [double][Math]::Min([double]$data.qrSize, [double]$width)',
-    '        $qrX = [double](($pageWidth - $qrSize) / 2.0)',
-    '        $e.Graphics.DrawImage($qrImage, $qrX, $y, $qrSize, $qrSize)',
-    '        $y += $qrSize + 4',
-    '      }',
-    '      if ($data.qrLabel) {',
-    '        $rect = New-Object System.Drawing.RectangleF($left, $y, $width, 20)',
-    '        $e.Graphics.DrawString([string]$data.qrLabel, $bodyFont, $black, $rect, $center)',
-    '        $y += 20',
-    '      }',
+    '      $y += 4',
+    '      $e.Graphics.DrawLine($pen, $left, $y, $right, $y)',
+    '      $y += 8',
+    '      $rect = New-Object System.Drawing.RectangleF($left, $y, $width, 22)',
+    "      `$e.Graphics.DrawString('OBUNA BO''LING!', `$bodyFont, `$black, `$rect, `$center)",
+    '      $y += 22',
+    '      $rect = New-Object System.Drawing.RectangleF($left, $y, $width, 22)',
+    "      `$e.Graphics.DrawString('@sohil.choyxona', `$bodyFont, `$black, `$rect, `$center)",
+    '      $y += 22',
+    '      $y += 4',
+    '      $e.Graphics.DrawLine($pen, $left, $y, $right, $y)',
+    '      $y += 8',
+    '      $rect = New-Object System.Drawing.RectangleF($left, $y, $width, 20)',
+    "      `$e.Graphics.DrawString('Loyiha Asoschisi: Hisobchim', `$smallFont, `$black, `$rect, `$center)",
+    '      $y += 20',
     '    } finally {',
     '      $pen.Dispose()',
     '      $center.Dispose()',
@@ -1069,7 +1047,6 @@ async function printViaWindowsDocument(payload: ReceiptPayload, printerName: str
     '    }',
     '  } finally {',
     '    if ($headerImage) { $headerImage.Dispose() }',
-    '    if ($qrImage) { $qrImage.Dispose() }',
     '    }',
     '  $e.HasMorePages = $false',
     '})',
@@ -1100,9 +1077,6 @@ async function printViaWindowsDocument(payload: ReceiptPayload, printerName: str
   } finally {
     try { unlinkSync(jsonFile) } catch { /* ignore */ }
     try { unlinkSync(scriptFile) } catch { /* ignore */ }
-    if (qrImagePath) {
-      try { unlinkSync(qrImagePath) } catch { /* ignore */ }
-    }
   }
 }
 
@@ -1221,8 +1195,6 @@ export async function printReceipt(payload: ReceiptPayload): Promise<{ ok: true 
     organizationPhone:   payload.organizationPhone   || s.organizationPhone   || '+99833 904 20 20',
     receiptHeader:       payload.receiptHeader       || s.receiptHeader       || 'CHOYXONA\nEST. 2005',
     receiptFooter:       payload.receiptFooter       || s.receiptFooter       || "Sohil Choyxonasiga qaytib kelganingiz uchun rahmat!\nBiz bilan yana ko'rishguncha!",
-    receiptQrText:       payload.receiptQrText       || s.receiptQrText       || 'https://instagram.com/soxil.choyxona',
-    receiptQrLabel:      payload.receiptQrLabel      || s.receiptQrLabel      || '@soxil.choyxona',
   }
   return printReceiptInternal(augmented, { useDailyReceiptNumber: payload.receiptNumber === undefined })
 }
