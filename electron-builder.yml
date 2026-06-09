@@ -33,6 +33,7 @@ win:
       arch: [x64]
   icon: src/assets/hisobchim-logo.ico
   artifactName: Hisobchim-${version}-${arch}.${ext}
+  signAndEditExecutable: false
 
 nsis:
   oneClick: false

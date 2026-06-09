@@ -45,5 +45,15 @@ export const useMenu = create<MenuState>((set, get) => ({
     set({ categories: uniqueCategories, products: uniqueProducts, loadedAt: Date.now() })
     preloadImages(uniqueProducts.map((p) => p.photo))
   },
-  productsByCategory: (categoryId) => get().products.filter((p) => p.categoryId === categoryId)
+  productsByCategory: (categoryId) => {
+    const LAST_KEYWORDS = ['yarimta']
+    return get().products
+      .filter((p) => p.categoryId === categoryId)
+      .sort((a, b) => {
+        const aLast = LAST_KEYWORDS.some(k => (a.nameUzLatn ?? '').toLowerCase().includes(k))
+        const bLast = LAST_KEYWORDS.some(k => (b.nameUzLatn ?? '').toLowerCase().includes(k))
+        if (aLast !== bLast) return aLast ? 1 : -1
+        return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      })
+  }
 }))

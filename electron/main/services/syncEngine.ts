@@ -13,7 +13,7 @@ let flushTimer: NodeJS.Timeout | null = null
 let online = false
 let lastSyncAt: number | null = null
 let mainWindowGetter: (() => BrowserWindow | null) | null = null
-let syncingPending = false
+let syncingPendingOrders = false
 
 const BATCH = 25
 const TICK_MS = 15_000
@@ -48,8 +48,10 @@ function setupSocket(getMainWindow: () => BrowserWindow | null): void {
   socket.on('connect', () => {
     online = true
     broadcastStatus(getMainWindow)
-    void flush().catch(() => undefined)
-    void syncPendingOrders().catch(() => undefined)
+    // Internet qayta ulanganda pending buyurtmalarni sinxronlaymiz
+    setTimeout(() => {
+      void syncPendingOrders().catch((e: any) => console.warn('[SYNC] syncPendingOrders on connect error:', e?.message))
+    }, 2000)
   })
 
   socket.on('disconnect', () => {
@@ -95,27 +97,122 @@ function broadcastStatus(getMainWindow: () => BrowserWindow | null): void {
 
 export async function flush(): Promise<{ ok: boolean; flushed: number }> {
   const items = dequeueBatch(BATCH)
-  if (items.length === 0) return { ok: true, flushed: 0 }
-
-  const api = getApi()
   let flushed = 0
-  const doneIds: number[] = []
 
-  for (const item of items) {
-    try {
-      const path = `/api/sync/${item.entity}/${item.action}`
-      await api.post(path, item.payload)
-      doneIds.push(item.id)
-      flushed++
-    } catch (err: any) {
-      const backoff = Math.min(2_000 * 2 ** item.attempts, MAX_BACKOFF)
-      markFailed(item.id, err?.message ?? 'unknown', backoff)
+  if (items.length > 0) {
+    const api = getApi()
+    const doneIds: number[] = []
+
+    for (const item of items) {
+      try {
+        const path = `/api/sync/${item.entity}/${item.action}`
+        await api.post(path, item.payload)
+        doneIds.push(item.id)
+        flushed++
+      } catch (err: any) {
+        const backoff = Math.min(2_000 * 2 ** item.attempts, MAX_BACKOFF)
+        markFailed(item.id, err?.message ?? 'unknown', backoff)
+      }
     }
+
+    if (doneIds.length > 0) markDone(doneIds)
+    lastSyncAt = Date.now()
   }
 
-  if (doneIds.length > 0) markDone(doneIds)
-  lastSyncAt = Date.now()
+  // Online bo'lganda pending buyurtmalarni sinxronlaymiz
+  if (online) {
+    void syncPendingOrders().catch((e: any) => console.warn('[SYNC] syncPendingOrders in flush error:', e?.message))
+  }
+
   return { ok: true, flushed }
+}
+
+async function syncPendingOrders(): Promise<void> {
+  if (syncingPendingOrders) return
+  const s = getSettings()
+  if (!s.apiToken) return
+
+  syncingPendingOrders = true
+  try {
+    const db = getDb()
+
+    // 1. Pending ochiq buyurtmalar — server bilan sinxronlaymiz
+    const pendingOpen = db.prepare(`
+      SELECT o.id, t.server_id AS room_server_id
+      FROM orders o
+      JOIN tables t ON o.table_id = t.id
+      WHERE o.sync_status = 'pending' AND o.status = 'open' AND t.server_id IS NOT NULL
+    `).all() as Array<{ id: number; room_server_id: string }>
+
+    for (const order of pendingOpen) {
+      const items = db.prepare(`
+        SELECT oi.quantity, p.server_id AS product_server_id
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = ?
+      `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
+
+      const syncItems = items
+        .filter((it) => it.product_server_id && it.quantity > 0)
+        .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
+
+      if (syncItems.length === 0) continue
+      try {
+        await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+        console.log(`[SYNC] Pending open order ${order.id} synced to server`)
+      } catch (e: any) {
+        console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)
+      }
+    }
+
+    // 2. Pending yopilgan/bekor qilingan buyurtmalar — serverni xabardor qilamiz
+    const pendingClosed = db.prepare(`
+      SELECT o.id, o.status, o.server_id, t.server_id AS room_server_id
+      FROM orders o
+      JOIN tables t ON o.table_id = t.id
+      WHERE o.sync_status = 'pending' AND o.status IN ('closed', 'cancelled')
+    `).all() as Array<{ id: number; status: string; server_id: string | null; room_server_id: string | null }>
+
+    for (const order of pendingClosed) {
+      try {
+        let serverId = order.server_id
+
+        // Server ID yo'q bo'lsa — avval mahsulotlarni sinxronlab server ID olamiz
+        if (!serverId && order.room_server_id) {
+          const items = db.prepare(`
+            SELECT oi.quantity, p.server_id AS product_server_id
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.id
+            WHERE oi.order_id = ?
+          `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
+
+          const syncItems = items
+            .filter((it) => it.product_server_id && it.quantity > 0)
+            .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
+
+          if (syncItems.length > 0) {
+            const res = await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+            serverId = res.serverId
+          }
+        }
+
+        if (serverId) {
+          if (order.status === 'closed') {
+            await closeOrderOnServer(serverId)
+          } else {
+            await cancelOrderOnServer(serverId)
+          }
+          db.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(?, server_id), updated_at = ? WHERE id = ?`)
+            .run(serverId, Date.now(), order.id)
+          console.log(`[SYNC] Pending ${order.status} order ${order.id} closed on server`)
+        }
+      } catch (e: any) {
+        console.warn(`[SYNC] Pending closed order ${order.id} failed: ${e?.message}`)
+      }
+    }
+  } finally {
+    syncingPendingOrders = false
+  }
 }
 
 export async function fullPull(): Promise<{
@@ -338,86 +435,6 @@ export async function fullPull(): Promise<{
   } catch (e: any) {
     console.error('fullPull error:', e?.message)
     return { ok: false }
-  }
-}
-
-// Internet qaytganda offline yopilgan buyurtmalarni serverga yuborish
-async function syncPendingOrders(): Promise<void> {
-  if (syncingPending) return
-  syncingPending = true
-  try {
-    const s = getSettings()
-    if (!s.apiToken) return
-    const db = getDb()
-
-    const pending = db.prepare(`
-      SELECT o.*, t.server_id AS table_server_id
-      FROM orders o
-      JOIN tables t ON o.table_id = t.id
-      WHERE o.sync_status = 'pending'
-        AND o.status IN ('closed', 'cancelled')
-        AND t.server_id IS NOT NULL
-    `).all() as any[]
-
-    if (pending.length === 0) return
-    console.log(`[SYNC] ${pending.length} ta pending buyurtma tekshirilmoqda...`)
-
-    for (const order of pending) {
-      try {
-        if (order.server_id) {
-          // Server_id bor — buyurtma serverda mavjud, faqat yopish kerak
-          // syncAllItems CHAQIRMAYMIZ — aks holda yangi order yaratiladi (duplicate bug)
-          if (order.status === 'closed') {
-            await closeOrderOnServer(order.server_id)
-          } else {
-            await cancelOrderOnServer(order.server_id)
-          }
-          db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
-          console.log(`[SYNC] server close OK: order ${order.id} → ${order.server_id}`)
-        } else {
-          // Server_id yo'q — offline yaratilgan, serverga yuborish kerak
-          const items = db.prepare(`
-            SELECT oi.quantity, p.server_id AS product_server_id
-            FROM order_items oi
-            JOIN products p ON oi.product_id = p.id
-            WHERE oi.order_id = ?
-          `).all(order.id) as any[]
-
-          const activeItems = items
-            .filter((it: any) => it.product_server_id && it.quantity > 0)
-            .map((it: any) => ({ productServerId: it.product_server_id, count: Number(it.quantity) }))
-
-          if (activeItems.length === 0) {
-            db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
-            continue
-          }
-
-          const result = await syncAllItems({
-            localOrderId: order.id,
-            roomServerId: order.table_server_id,
-            items: activeItems
-          })
-
-          if (result.serverId) {
-            if (order.status === 'closed') await closeOrderOnServer(result.serverId)
-            else await cancelOrderOnServer(result.serverId)
-            db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
-          }
-          console.log(`[SYNC] offline order ${order.id} → server ${result?.serverId} OK`)
-        }
-      } catch (e: any) {
-        const status = (e as any)?.response?.status
-        if (status === 400 || status === 404) {
-          db.prepare(`UPDATE orders SET sync_status = 'server_closed' WHERE id = ?`).run(order.id)
-        } else {
-          console.warn(`[SYNC] order ${order.id} sync xato:`, e?.message)
-        }
-      }
-    }
-  } catch (e: any) {
-    console.warn('[SYNC] syncPendingOrders xato:', e?.message)
-  } finally {
-    syncingPending = false
   }
 }
 

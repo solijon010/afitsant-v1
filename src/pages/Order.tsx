@@ -198,16 +198,68 @@ export default function OrderPage(): JSX.Element {
       })
   }, [categories])
 
+  const extractVolume = (name: string): number => {
+    const m = name.match(/(\d+(?:[.,]\d+)?)\s*\.?\s*[Ll]/i)
+    return m ? parseFloat(m[1].replace(',', '.')) : -1
+  }
+
+  const exactOrder = (name: string, orders: string[]): number => {
+    const sorted = [...orders].map((s, i) => ({ s, i })).sort((a, b) => b.s.length - a.s.length)
+    for (const { s, i } of sorted) {
+      if (name.includes(s)) return i
+    }
+    return 99
+  }
+
+  const SALATLAR_ORDER = ['katta salat', 'qalampir', 'kichik salat']
+  const ASOSIY_ORDER = ['non', 'choy', 'salfetka', 'nam salfetka', 'kata non']
+  const GOSHT_ORDER = ['qiyma', "go'sht", "qo'y"]
+
   const shownProducts = useMemo<Product[]>(() => {
-    const list = products.filter((p) => p.categoryId === activeCatId)
+    const list = products.filter((p) => p.categoryId === activeCatId && p.isAvailable)
     const seen = new Set<string>()
-    return list.filter(p => {
+    const unique = list.filter(p => {
       const key = (p.nameUzLatn ?? '').toLowerCase().trim()
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
-  }, [products, activeCatId])
+
+    const catName = (categories.find(c => c.id === activeCatId)?.nameUzLatn ?? '').toLowerCase()
+
+    return [...unique].sort((a, b) => {
+      const an = (a.nameUzLatn ?? '').toLowerCase()
+      const bn = (b.nameUzLatn ?? '').toLowerCase()
+
+      const aLast = an.includes('yarimta')
+      const bLast = bn.includes('yarimta')
+      if (aLast !== bLast) return aLast ? 1 : -1
+
+      if (catName.includes('salat')) {
+        const ai = exactOrder(an, SALATLAR_ORDER)
+        const bi = exactOrder(bn, SALATLAR_ORDER)
+        if (ai !== 99 || bi !== 99) return ai - bi
+      }
+      if (catName.includes('asosiy')) {
+        const ai = exactOrder(an, ASOSIY_ORDER)
+        const bi = exactOrder(bn, ASOSIY_ORDER)
+        if (ai !== 99 || bi !== 99) return ai - bi
+      }
+      if (catName.includes("go'sht") || catName.includes('gosht')) {
+        const ai = exactOrder(an, GOSHT_ORDER)
+        const bi = exactOrder(bn, GOSHT_ORDER)
+        if (ai !== 99 || bi !== 99) return ai - bi
+      }
+      if (catName.includes('ichimlik')) {
+        const av = extractVolume(a.nameUzLatn ?? '')
+        const bv = extractVolume(b.nameUzLatn ?? '')
+        if (av !== bv) return bv - av
+      }
+
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, activeCatId, categories])
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
@@ -249,10 +301,22 @@ export default function OrderPage(): JSX.Element {
         useCart.setState({ orderId: baseOrder.id })
       }
 
+      // Mahsulotlar snapshot — navigate oldidan saqlaymiz (background sync uchun)
+      const savedLines = [...cart.lines]
+
+      // Server dan o'chirilgan mahsulotlar
+      const removedFromServer = initialServerItemsRef.current.filter(
+        (init) => init.productServerId &&
+          !savedLines.some((l) => l.productServerId === init.productServerId)
+      )
+
+      // Faqat haqiqiy o'zgarishlar bo'lganda tarixga yozamiz (dublikat oldini olish)
+      const hasChanges = savedLines.some((l) => !l.flushed) || removedFromServer.length > 0
+
       // Har doim local SQLite ga saqlash (offline persistence uchun)
       await window.afisant.orders.replaceItems(
         orderId,
-        cart.lines.map((l) => ({
+        savedLines.map((l) => ({
           productId: l.productId,
           productName: l.productName,
           unitPrice: l.unitPrice,
@@ -262,64 +326,57 @@ export default function OrderPage(): JSX.Element {
         }))
       )
 
-      // Server sync — roomServerId bo'lsa yuboramiz (waiterServerId shart emas — JWT tokendan olinadi)
-      if (!roomServerId) {
-        // Xona server_id yo'q — sinxronlash kerak
-        toast.error("Xona server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
-      } else {
-        const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
-        // Server dan yuklangan va endi savatchada yo'q mahsulotlar — count:0 bilan yuboriladi
-        const removedFromServer = initialServerItemsRef.current.filter(
-          (init) => init.productServerId &&
-            !cart.lines.some((l) => l.productServerId === init.productServerId)
-        )
-        const syncItems = [
-          ...itemsWithServerId.map((l) => ({
-            productServerId: l.productServerId!,
-            count: Math.round(l.quantity)
+      // Tarixga faqat yangi o'zgarish bo'lganda yozamiz
+      if (table && hasChanges) {
+        useOrderHistory.getState().push({
+          tableId: tId,
+          tableName: table.name,
+          waiterName: `${waiter.firstName} ${waiter.lastName}`,
+          savedAt: Date.now(),
+          items: savedLines.map((l) => ({
+            name: l.productName,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            total: Math.round(l.unitPrice * l.quantity)
           })),
-          ...removedFromServer.map((item) => ({
-            productServerId: item.productServerId!,
-            count: 0
-          }))
-        ]
-        if (syncItems.length > 0) {
-          try {
-            // 5 soniyada server javob bermasa — mahalliy saqlanadi, qotib qolmaydi
-            const res = await Promise.race([
-              window.afisant.orders.syncAll({
-                localOrderId: orderId ?? undefined,
-                roomServerId,
-                items: syncItems
-              }),
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('server_timeout')), 5000)
-              )
-            ])
-            useCart.setState({ serverOrderId: res.serverId })
-            useCart.setState({
-              lines: cart.lines.map((l) => ({ ...l, flushed: true }))
-            })
-            initialServerItemsRef.current = cart.lines.filter((l) => l.productServerId)
-            toast.success('Buyurtma serverga yuborildi ✓')
-          } catch (e: any) {
-            const msg = e?.message ?? ''
-            if (msg.includes('404') || msg.includes('mavjud emas') || msg.includes('inactive')) {
-              toast.warning('Ba\'zi mahsulotlar serverda yo\'q — mahalliy saqlandi')
-            } else {
-              toast.warning("Server bilan ulanib bo'lmadi — mahalliy saqlandi")
-            }
-          }
-        } else if (cart.lines.length > 0) {
-          // Mahsulotlarda server_id yo'q — fullPull kerak
-          toast.error("Mahsulotlarda server ID yo'q — Sozlamalar → To'liq sinxronlash bosing")
-        }
+          subtotal: cart.subtotal(),
+          serviceFee: cart.serviceFee(),
+          total: cart.total()
+        })
       }
 
+      // Darhol navigatsiya — server sinxronini kutmaymiz (sekinlikni hal qilish)
       await refreshTable(tId)
       cart.clear()
       cart.setOrder(null, null)
       navigate('/tables')
+
+      // Server sinxronini fon rejimida bajaramiz (UI bloklash yo'q)
+      if (!roomServerId) return
+
+      const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
+      const syncItems = [
+        ...itemsWithServerId.map((l) => ({
+          productServerId: l.productServerId!,
+          count: Math.round(l.quantity)
+        })),
+        ...removedFromServer.map((item) => ({
+          productServerId: item.productServerId!,
+          count: 0
+        }))
+      ]
+
+      if (syncItems.length > 0) {
+        void window.afisant.orders.syncAll({
+          localOrderId: orderId ?? undefined,
+          roomServerId,
+          items: syncItems
+        }).catch((e: any) => {
+          console.warn('[handleSave] Background server sync failed:', e?.message)
+        })
+      } else if (savedLines.length > 0 && savedLines.every((l) => !l.productServerId)) {
+        console.warn('[handleSave] Mahsulotlarda server ID yo\'q — To\'liq sinxronlash kerak')
+      }
     } catch (e: any) {
       toast.error('Saqlashda xatolik', { description: e?.message })
     } finally {
@@ -357,12 +414,15 @@ export default function OrderPage(): JSX.Element {
     setPrinting(true)
     try {
       const roomServerId = useCart.getState().roomServerId
-      let serverOrderId = useCart.getState().serverOrderId
+      const currentServerOrderId = useCart.getState().serverOrderId
       const fee = settings?.serviceFeePercent ?? 0
+
+      // Mahsulotlar snapshot — navigate oldidan saqlaymiz
+      const savedLines = [...cart.lines]
 
       // Lazy order creation — mahsulot bor bo'lsa SQLite buyurtma yaratamiz
       let orderId = cart.orderId
-      if (!orderId && cart.lines.length > 0) {
+      if (!orderId && savedLines.length > 0) {
         const baseOrder = await window.afisant.orders.upsert({
           tableId: tId,
           waiterId: waiter.id,
@@ -372,40 +432,9 @@ export default function OrderPage(): JSX.Element {
         useCart.setState({ orderId: baseOrder.id })
       }
 
-      // Mahsulotlarni SQLite ga saqlaymiz — offline bo'lganda sync uchun zarur
-      if (orderId && cart.lines.length > 0) {
-        await window.afisant.orders.replaceItems(
-          orderId,
-          cart.lines.map((l) => ({
-            productId: l.productId,
-            productName: l.productName,
-            unitPrice: l.unitPrice,
-            quantity: l.quantity,
-            notes: l.notes ?? null,
-            localUuid: l.localUuid
-          }))
-        )
-      }
-
-      if (roomServerId && cart.lines.length > 0) {
-        const itemsWithServerId = cart.lines.filter((l) => l.productServerId && l.quantity > 0)
-        if (itemsWithServerId.length > 0) {
-          try {
-            const res = await window.afisant.orders.syncAll({
-              localOrderId: orderId ?? undefined,
-              roomServerId,
-              items: itemsWithServerId.map((l) => ({
-                productServerId: l.productServerId!,
-                count: Math.round(l.quantity)
-              }))
-            })
-            serverOrderId = res.serverId
-          } catch (e: any) {
-            toast.warning(`Server sync xatosi: ${e?.message ?? 'ulanish yo\'q'}`)
-          }
-        } else {
-          toast.warning("Mahsulotlarda server ID yo'q — Sozlamalar → To'liq sinxronlash")
-        }
+      // Avval mahalliy yopamiz (tez, faqat SQLite) — navigatsiyani bloklash yo'q
+      if (orderId && orderId > 0) {
+        await window.afisant.orders.close(orderId)
       }
 
       const payload: ReceiptPayload = {
@@ -413,9 +442,9 @@ export default function OrderPage(): JSX.Element {
         organizationAddress: settings?.organizationAddress ?? null,
         organizationPhone: settings?.organizationPhone ?? null,
         tableName: table.name,
-        waiterName: [waiter.lastName, waiter.firstName].filter(Boolean).join(' '),
-        orderLocalUuid: serverOrderId ?? String(orderId ?? 'unkwn'),
-        items: cart.lines.map((l) => ({
+        waiterName: `${waiter.firstName} ${waiter.lastName}`,
+        orderLocalUuid: currentServerOrderId ?? String(orderId ?? 'unkwn'),
+        items: savedLines.map((l) => ({
           name: l.productName,
           quantity: l.quantity,
           unitPrice: l.unitPrice,
@@ -432,7 +461,7 @@ export default function OrderPage(): JSX.Element {
         receiptQrLabel: settings?.receiptQrLabel ?? null
       }
 
-      // Localda saqlash va chop etilgan deb belgilash
+      // Tarixga yozamiz va chop etilgan deb belgilaymiz
       const histId = useOrderHistory.getState().push({
         tableId: tId,
         tableName: table.name,
@@ -445,6 +474,7 @@ export default function OrderPage(): JSX.Element {
       })
       useOrderHistory.getState().markPrinted(histId)
 
+      // Chek chiqarish
       const res = await window.afisant.printer.receipt(payload)
       if (!res.ok) {
         if (settings?.printerType) {
@@ -456,16 +486,40 @@ export default function OrderPage(): JSX.Element {
         toast.success('Chek chiqdi (2 nusxa)')
       }
 
-      if (serverOrderId) {
-        await window.afisant.orders.close(orderId ?? 0, serverOrderId)
-      } else if (orderId) {
-        await window.afisant.orders.close(orderId)
-      }
-
+      // Darhol navigatsiya — server yopishini kutmaymiz
       cart.clear()
       cart.setOrder(null, null)
       await refreshTable(tId)
       navigate('/tables')
+
+      // Fon rejimida: server sinxronlash + server da yopish
+      if (roomServerId || currentServerOrderId) {
+        void (async () => {
+          try {
+            let serverOrderId = currentServerOrderId
+            if (!serverOrderId && roomServerId && savedLines.length > 0) {
+              const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
+              if (itemsWithServerId.length > 0) {
+                const syncRes = await window.afisant.orders.syncAll({
+                  localOrderId: orderId ?? undefined,
+                  roomServerId,
+                  items: itemsWithServerId.map((l) => ({
+                    productServerId: l.productServerId!,
+                    count: Math.round(l.quantity)
+                  }))
+                })
+                serverOrderId = syncRes.serverId
+              }
+            }
+            if (serverOrderId) {
+              // Server da yopamiz (faqat server, local allaqachon yopilgan)
+              await window.afisant.orders.close(0, serverOrderId)
+            }
+          } catch (e: any) {
+            console.warn('[handleCloseAndPrint] Background server close failed:', e?.message)
+          }
+        })()
+      }
     } catch (e: any) {
       toast.error('Xatolik', { description: e?.message })
     } finally {
