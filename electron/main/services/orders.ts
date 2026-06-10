@@ -93,6 +93,8 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
       })
 
     const subtotal = items.reduce((s: number, it: any) => s + it.unitPrice * it.quantity, 0)
+    const pct = getSettings().serviceFeePercent ?? 0
+    const serviceFee = Math.round((subtotal * pct) / 100)
 
     return {
       id: 0,
@@ -102,8 +104,8 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
       waiterId,
       status: 'open',
       subtotal,
-      serviceFee: 0,
-      total: subtotal,
+      serviceFee,
+      total: subtotal + serviceFee,
       openedAt: new Date(active.createdAt).getTime(),
       closedAt: null,
       printedAt: null,

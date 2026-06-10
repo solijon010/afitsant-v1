@@ -90,6 +90,8 @@ export async function snapshot(): Promise<TableWithOrder[]> {
       })
 
     const subtotal = items.reduce((s: number, it: any) => s + it.unitPrice * it.quantity, 0)
+    const pct = getSettings().serviceFeePercent ?? 0
+    const serviceFee = Math.round((subtotal * pct) / 100)
 
     const order: OrderWithItems = {
       id: 0,
@@ -99,8 +101,8 @@ export async function snapshot(): Promise<TableWithOrder[]> {
       waiterId: waiter?.id ?? 0,
       status: 'open',
       subtotal,
-      serviceFee: 0,
-      total: subtotal,
+      serviceFee,
+      total: subtotal + serviceFee,
       openedAt: new Date(backendOrder.createdAt).getTime(),
       closedAt: null,
       printedAt: null,

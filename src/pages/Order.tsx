@@ -491,7 +491,8 @@ export default function OrderPage(): JSX.Element {
         void (async () => {
           try {
             let serverOrderId = currentServerOrderId
-            if (!serverOrderId && roomServerId && savedLines.length > 0) {
+            // serverOrderId bo'lsa ham bo'lmasa ham — har doim items ni sync qilamiz
+            if (roomServerId && savedLines.length > 0) {
               const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
               if (itemsWithServerId.length > 0) {
                 const syncRes = await window.afisant.orders.syncAll({

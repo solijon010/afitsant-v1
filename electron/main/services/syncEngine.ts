@@ -179,8 +179,8 @@ async function syncPendingOrders(): Promise<void> {
       try {
         let serverId = order.server_id
 
-        // Server ID yo'q bo'lsa — avval mahsulotlarni sinxronlab server ID olamiz
-        if (!serverId && order.room_server_id) {
+        // Har doim items ni serverga yuboramiz — serverId bo'lsa ham bo'lmasa ham
+        if (order.room_server_id) {
           const items = db.prepare(`
             SELECT oi.quantity, p.server_id AS product_server_id
             FROM order_items oi
@@ -193,8 +193,24 @@ async function syncPendingOrders(): Promise<void> {
             .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
 
           if (syncItems.length > 0) {
-            const res = await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
-            serverId = res.serverId
+            if (serverId) {
+              // Server ID bor — items ni yangilaymiz (yangi order yaratmaymiz)
+              try {
+                await getApi().patch(`/api/order/sync-items/${serverId}`, {
+                  items: syncItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+                })
+                console.log(`[SYNC] Updated items for order ${order.id} before closing`)
+              } catch (patchErr: any) {
+                const pst = patchErr?.response?.status
+                if (pst !== 400 && pst !== 404) {
+                  console.warn(`[SYNC] items patch failed for order ${order.id}: ${patchErr?.message}`)
+                }
+              }
+            } else {
+              // Server ID yo'q — syncAllItems orqali yaratamiz
+              const res = await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+              serverId = res.serverId
+            }
           }
         }
 
@@ -208,7 +224,6 @@ async function syncPendingOrders(): Promise<void> {
           } catch (closeErr: any) {
             const st = closeErr?.response?.status
             if (st === 400 || st === 404) {
-              // Server da allaqachon yopilgan — mahalliy ham synced deb belgilaymiz
               console.log(`[SYNC] Order ${order.id} already closed on server (${st}) — marking synced`)
             } else {
               throw closeErr
