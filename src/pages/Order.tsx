@@ -98,6 +98,22 @@ export default function OrderPage(): JSX.Element {
             // Foydalanuvchi bu qurilmada saqlagan — local versiyani ishlatamiz
             // Server order ID ni saqlab qolamiz, future sync uchun
             cart.setOrder(localOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
+            // Server dagi items ni eslab qolamiz — o'chirilganlarni aniqlash uchun (tok o'chib yongan holat)
+            initialServerItemsRef.current = existingOrder.items.map<CartLine>((it) => {
+              const prod = products.find((p) => p.id === it.productId || (it.serverId != null && p.serverId === it.serverId))
+              return {
+                localUuid: it.localUuid,
+                productId: it.productId,
+                productServerId: prod?.serverId ?? null,
+                productName: it.productName,
+                unitPrice: it.unitPrice,
+                quantity: it.quantity,
+                notes: it.notes,
+                flushed: true,
+                itemId: it.id,
+                addedAt: it.createdAt
+              }
+            })
             cart.hydrateFromOrder(
               localOrder.items.map<CartLine>((it) => {
                 // productServerId ni products store'dan qidiramiz — server sync uchun zarur
