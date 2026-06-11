@@ -188,9 +188,13 @@ async function syncPendingOrders(): Promise<void> {
             WHERE oi.order_id = ?
           `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
 
-          const syncItems = items
-            .filter((it) => it.product_server_id && it.quantity > 0)
-            .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
+          const mergedItems = new Map<string, number>()
+          for (const it of items) {
+            if (it.product_server_id && it.quantity > 0) {
+              mergedItems.set(it.product_server_id, (mergedItems.get(it.product_server_id) ?? 0) + Math.round(it.quantity))
+            }
+          }
+          const syncItems = Array.from(mergedItems.entries()).map(([productServerId, count]) => ({ productServerId, count }))
 
           if (syncItems.length > 0) {
             if (serverId) {
