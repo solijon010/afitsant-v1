@@ -180,15 +180,15 @@ export async function syncAllItems(input: {
       console.log(`[ORDER] Updated existing order ${existing.id}`)
       if (localOrderId) markOrderSynced(localOrderId, existing.id)
     } catch (e: any) {
-      // sync-items 400/404 bersa, to'liq yangi order yaratishga urinib ko'ramiz
-      console.warn(`[ORDER] sync-items xato (${e?.response?.status}), yangi order yaratilmoqda...`)
-      const errData = e?.response?.data
-      console.warn('[ORDER] sync-items error body:', JSON.stringify(errData ?? e?.message))
-      // existing orderni o'chirib, yangi yaratamiz
-      try {
-        await updateServerOrderStatus(existing.id, 'CANCELED')
-      } catch { /* ignore */ }
-      existing = null
+      const pst = e?.response?.status
+      console.warn(`[ORDER] sync-items xato (${pst}): ${JSON.stringify(e?.response?.data ?? e?.message)}`)
+      if (pst === 400 || pst === 404) {
+        // Order topilmadi yoki holati noto'g'ri — BEKOR QILMAYMIZ, yangi order izlaymiz
+        existing = null
+      } else {
+        // Network xato yoki server xato — keyinroq qayta urinamiz
+        throw e
+      }
     }
     if (existing) return { serverId: existing.id }
   }

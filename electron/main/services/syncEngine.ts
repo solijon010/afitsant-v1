@@ -194,7 +194,7 @@ async function syncPendingOrders(): Promise<void> {
 
           if (syncItems.length > 0) {
             if (serverId) {
-              // Server ID bor — items ni yangilaymiz (yangi order yaratmaymiz)
+              // Server ID bor — items ni yangilaymiz
               try {
                 await getApi().patch(`/api/order/sync-items/${serverId}`, {
                   items: syncItems.map((it) => ({ productId: it.productServerId, count: it.count }))
@@ -202,12 +202,17 @@ async function syncPendingOrders(): Promise<void> {
                 console.log(`[SYNC] Updated items for order ${order.id} before closing`)
               } catch (patchErr: any) {
                 const pst = patchErr?.response?.status
-                if (pst !== 400 && pst !== 404) {
-                  console.warn(`[SYNC] items patch failed for order ${order.id}: ${patchErr?.message}`)
+                if (pst === 400 || pst === 404) {
+                  // Server order topilmadi/holati noto'g'ri — syncAllItems bilan yangisini izlaymiz
+                  console.log(`[SYNC] PATCH failed (${pst}) for order ${order.id} — falling back to syncAllItems`)
+                  serverId = null
+                } else {
+                  throw patchErr  // Network xato — keyinroq qayta urinadi
                 }
               }
-            } else {
-              // Server ID yo'q — syncAllItems orqali yaratamiz
+            }
+            if (!serverId) {
+              // Server ID yo'q yoki PATCH muvaffaqiyatsiz — syncAllItems orqali topamiz/yaratamiz
               const res = await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
               serverId = res.serverId
             }
