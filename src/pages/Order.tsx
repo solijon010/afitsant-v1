@@ -523,8 +523,9 @@ export default function OrderPage(): JSX.Element {
               }
             }
             if (serverOrderId) {
-              // Server da yopamiz (faqat server, local allaqachon yopilgan)
-              await window.afisant.orders.close(0, serverOrderId)
+              // Server da yopamiz — orderId ham uzatamiz, close muvaffaqiyatsiz bo'lsa
+              // closeOrder sync_status='pending' ga qaytaradi va syncPendingOrders qayta urinadi
+              await window.afisant.orders.close(orderId ?? 0, serverOrderId)
             }
           } catch (e: any) {
             console.warn('[handleCloseAndPrint] Background server close failed:', e?.message)

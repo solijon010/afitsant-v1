@@ -207,17 +207,18 @@ async function syncPendingOrders(): Promise<void> {
               } catch (patchErr: any) {
                 const pst = patchErr?.response?.status
                 if (pst === 400 || pst === 404) {
-                  // Server order topilmadi/holati noto'g'ri — syncAllItems bilan yangisini izlaymiz
-                  console.log(`[SYNC] PATCH failed (${pst}) for order ${order.id} — falling back to syncAllItems`)
-                  serverId = null
+                  // Server order allaqachon yopilgan yoki topilmadi — soxta order yaratmaymiz,
+                  // serverId saqlanadi va pastda close urinish qilinadi (400/404 = allaqachon yopilgan)
+                  console.log(`[SYNC] PATCH ${pst} for order ${order.id} — order may be closed, trying close anyway`)
                 } else {
                   throw patchErr  // Network xato — keyinroq qayta urinadi
                 }
               }
             }
             if (!serverId) {
-              // Server ID yo'q yoki PATCH muvaffaqiyatsiz — syncAllItems orqali topamiz/yaratamiz
-              const res = await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+              // Server ID hech qachon o'rnatilmagan — syncAllItems orqali topamiz/yaratamiz
+              // localOrderId uzatmaymiz: markOrderSynced ni bu yerda emas, close dan keyin chaqiramiz
+              const res = await syncAllItems({ roomServerId: order.room_server_id, items: syncItems })
               serverId = res.serverId
             }
           }
