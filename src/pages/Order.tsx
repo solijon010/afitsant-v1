@@ -500,7 +500,11 @@ export default function OrderPage(): JSX.Element {
           try {
             let serverOrderId = currentServerOrderId
             if (roomServerId && savedLines.length > 0) {
-              const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
+              // currentServerOrderId bor bo'lsa: faqat flushed=false (yangi) mahsulotlarni yuboramiz
+              // Aks holda server DONE itemlarga ustma-ust yangi yozuv yaratadi (duplicate muammo)
+              const itemsWithServerId = savedLines.filter(
+                (l) => l.productServerId && l.quantity > 0 && (currentServerOrderId ? !l.flushed : true)
+              )
               if (itemsWithServerId.length > 0) {
                 const syncRes = await window.afisant.orders.syncAll({
                   localOrderId: orderId ?? undefined,
