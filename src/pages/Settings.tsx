@@ -176,12 +176,12 @@ export default function SettingsPage(): JSX.Element {
 
   if (!form) return <div className="grid h-full place-items-center"><div className="card h-24 w-72 animate-pulse" /></div>
 
-  /* Faqat SUPERADMIN/ADMIN server foydalanuvchisi yoki manager/super_waiter afitsanti texnik ma'lumotlarni ko'radi */
-  const isAdmin = serverUser?.role === 'SUPERADMIN' || serverUser?.role === 'ADMIN' ||
+  /* Faqat SUPERADMIN/ADMIN/MANAGER server foydalanuvchisi yoki manager/super_waiter afitsanti texnik ma'lumotlarni ko'radi */
+  const isAdmin = serverUser?.role === 'SUPERADMIN' || serverUser?.role === 'ADMIN' || serverUser?.role === 'MANAGER' ||
     (waiter !== null && (waiter.role === 'manager' || waiter.role === 'super_waiter'))
 
-  /* Xavfli server operatsiyalari uchun faqat haqiqiy server admin (JWT roli) */
-  const isServerAdmin = serverUser?.role === 'SUPERADMIN' || serverUser?.role === 'ADMIN'
+  /* Xavfli server operatsiyalari uchun server admin (MANAGER yoki undan yuqori) */
+  const isServerAdmin = serverUser?.role === 'SUPERADMIN' || serverUser?.role === 'ADMIN' || serverUser?.role === 'MANAGER'
 
   const update = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
     setForm((f) => (f ? { ...f, [key]: value } : f))

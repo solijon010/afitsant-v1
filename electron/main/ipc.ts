@@ -20,7 +20,7 @@ function assertServerAdmin(): void {
   if (!token) throw new Error('Admin token topilmadi')
   try {
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()) as { role?: string }
-    if (payload.role === 'SUPERADMIN' || payload.role === 'ADMIN') return
+    if (payload.role === 'SUPERADMIN' || payload.role === 'ADMIN' || payload.role === 'MANAGER') return
   } catch {}
   throw new Error('Bu amal uchun server admin huquqi kerak')
 }
