@@ -26,6 +26,7 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
         oId,
         pending.map((l) => ({
           productId: l.productId,
+          productServerId: l.productServerId,
           productName: l.productName,
           unitPrice: l.unitPrice,
           quantity: l.quantity,

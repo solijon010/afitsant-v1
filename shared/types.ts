@@ -71,6 +71,7 @@ export interface TableEntity {
 export interface OrderItem {
   id: number
   serverId: string | null
+  productServerId?: string | null
   localUuid: string
   orderId: number
   productId: number

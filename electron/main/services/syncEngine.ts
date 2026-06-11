@@ -6,7 +6,7 @@ import { getDb } from '../db/connection'
 import { dequeueBatch, markDone, markFailed, queuedCount } from './syncQueue'
 import { syncWaitersForBranch } from './auth'
 import { applyProductCategoryOverrides } from './categoryConfig'
-import { syncAllItems, closeOrderOnServer, cancelOrderOnServer } from './orders'
+import { syncAllItems, closeOrderOnServer, cancelOrderOnServer, replaceOrderItemsOnServer } from './orders'
 
 let socket: Socket | null = null
 let flushTimer: NodeJS.Timeout | null = null
@@ -28,6 +28,9 @@ export function startSync(getMainWindow: () => BrowserWindow | null): void {
   mainWindowGetter = getMainWindow
   setupSocket(getMainWindow)
   startTicker()
+  setTimeout(() => {
+    void syncPendingOrders().catch((e: any) => console.warn('[SYNC] initial syncPendingOrders error:', e?.message))
+  }, 2_000)
 }
 
 export function restartSync(): void {
@@ -145,17 +148,17 @@ async function syncPendingOrders(): Promise<void> {
 
     // 1. Pending ochiq buyurtmalar — server bilan sinxronlaymiz
     const pendingOpen = db.prepare(`
-      SELECT o.id, t.server_id AS room_server_id
+      SELECT o.id, o.server_id, t.server_id AS room_server_id
       FROM orders o
       JOIN tables t ON o.table_id = t.id
       WHERE o.sync_status = 'pending' AND o.status = 'open' AND t.server_id IS NOT NULL
-    `).all() as Array<{ id: number; room_server_id: string }>
+    `).all() as Array<{ id: number; server_id: string | null; room_server_id: string }>
 
     for (const order of pendingOpen) {
       const items = db.prepare(`
-        SELECT oi.quantity, p.server_id AS product_server_id
+        SELECT oi.quantity, COALESCE(oi.product_server_id, p.server_id) AS product_server_id
         FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
+        LEFT JOIN products p ON oi.product_id = p.id
         WHERE oi.order_id = ?
       `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
 
@@ -165,7 +168,12 @@ async function syncPendingOrders(): Promise<void> {
 
       if (syncItems.length === 0) continue
       try {
-        await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+        await syncAllItems({
+          localOrderId: order.id,
+          serverOrderId: order.server_id ?? undefined,
+          roomServerId: order.room_server_id,
+          items: syncItems
+        })
         console.log(`[SYNC] Pending open order ${order.id} synced to server`)
       } catch (e: any) {
         console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)
@@ -196,9 +204,9 @@ async function syncPendingOrders(): Promise<void> {
         // Har doim items ni serverga yuboramiz — serverId bo'lsa ham bo'lmasa ham
         if (order.room_server_id) {
           const items = db.prepare(`
-            SELECT oi.quantity, p.server_id AS product_server_id
+            SELECT oi.quantity, COALESCE(oi.product_server_id, p.server_id) AS product_server_id
             FROM order_items oi
-            JOIN products p ON oi.product_id = p.id
+            LEFT JOIN products p ON oi.product_id = p.id
             WHERE oi.order_id = ?
           `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
 
@@ -215,11 +223,9 @@ async function syncPendingOrders(): Promise<void> {
 
           if (syncItems.length > 0) {
             if (serverId) {
-              // Server ID bor — items ni yangilaymiz
+              // Server ID bor — items ni yakuniy snapshot bilan almashtiramiz.
               try {
-                await getApi().patch(`/api/order/sync-items/${serverId}`, {
-                  items: syncItems.map((it) => ({ productId: it.productServerId, count: it.count }))
-                })
+                await replaceOrderItemsOnServer(serverId, syncItems)
                 console.log(`[SYNC] Updated items for order ${order.id} before closing`)
               } catch (patchErr: any) {
                 const pst = patchErr?.response?.status

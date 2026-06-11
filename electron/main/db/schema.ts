@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export const MIGRATIONS: Record<number, string> = {
   1: `
@@ -156,5 +156,10 @@ export const MIGRATIONS: Record<number, string> = {
       product_server_id TEXT PRIMARY KEY,
       sort_order_override INTEGER NOT NULL
     );
+  `,
+
+  4: `
+    ALTER TABLE order_items ADD COLUMN product_server_id TEXT;
+    CREATE INDEX IF NOT EXISTS idx_order_items_product_server ON order_items(product_server_id);
   `
 }

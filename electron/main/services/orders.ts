@@ -10,6 +10,7 @@ const now = () => Date.now()
 
 interface LocalOrderItemInput {
   productId: number
+  productServerId?: string | null
   productName: string
   unitPrice: number
   quantity: number
@@ -29,17 +30,21 @@ function assertPositiveInteger(name: string, value: number): void {
 function normalizeLocalItems(items: LocalOrderItemInput[]): LocalOrderItemInput[] {
   if (!Array.isArray(items)) throw new Error('Mahsulotlar ro`yxati noto`g`ri')
   return items.map((it) => {
+    const productId = Number(it.productId)
+    const productServerId = it.productServerId ? String(it.productServerId).trim() : null
     const quantity = normalizeCount(Number(it.quantity))
     const unitPrice = Number(it.unitPrice)
     const productName = String(it.productName ?? '').trim()
     const localUuid = String(it.localUuid ?? '').trim()
-    if (!Number.isInteger(Number(it.productId)) || Number(it.productId) < 0) throw new Error('Mahsulot ID noto`g`ri')
+    if (!Number.isInteger(productId) || productId < 0) throw new Error('Mahsulot ID noto`g`ri')
+    if (productId <= 0 && !productServerId) throw new Error('Mahsulot server ID noto`g`ri')
     if (!productName) throw new Error('Mahsulot nomi bo`sh')
     if (!localUuid) throw new Error('Mahsulot localUuid bo`sh')
     if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error('Mahsulot narxi noto`g`ri')
     if (quantity <= 0) throw new Error('Mahsulot miqdori noto`g`ri')
     return {
-      productId: Number(it.productId),
+      productId,
+      productServerId,
       productName,
       unitPrice,
       quantity,
@@ -88,6 +93,35 @@ function buildOrderWithItems(orderId: number): OrderWithItems | null {
   return { ...mapOrder(order), items: items.map(mapOrderItem) }
 }
 
+type ServerOrderItemInput = { productServerId: string; count: number }
+
+function normalizeServerItems(items: ServerOrderItemInput[]): ServerOrderItemInput[] {
+  const merged = new Map<string, number>()
+  for (const it of items) {
+    const productServerId = String(it.productServerId ?? '').trim()
+    const count = normalizeCount(Number(it.count))
+    if (productServerId && count > 0) {
+      merged.set(productServerId, normalizeCount((merged.get(productServerId) ?? 0) + count))
+    }
+  }
+  return Array.from(merged.entries()).map(([productServerId, count]) => ({ productServerId, count }))
+}
+
+function toOrderItemDto(items: ServerOrderItemInput[]): Array<{ productId: string; count: number }> {
+  return items.map((it) => ({ productId: it.productServerId, count: it.count }))
+}
+
+export async function replaceOrderItemsOnServer(serverOrderId: string, items: ServerOrderItemInput[]): Promise<void> {
+  const activeItems = normalizeServerItems(items)
+  if (activeItems.length === 0) {
+    await updateServerOrderStatus(serverOrderId, 'CANCELED')
+    return
+  }
+  await getApi().patch(`/api/order/${serverOrderId}`, {
+    orderItems: toOrderItemDto(activeItems)
+  })
+}
+
 export async function getOrderByRoom(roomServerId: string): Promise<OrderWithItems | null> {
   const s = getSettings()
   if (!s.apiToken) return null
@@ -120,6 +154,7 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
         return {
           id: idx + 1,
           serverId: it.id,
+          productServerId: it.product?.id ?? null,
           localUuid: it.id,
           orderId: 0,
           productId: product?.id ?? 0,
@@ -164,6 +199,7 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
 
 export async function syncAllItems(input: {
   localOrderId?: number
+  serverOrderId?: string
   roomServerId: string
   items: Array<{ productServerId: string; count: number }>
 }): Promise<{ serverId: string }> {
@@ -171,18 +207,12 @@ export async function syncAllItems(input: {
   if (!s.apiToken) throw new Error('Token yo\'q')
 
   const api = getApi()
-  const { localOrderId, roomServerId, items } = input
+  const { localOrderId, serverOrderId, roomServerId, items } = input
 
-  // count > 0 bo'lgan itemlarni ajratamiz — server 0 li itemlarni rad etadi
-  // Bir xil productServerId li itemlarni birlashtiramiz — server duplikat rad etadi
-  const merged = new Map<string, number>()
-  for (const it of items) {
-    const count = normalizeCount(Number(it.count))
-    if (it.productServerId && count > 0) {
-      merged.set(it.productServerId, normalizeCount((merged.get(it.productServerId) ?? 0) + count))
-    }
-  }
-  const activeItems = Array.from(merged.entries()).map(([productServerId, count]) => ({ productServerId, count }))
+  // Bu funksiya har doim POS savatining yakuniy snapshotini qabul qiladi.
+  // Mavjud server order uchun /api/order/{id} ishlatiladi, chunki sync-items
+  // backendda delta/additive bo'lib, itemlar dublikat bo'lishi mumkin.
+  const activeItems = normalizeServerItems(items)
 
   // Yopilgan/bekor qilingan statuslardan boshqasi "aktiv" hisoblanadi.
   const isActive = isActiveServerOrder
@@ -196,15 +226,17 @@ export async function syncAllItems(input: {
   }
 
   // Mavjud aktiv orderni topamiz (barcha statuslar tekshiriladi, nafaqat PENDING/READY)
-  let existing: any = null
+  let existing: any = serverOrderId ? { id: serverOrderId } : null
   try {
-    const orders = await fetchVisibleOrders(200)
-    existing = orders.find((o: any) =>
-      (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
-    ) ?? null
-
     if (!existing) {
-      existing = await findActiveForRoom()
+      const orders = await fetchVisibleOrders(200)
+      existing = orders.find((o: any) =>
+        (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
+      ) ?? null
+
+      if (!existing) {
+        existing = await findActiveForRoom()
+      }
     }
     console.log(`[ORDER] Existing order check — found: ${existing?.id ?? 'none'} (status: ${existing?.status ?? '-'})`)
   } catch (e: any) {
@@ -218,16 +250,14 @@ export async function syncAllItems(input: {
       await updateServerOrderStatus(existing.id, 'CANCELED')
       return { serverId: existing.id }
     }
-    // Mavjud orderni yangilash — sync-items endpointi
+    // Mavjud orderni yakuniy snapshot bilan almashtiramiz.
     try {
-      await api.patch(`/api/order/sync-items/${existing.id}`, {
-        items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
-      })
-      console.log(`[ORDER] Updated existing order ${existing.id}`)
+      await replaceOrderItemsOnServer(existing.id, activeItems)
+      console.log(`[ORDER] Replaced existing order ${existing.id}`)
       if (localOrderId) markOrderSynced(localOrderId, existing.id)
     } catch (e: any) {
       const pst = e?.response?.status
-      console.warn(`[ORDER] sync-items xato (${pst}): ${JSON.stringify(e?.response?.data ?? e?.message)}`)
+      console.warn(`[ORDER] replace order items xato (${pst}): ${JSON.stringify(e?.response?.data ?? e?.message)}`)
       if (pst === 400 || pst === 404) {
         // Order topilmadi yoki holati noto'g'ri — BEKOR QILMAYMIZ, yangi order izlaymiz
         existing = null
@@ -252,7 +282,7 @@ export async function syncAllItems(input: {
   // branchId HECH QACHON yuborilmaydi — server "property branchId should not exist" deydi
   const body: Record<string, any> = {
     roomId: roomServerId,
-    orderItems: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+    orderItems: toOrderItemDto(activeItems)
   }
   if (waiterId) body.waiterId = waiterId
 
@@ -274,10 +304,8 @@ export async function syncAllItems(input: {
       const found = await findActiveForRoom()
       if (found) {
         try {
-          await api.patch(`/api/order/sync-items/${found.id}`, {
-            items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
-          })
-          console.log('[ORDER] 403 recovery OK — patched order:', found.id)
+          await replaceOrderItemsOnServer(found.id, activeItems)
+          console.log('[ORDER] 403 recovery OK — replaced order:', found.id)
           if (localOrderId) markOrderSynced(localOrderId, found.id)
           return { serverId: found.id }
         } catch (patchErr: any) {
@@ -339,11 +367,11 @@ export function replaceOrderItems(
     db.prepare(`DELETE FROM order_items WHERE order_id = ?`).run(orderId)
 
     const insert = db.prepare(
-      `INSERT INTO order_items (local_uuid, order_id, product_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+      `INSERT INTO order_items (local_uuid, order_id, product_id, product_server_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
     )
     for (const it of safeItems) {
-      insert.run(it.localUuid, orderId, it.productId, it.productName, it.unitPrice, it.quantity, it.notes ?? null, ts, ts)
+      insert.run(it.localUuid, orderId, it.productId, it.productServerId ?? null, it.productName, it.unitPrice, it.quantity, it.notes ?? null, ts, ts)
     }
     recalculateOrder(orderId)
     markOrderPending(orderId, ts)
@@ -365,8 +393,8 @@ export function addItems(
   const inserted: OrderItem[] = []
 
   const insert = db.prepare(
-    `INSERT INTO order_items (local_uuid, order_id, product_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+    `INSERT INTO order_items (local_uuid, order_id, product_id, product_server_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
   )
 
   const tx = db.transaction(() => {
@@ -375,6 +403,7 @@ export function addItems(
         it.localUuid,
         orderId,
         it.productId,
+        it.productServerId ?? null,
         it.productName,
         it.unitPrice,
         it.quantity,

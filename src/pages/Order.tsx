@@ -68,9 +68,6 @@ export default function OrderPage(): JSX.Element {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [saving, setSaving] = useState(false)
-  // Server dan yuklangan dastlabki items — saqlashda o'chirilganlarni aniqlash uchun
-  const initialServerItemsRef = useRef<CartLine[]>([])
-
   useEffect(() => {
     if (!activeCatId && categories[0]) setActiveCatId(categories[0].id)
   }, [categories, activeCatId])
@@ -100,22 +97,6 @@ export default function OrderPage(): JSX.Element {
             // Foydalanuvchi bu qurilmada saqlagan — local versiyani ishlatamiz
             // Server order ID ni saqlab qolamiz, future sync uchun
             cart.setOrder(localOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
-            // Server dagi items ni eslab qolamiz — o'chirilganlarni aniqlash uchun (tok o'chib yongan holat)
-            initialServerItemsRef.current = existingOrder.items.map<CartLine>((it) => {
-              const prod = products.find((p) => p.id === it.productId || (it.serverId != null && p.serverId === it.serverId))
-              return {
-                localUuid: it.localUuid,
-                productId: it.productId,
-                productServerId: prod?.serverId ?? null,
-                productName: it.productName,
-                unitPrice: it.unitPrice,
-                quantity: it.quantity,
-                notes: it.notes,
-                flushed: true,
-                itemId: it.id,
-                addedAt: it.createdAt
-              }
-            })
             cart.hydrateFromOrder(
               localOrder.items.map<CartLine>((it) => {
                 // productServerId ni products store'dan qidiramiz — server sync uchun zarur
@@ -123,7 +104,7 @@ export default function OrderPage(): JSX.Element {
                 return {
                   localUuid: it.localUuid,
                   productId: it.productId,
-                  productServerId: prod?.serverId ?? null,
+                  productServerId: it.productServerId ?? prod?.serverId ?? null,
                   productName: it.productName,
                   unitPrice: it.unitPrice,
                   quantity: it.quantity,
@@ -139,11 +120,12 @@ export default function OrderPage(): JSX.Element {
 
           // Local yoq — server buyurtmasini yuklaymiz
           const serverLines = existingOrder.items.map<CartLine>((it) => {
-            const product = products.find((p) => p.id === it.productId || (it.serverId != null && p.serverId === it.serverId))
+            const productServerId = it.productServerId ?? null
+            const product = products.find((p) => p.id === it.productId || (productServerId != null && p.serverId === productServerId))
             return {
               localUuid: it.localUuid,
               productId: it.productId,
-              productServerId: product?.serverId ?? null,
+              productServerId: productServerId ?? product?.serverId ?? null,
               productName: it.productName,
               unitPrice: it.unitPrice,
               quantity: it.quantity,
@@ -153,8 +135,6 @@ export default function OrderPage(): JSX.Element {
               addedAt: it.createdAt
             }
           })
-          // Dastlabki server items ni eslab qolamiz — saqlashda o'chirilganlarni topish uchun
-          initialServerItemsRef.current = serverLines
           if (cancelled) return
           // Local order YARATMAYMIZ — faqat ko'rsatamiz. Saqlashda lazy yaratiladi.
           cart.setOrder(null, tId, existingOrder.serverId ?? null, roomServerId)
@@ -176,7 +156,7 @@ export default function OrderPage(): JSX.Element {
             return {
               localUuid: it.localUuid,
               productId: it.productId,
-              productServerId: prod?.serverId ?? null,
+              productServerId: it.productServerId ?? prod?.serverId ?? null,
               productName: it.productName,
               unitPrice: it.unitPrice,
               quantity: it.quantity,
@@ -281,14 +261,12 @@ export default function OrderPage(): JSX.Element {
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
-      // Savat bo'sh — faqat LOCAL order bo'lsa bekor qilamiz
-      // Server orderni tegmaymiz (foydalanuvchi faqat ko'rib chiqdi)
       const orderId = cart.orderId
       const serverOrderId = useCart.getState().serverOrderId
-      if (orderId && orderId > 0) {
+      if ((orderId && orderId > 0) || serverOrderId) {
         setSaving(true)
         try {
-          await window.afisant.orders.cancel(orderId, serverOrderId ?? undefined)
+          await window.afisant.orders.cancel(orderId ?? 0, serverOrderId ?? undefined)
           cart.clear()
           cart.setOrder(null, null)
           await refreshTable(tId)
@@ -305,9 +283,9 @@ export default function OrderPage(): JSX.Element {
     setSaving(true)
     try {
       const roomServerId = useCart.getState().roomServerId
+      const currentServerOrderId = useCart.getState().serverOrderId
       const fee = settings?.serviceFeePercent ?? 0
 
-      // Lazy order creation — mahsulot qo'shilganda birinchi marta SQLite buyurtma yaratiladi
       let orderId = cart.orderId
       if (!orderId) {
         const baseOrder = await window.afisant.orders.upsert({
@@ -319,20 +297,13 @@ export default function OrderPage(): JSX.Element {
         useCart.setState({ orderId: baseOrder.id })
       }
 
-      // Mahsulotlar snapshot — navigate oldidan saqlaymiz (background sync uchun)
       const savedLines = [...cart.lines]
 
-      // Server dan o'chirilgan mahsulotlar
-      const removedFromServer = initialServerItemsRef.current.filter(
-        (init) => init.productServerId &&
-          !savedLines.some((l) => l.productServerId === init.productServerId)
-      )
-
-      // Har doim local SQLite ga saqlash (offline persistence uchun)
       await window.afisant.orders.replaceItems(
         orderId,
         savedLines.map((l) => ({
           productId: l.productId,
+          productServerId: l.productServerId,
           productName: l.productName,
           unitPrice: l.unitPrice,
           quantity: l.quantity,
@@ -341,43 +312,39 @@ export default function OrderPage(): JSX.Element {
         }))
       )
 
-      // Darhol navigatsiya — server sinxronini kutmaymiz (sekinlikni hal qilish)
+      let syncFailed = false
+      if (roomServerId) {
+        const syncItems = savedLines
+          .filter((l) => l.productServerId && l.quantity > 0)
+          .map((l) => ({
+            productServerId: l.productServerId!,
+            count: syncCount(l.quantity)
+          }))
+
+        if (syncItems.length > 0) {
+          try {
+            const syncRes = await window.afisant.orders.syncAll({
+              localOrderId: orderId ?? undefined,
+              serverOrderId: currentServerOrderId ?? undefined,
+              roomServerId,
+              items: syncItems
+            })
+            useCart.setState({ serverOrderId: syncRes.serverId })
+          } catch (e: any) {
+            syncFailed = true
+            console.warn('[handleSave] Server sync failed, local pending remains:', e?.message)
+          }
+        } else {
+          syncFailed = true
+          console.warn('[handleSave] Mahsulotlarda server ID yo\'q — To\'liq sinxronlash kerak')
+        }
+      }
+
       await refreshTable(tId)
       cart.clear()
       cart.setOrder(null, null)
       navigate('/tables')
-
-      // Server sinxronini fon rejimida bajaramiz (UI bloklash yo'q)
-      if (!roomServerId) return
-
-      const currentServerOrderId = useCart.getState().serverOrderId
-      // Server order mavjud bo'lsa — faqat yangi (flushed=false) itemlarni yuboramiz
-      // Aks holda server additive PATCH tufayli admin panelda dublikat yaratadi
-      const itemsWithServerId = savedLines.filter(
-        (l) => l.productServerId && l.quantity > 0 && (currentServerOrderId ? !l.flushed : true)
-      )
-      const syncItems = [
-        ...itemsWithServerId.map((l) => ({
-          productServerId: l.productServerId!,
-          count: syncCount(l.quantity)
-        })),
-        ...removedFromServer.map((item) => ({
-          productServerId: item.productServerId!,
-          count: 0
-        }))
-      ]
-
-      if (syncItems.length > 0) {
-        void window.afisant.orders.syncAll({
-          localOrderId: orderId ?? undefined,
-          roomServerId,
-          items: syncItems
-        }).catch((e: any) => {
-          console.warn('[handleSave] Background server sync failed:', e?.message)
-        })
-      } else if (savedLines.length > 0 && savedLines.every((l) => !l.productServerId)) {
-        console.warn('[handleSave] Mahsulotlarda server ID yo\'q — To\'liq sinxronlash kerak')
-      }
+      if (syncFailed) toast.message('Buyurtma lokal saqlandi — internet kelganda serverga yuboriladi')
     } catch (e: any) {
       toast.error('Saqlashda xatolik', { description: e?.message })
     } finally {
@@ -435,6 +402,7 @@ export default function OrderPage(): JSX.Element {
           orderId,
           savedLines.map((l) => ({
             productId: l.productId,
+            productServerId: l.productServerId,
             productName: l.productName,
             unitPrice: l.unitPrice,
             quantity: l.quantity,
@@ -495,39 +463,49 @@ export default function OrderPage(): JSX.Element {
         await window.afisant.orders.close(orderId)
       }
 
+      let serverSyncFailed = false
+      let serverOrderId = currentServerOrderId
+      if (roomServerId && savedLines.length > 0) {
+        const syncItems = savedLines
+          .filter((l) => l.productServerId && l.quantity > 0)
+          .map((l) => ({
+            productServerId: l.productServerId!,
+            count: syncCount(l.quantity)
+          }))
+
+        if (syncItems.length > 0) {
+          try {
+            const syncRes = await window.afisant.orders.syncAll({
+              serverOrderId: currentServerOrderId ?? undefined,
+              roomServerId,
+              items: syncItems
+            })
+            serverOrderId = syncRes.serverId
+          } catch (e: any) {
+            serverSyncFailed = true
+            console.warn('[handleCloseAndPrint] Server item sync failed, local pending remains:', e?.message)
+          }
+        } else {
+          serverSyncFailed = true
+          console.warn('[handleCloseAndPrint] Mahsulotlarda server ID yo\'q — close pending qoladi')
+        }
+      }
+
+      if (serverOrderId && orderId && orderId > 0) {
+        try {
+          const closed = await window.afisant.orders.close(orderId, serverOrderId)
+          if (closed.syncStatus !== 'synced') serverSyncFailed = true
+        } catch (e: any) {
+          serverSyncFailed = true
+          console.warn('[handleCloseAndPrint] Server close failed, local pending remains:', e?.message)
+        }
+      }
+
       cart.clear()
       cart.setOrder(null, null)
       await refreshTable(tId)
       navigate('/tables')
-
-      if (roomServerId || currentServerOrderId) {
-        void (async () => {
-          try {
-            let serverOrderId = currentServerOrderId
-            if (roomServerId && savedLines.length > 0) {
-              // currentServerOrderId bor bo'lsa: faqat flushed=false (yangi) mahsulotlarni yuboramiz
-              // Aks holda server DONE itemlarga ustma-ust yangi yozuv yaratadi (duplicate muammo)
-              const itemsWithServerId = savedLines.filter(
-                (l) => l.productServerId && l.quantity > 0 && (currentServerOrderId ? !l.flushed : true)
-              )
-              if (itemsWithServerId.length > 0) {
-                const syncRes = await window.afisant.orders.syncAll({
-                  localOrderId: orderId ?? undefined,
-                  roomServerId,
-                  items: itemsWithServerId.map((l) => ({
-                    productServerId: l.productServerId!,
-                    count: syncCount(l.quantity)
-                  }))
-                })
-                serverOrderId = syncRes.serverId
-              }
-            }
-            if (serverOrderId) await window.afisant.orders.close(orderId ?? 0, serverOrderId)
-          } catch (e: any) {
-            console.warn('[handleCloseAndPrint] Background server close failed:', e?.message)
-          }
-        })()
-      }
+      if (serverSyncFailed) toast.message('Chek yopildi — serverga internet kelganda qayta yuboriladi')
     } catch (e: any) {
       toast.error('Xatolik', { description: e?.message })
     } finally {

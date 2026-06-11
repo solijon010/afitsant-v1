@@ -131,6 +131,7 @@ export interface BridgeAPI {
     }) => Promise<Order>
     syncAll: (input: {
       localOrderId?: number
+      serverOrderId?: string
       roomServerId: string
       items: Array<{ productServerId: string; count: number }>
     }) => Promise<{ serverId: string }>
@@ -139,6 +140,7 @@ export interface BridgeAPI {
       items: Array<{
         productId: number
         productName: string
+        productServerId?: string | null
         unitPrice: number
         quantity: number
         notes?: string | null
@@ -150,6 +152,7 @@ export interface BridgeAPI {
       items: Array<{
         productId: number
         productName: string
+        productServerId?: string | null
         unitPrice: number
         quantity: number
         notes?: string | null

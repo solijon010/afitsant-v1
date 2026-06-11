@@ -76,6 +76,7 @@ export async function snapshot(): Promise<TableWithOrder[]> {
         return {
           id: idx + 1,
           serverId: it.id,
+          productServerId: it.product?.id ?? null,
           localUuid: it.id,
           orderId: 0,
           productId: product?.id ?? 0,

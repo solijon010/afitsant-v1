@@ -93,6 +93,7 @@ export const mapOrder = (r: Row): Order => ({
 export const mapOrderItem = (r: Row): OrderItem => ({
   id: r.id,
   serverId: r.server_id,
+  productServerId: r.product_server_id ?? null,
   localUuid: r.local_uuid,
   orderId: r.order_id,
   productId: r.product_id,
