@@ -350,7 +350,12 @@ export default function OrderPage(): JSX.Element {
       // Server sinxronini fon rejimida bajaramiz (UI bloklash yo'q)
       if (!roomServerId) return
 
-      const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
+      const currentServerOrderId = useCart.getState().serverOrderId
+      // Server order mavjud bo'lsa — faqat yangi (flushed=false) itemlarni yuboramiz
+      // Aks holda server additive PATCH tufayli admin panelda dublikat yaratadi
+      const itemsWithServerId = savedLines.filter(
+        (l) => l.productServerId && l.quantity > 0 && (currentServerOrderId ? !l.flushed : true)
+      )
       const syncItems = [
         ...itemsWithServerId.map((l) => ({
           productServerId: l.productServerId!,
