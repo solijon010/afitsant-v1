@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, ClipboardList, Eye, EyeOff, FolderOpen, Globe, GripVertical, Languages, LayoutList, Package, Printer, RefreshCw, ScanLine, Shield, ShieldCheck, Store, TestTube2, Users, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -77,7 +77,7 @@ export default function SettingsPage(): JSX.Element {
   const [diagInfo, setDiagInfo] = useState<{ hasToken: boolean; branchId: string | null; serverUrl: string; logPath: string } | null>(null)
   const [recentOrders, setRecentOrders] = useState<DiagRecentOrder[] | null>(null)
   const [loadingOrders, setLoadingOrders] = useState(false)
-  const [dbStatus, setDbStatus] = useState<{ waiters: { total: number; withServerId: number; list: string[] }; products: { total: number; withServerId: number }; tables: { total: number; withServerId: number; list: string[] }; token: string | null; branchId: string | null } | null>(null)
+  const [dbStatus, setDbStatus] = useState<{ waiters: { total: number; withServerId: number; list: string[] }; products: { total: number; withServerId: number }; tables: { total: number; withServerId: number; list: string[] }; hasToken: boolean; branchId: string | null } | null>(null)
   const [loadingDb, setLoadingDb] = useState(false)
   const [roomsTest, setRoomsTest] = useState<RoomsDiagResult | null>(null)
   const [loadingRooms, setLoadingRooms] = useState(false)
@@ -850,10 +850,10 @@ export default function SettingsPage(): JSX.Element {
 
                 {/* Token */}
                 <div className="flex items-center gap-2">
-                  {dbStatus.token ? <CheckCircle2 size={12} className="text-brand-success shrink-0" /> : <XCircle size={12} className="text-brand-danger shrink-0" />}
+                  {dbStatus.hasToken ? <CheckCircle2 size={12} className="text-brand-success shrink-0" /> : <XCircle size={12} className="text-brand-danger shrink-0" />}
                   <span className="text-ink-soft">Token:</span>
-                  <span className={cn('font-mono truncate', dbStatus.token ? 'text-brand-success' : 'text-brand-danger')}>
-                    {dbStatus.token ?? 'YO\'Q — qayta login qiling'}
+                  <span className={cn('font-mono truncate', dbStatus.hasToken ? 'text-brand-success' : 'text-brand-danger')}>
+                    {dbStatus.hasToken ? 'Mavjud' : 'YO\'Q — qayta login qiling'}
                   </span>
                 </div>
 

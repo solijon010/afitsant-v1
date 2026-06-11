@@ -19,6 +19,11 @@ const BATCH = 25
 const TICK_MS = 15_000
 const MAX_BACKOFF = 60_000 * 5
 
+function normalizeCount(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0
+  return Number(value.toFixed(3))
+}
+
 export function startSync(getMainWindow: () => BrowserWindow | null): void {
   mainWindowGetter = getMainWindow
   setupSocket(getMainWindow)
@@ -156,7 +161,7 @@ async function syncPendingOrders(): Promise<void> {
 
       const syncItems = items
         .filter((it) => it.product_server_id && it.quantity > 0)
-        .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
+        .map((it) => ({ productServerId: it.product_server_id!, count: normalizeCount(Number(it.quantity)) }))
 
       if (syncItems.length === 0) continue
       try {
@@ -191,7 +196,10 @@ async function syncPendingOrders(): Promise<void> {
           const mergedItems = new Map<string, number>()
           for (const it of items) {
             if (it.product_server_id && it.quantity > 0) {
-              mergedItems.set(it.product_server_id, (mergedItems.get(it.product_server_id) ?? 0) + Math.round(it.quantity))
+              mergedItems.set(
+                it.product_server_id,
+                normalizeCount((mergedItems.get(it.product_server_id) ?? 0) + Number(it.quantity))
+              )
             }
           }
           const syncItems = Array.from(mergedItems.entries()).map(([productServerId, count]) => ({ productServerId, count }))
@@ -273,6 +281,8 @@ export async function fullPull(): Promise<{
         console.log(`[SYNC] ${urlWithBranch} → OK (${toArray(res.data).length} ta)`)
         return res
       } catch (e: any) {
+        const status = e?.response?.status
+        if (status !== 404) throw e
         console.warn(`[SYNC] ${urlWithBranch} xato (${e?.response?.status ?? e?.code}) — fallback: ${urlWithout}`)
       }
     }
@@ -281,16 +291,28 @@ export async function fullPull(): Promise<{
     return res
   }
 
+  async function fetchAllProducts(): Promise<any[]> {
+    const all: any[] = []
+    const limit = 500
+    for (let page = 1; page <= 50; page++) {
+      const res = await fetchWithFallback(
+        branchId ? `/api/product/all/${branchId}?page=${page}&limit=${limit}` : null,
+        `/api/product/all?page=${page}&limit=${limit}`
+      )
+      const list = toArray(res.data)
+      all.push(...list)
+      if (list.length < limit) break
+    }
+    return all
+  }
+
   try {
     // Barcha ma'lumotlarni BITTA parallel to'plamda olamiz — DB dan oldin!
     // Bu DELETE→fetch→insert zanjirida products yo'qolishini oldini oladi
     const [catsRes, roomCatsRes, prodsRes, roomsRes] = await Promise.allSettled([
       fetchWithFallback(branchId ? `/api/category/all/${branchId}` : null, `/api/category/all`),
       fetchWithFallback(branchId ? `/api/room-category/all/${branchId}` : null, `/api/room-category/all`),
-      fetchWithFallback(
-        branchId ? `/api/product/all/${branchId}?page=1&limit=500` : null,
-        `/api/product/all?page=1&limit=500`
-      ),
+      fetchAllProducts(),
       fetchWithFallback(branchId ? `/api/room/all/${branchId}` : null, `/api/room/all`)
     ])
 
@@ -371,7 +393,7 @@ export async function fullPull(): Promise<{
 
     // Mahsulotlarni saqlash
     if (prodsRes.status === 'fulfilled') {
-      const prods = toArray(prodsRes.value.data)
+      const prods = prodsRes.value
       console.log(`[SYNC] products raw count: ${prods.length}`)
       const upsertProd = db.prepare(
         `INSERT INTO products (server_id, category_id, name_uz_latn, name_uz_cyrl, price, unit, image_url, emoji, is_available, stock, sort_order)

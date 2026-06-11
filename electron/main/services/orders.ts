@@ -2,11 +2,52 @@ import { randomUUID } from 'node:crypto'
 import { getDb } from '../db/connection'
 import { mapOrder, mapOrderItem } from '../db/mappers'
 import { getApi } from './apiClient'
-import { fetchVisibleOrders } from './orderApi'
+import { fetchVisibleOrders, isActiveServerOrder } from './orderApi'
 import { getSettings } from './settings'
 import type { Order, OrderItem, OrderWithItems } from '@shared/types'
 
 const now = () => Date.now()
+
+interface LocalOrderItemInput {
+  productId: number
+  productName: string
+  unitPrice: number
+  quantity: number
+  notes?: string | null
+  localUuid: string
+}
+
+function normalizeCount(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0
+  return Number(value.toFixed(3))
+}
+
+function assertPositiveInteger(name: string, value: number): void {
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} noto'g'ri`)
+}
+
+function normalizeLocalItems(items: LocalOrderItemInput[]): LocalOrderItemInput[] {
+  if (!Array.isArray(items)) throw new Error('Mahsulotlar ro`yxati noto`g`ri')
+  return items.map((it) => {
+    const quantity = normalizeCount(Number(it.quantity))
+    const unitPrice = Number(it.unitPrice)
+    const productName = String(it.productName ?? '').trim()
+    const localUuid = String(it.localUuid ?? '').trim()
+    if (!Number.isInteger(Number(it.productId)) || Number(it.productId) < 0) throw new Error('Mahsulot ID noto`g`ri')
+    if (!productName) throw new Error('Mahsulot nomi bo`sh')
+    if (!localUuid) throw new Error('Mahsulot localUuid bo`sh')
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error('Mahsulot narxi noto`g`ri')
+    if (quantity <= 0) throw new Error('Mahsulot miqdori noto`g`ri')
+    return {
+      productId: Number(it.productId),
+      productName,
+      unitPrice,
+      quantity,
+      notes: it.notes ?? null,
+      localUuid
+    }
+  })
+}
 
 async function updateServerOrderStatus(orderId: string, status: 'SUCCESS' | 'CANCELED'): Promise<void> {
   const api = getApi()
@@ -56,7 +97,7 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
     const active = orders.find(
       (o: any) =>
         o.room?.id === roomServerId &&
-        (o.status === 'PENDING' || o.status === 'READY')
+        isActiveServerOrder(o)
     )
     if (!active) return null
 
@@ -136,14 +177,15 @@ export async function syncAllItems(input: {
   // Bir xil productServerId li itemlarni birlashtiramiz — server duplikat rad etadi
   const merged = new Map<string, number>()
   for (const it of items) {
-    if (it.count > 0) merged.set(it.productServerId, (merged.get(it.productServerId) ?? 0) + it.count)
+    const count = normalizeCount(Number(it.count))
+    if (it.productServerId && count > 0) {
+      merged.set(it.productServerId, normalizeCount((merged.get(it.productServerId) ?? 0) + count))
+    }
   }
   const activeItems = Array.from(merged.entries()).map(([productServerId, count]) => ({ productServerId, count }))
 
-  // Yopilgan/bekor qilingan statuslar — bulardan boshqasi "aktiv" hisoblanadi
-  const CLOSED_STATUSES = ['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED']
-  const isActive = (o: any): boolean =>
-    !CLOSED_STATUSES.includes((o.status ?? '').toUpperCase())
+  // Yopilgan/bekor qilingan statuslardan boshqasi "aktiv" hisoblanadi.
+  const isActive = isActiveServerOrder
 
   // Xona bo'yicha aktiv buyurtmani topish — room endpointidan to'g'ridan qidiramiz
   const findActiveForRoom = async (): Promise<any> => {
@@ -262,6 +304,8 @@ export function upsertOpenOrder(input: {
   serviceFeePercent: number
   notes?: string | null
 }): Order {
+  assertPositiveInteger('Stol ID', input.tableId)
+  assertPositiveInteger('Afitsant ID', input.waiterId)
   const db = getDb()
   const existing = db
     .prepare(`SELECT * FROM orders WHERE table_id = ? AND status = 'open' LIMIT 1`)
@@ -284,15 +328,10 @@ export function upsertOpenOrder(input: {
 
 export function replaceOrderItems(
   orderId: number,
-  items: Array<{
-    productId: number
-    productName: string
-    unitPrice: number
-    quantity: number
-    notes?: string | null
-    localUuid: string
-  }>
+  items: LocalOrderItemInput[]
 ): OrderItem[] {
+  assertPositiveInteger('Buyurtma ID', orderId)
+  const safeItems = normalizeLocalItems(items)
   const db = getDb()
   const ts = now()
 
@@ -303,7 +342,7 @@ export function replaceOrderItems(
       `INSERT INTO order_items (local_uuid, order_id, product_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
     )
-    for (const it of items) {
+    for (const it of safeItems) {
       insert.run(it.localUuid, orderId, it.productId, it.productName, it.unitPrice, it.quantity, it.notes ?? null, ts, ts)
     }
     recalculateOrder(orderId)
@@ -317,15 +356,10 @@ export function replaceOrderItems(
 
 export function addItems(
   orderId: number,
-  items: Array<{
-    productId: number
-    productName: string
-    unitPrice: number
-    quantity: number
-    notes?: string | null
-    localUuid: string
-  }>
+  items: LocalOrderItemInput[]
 ): OrderItem[] {
+  assertPositiveInteger('Buyurtma ID', orderId)
+  const safeItems = normalizeLocalItems(items)
   const db = getDb()
   const ts = now()
   const inserted: OrderItem[] = []
@@ -336,7 +370,7 @@ export function addItems(
   )
 
   const tx = db.transaction(() => {
-    for (const it of items) {
+    for (const it of safeItems) {
       const info = insert.run(
         it.localUuid,
         orderId,
@@ -367,6 +401,9 @@ export function updateItem(itemId: number, patch: { quantity?: number; notes?: s
   // COALESCE ishlatilmaydi — notes = null bo'lganda eski qiymat o'rnini egallaydi.
   // Buning o'rniga faqat berilgan maydonlarni yangilash uchun shart ishlatiladi.
   const newQuantity = patch.quantity !== undefined ? patch.quantity : existing.quantity
+  if (!Number.isFinite(Number(newQuantity)) || Number(newQuantity) <= 0) {
+    throw new Error('Mahsulot miqdori noto`g`ri')
+  }
   const newNotes    = 'notes' in patch ? patch.notes : existing.notes
 
   db.prepare(
@@ -389,29 +426,51 @@ export function removeItem(itemId: number): void {
   markOrderPending(existing.order_id, ts)
 }
 
-export function closeOrder(orderId: number, printedAt: number | null = now()): Order {
+export function closeOrder(
+  orderId: number,
+  printedAt: number | null = now(),
+  syncStatus: 'pending' | 'synced' = 'pending',
+  serverOrderId?: string
+): Order {
   if (!Number.isInteger(orderId) || orderId <= 0) {
     throw new Error('Buyurtma ID noto\'g\'ri')
   }
   const db = getDb()
   const ts = now()
   db.prepare(
-    `UPDATE orders SET status = 'closed', closed_at = ?, printed_at = ?, sync_status = 'pending', updated_at = ? WHERE id = ?`
-  ).run(ts, printedAt, ts, orderId)
+    `UPDATE orders
+     SET server_id = COALESCE(?, server_id),
+         status = 'closed',
+         closed_at = ?,
+         printed_at = ?,
+         sync_status = ?,
+         updated_at = ?
+     WHERE id = ?`
+  ).run(serverOrderId ?? null, ts, printedAt, syncStatus, ts, orderId)
   const row = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId) as any
   if (!row) throw new Error('Buyurtma topilmadi')
   return mapOrder(row)
 }
 
-export function cancelOrder(orderId: number): Order {
+export function cancelOrder(
+  orderId: number,
+  syncStatus: 'pending' | 'synced' = 'pending',
+  serverOrderId?: string
+): Order {
   if (!Number.isInteger(orderId) || orderId <= 0) {
     throw new Error('Buyurtma ID noto\'g\'ri')
   }
   const db = getDb()
   const ts = now()
   db.prepare(
-    `UPDATE orders SET status = 'cancelled', closed_at = ?, sync_status = 'pending', updated_at = ? WHERE id = ?`
-  ).run(ts, ts, orderId)
+    `UPDATE orders
+     SET server_id = COALESCE(?, server_id),
+         status = 'cancelled',
+         closed_at = ?,
+         sync_status = ?,
+         updated_at = ?
+     WHERE id = ?`
+  ).run(serverOrderId ?? null, ts, syncStatus, ts, orderId)
   const row = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(orderId) as any
   if (!row) throw new Error('Buyurtma topilmadi')
   return mapOrder(row)

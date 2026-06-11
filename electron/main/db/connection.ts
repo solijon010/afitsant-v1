@@ -28,11 +28,20 @@ export function getDb(): Database.Database {
 
 function clearMockData(d: Database.Database): void {
   try {
+    const hasServerBackedData = (d.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM waiters WHERE server_id IS NOT NULL) +
+        (SELECT COUNT(*) FROM categories WHERE server_id IS NOT NULL) +
+        (SELECT COUNT(*) FROM areas WHERE server_id IS NOT NULL) +
+        (SELECT COUNT(*) FROM tables WHERE server_id IS NOT NULL) AS c
+    `).get() as { c: number }).c > 0
+
+    if (!hasServerBackedData) return
+
     d.transaction(() => {
-      // Avval mock tablelerga tegishli orderlarni o'chirish (FK constraint)
+      // Server data bor bo'lsa legacy demo catalog tozalanadi, aks holda offline demo saqlanadi.
       d.prepare(`DELETE FROM order_items WHERE order_id IN (SELECT o.id FROM orders o JOIN tables t ON o.table_id = t.id WHERE t.server_id IS NULL)`).run()
       d.prepare(`DELETE FROM orders WHERE table_id IN (SELECT id FROM tables WHERE server_id IS NULL)`).run()
-      // Keyin mock datani o'chirish
       d.prepare(`DELETE FROM waiters WHERE server_id IS NULL`).run()
       d.prepare(`DELETE FROM areas WHERE server_id IS NULL`).run()
       d.prepare(`DELETE FROM categories WHERE server_id IS NULL`).run()

@@ -10,10 +10,10 @@ Choyxona, restoran va kafelar uchun **Electron + React + SQLite** asosida qurilg
 - **5 ta xato urinishdan keyin 1 daqiqaga blok**, bcrypt bilan PIN himoyalangan
 - **Stol/xona/katta xona** boshqaruvi (band/bo'sh holatlar, real-time pul ko'rsatkichi)
 - **Kategoriya bo'yicha tezkor buyurtma**: emoji, narx va miqdor
-- **Smart batch sync**: har 5 mahsulot yoki 10 soniyada bitta IPC chaqirig'ida saqlanadi
+- **Offline-first order sync**: buyurtmalar SQLite'da saqlanadi, internet qaytganda fon rejimida serverga yuboriladi
 - **ESC/POS chek printer** (USB / LAN / Windows)
 - **WebSocket real-time** menyu yangilanishlari
-- **Offline-first** — internet uzilsa SQLite queue ishlaydi, qaytganda flush qiladi
+- **Offline-first** — internet uzilsa buyurtmalar `pending` holatda qoladi, qaytganda avtomatik sinxronlanadi
 - **Til**: O'zbek (lotin) va O'zbek (kirill)
 - **Default seed data** — birinchi ishga tushganda 4 afitsant, 21 stol, 6 kategoriya, 21 mahsulot avtomatik qo'shiladi
 
@@ -113,19 +113,17 @@ afisant/
         ↓
    Zustand savatga qo'shadi (lokal, darhol)
         ↓
-   ┌──────────────────────────────┐
-   │ Trigger: 5 mahsulot yoki 10s │
-   └──────────────┬───────────────┘
+   "Saqlash" yoki "Chek & Yopish"
                   ↓
-   window.afisant.orders.addItems()  ← bitta IPC chaqiruv
+   window.afisant.orders.upsertOpen() + replaceItems()
                   ↓
    SQLite (better-sqlite3 transaction)
                   ↓
-   sync_queue jadvaliga payload qo'yiladi
+   orders.sync_status = 'pending'
                   ↓
-   Har 8 soniyada queue worker serverga POST qiladi
+   Fon sync har 15 soniyada serverga yuboradi
                   ↓
-   Backend → WebSocket orqali boshqa POS'larga yuboradi
+   Muvaffaqiyatli yuborilsa sync_status = 'synced'
 ```
 
 ## Xavfsizlik

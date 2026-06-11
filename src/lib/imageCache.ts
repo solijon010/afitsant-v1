@@ -1,8 +1,25 @@
 const promises = new Map<string, Promise<string>>()
 const resolved = new Map<string, string>()
+let imageApiBase = import.meta.env.VITE_API_URL ?? ''
+
+function clearMemoryCache(): void {
+  for (const blobUrl of resolved.values()) {
+    if (blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl)
+  }
+  promises.clear()
+  resolved.clear()
+}
+
+export function setImageServerUrl(serverUrl: string): void {
+  const trimmed = serverUrl.replace(/\/+$/, '')
+  const next = trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`
+  if (next === imageApiBase) return
+  imageApiBase = next
+  clearMemoryCache()
+}
 
 function fullUrl(photo: string): string {
-  return `${import.meta.env.VITE_API_URL ?? ''}/image/${photo}`
+  return `${imageApiBase}/image/${photo}`
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -68,11 +85,7 @@ export async function getCachedImageUrl(photo: string): Promise<string> {
 }
 
 export function clearImageCache(): void {
-  for (const blobUrl of resolved.values()) {
-    if (blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl)
-  }
-  promises.clear()
-  resolved.clear()
+  clearMemoryCache()
   try {
     void window.afisant?.imageCache?.clear()
   } catch {}

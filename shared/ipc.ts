@@ -221,7 +221,7 @@ export interface BridgeAPI {
       waiters: { total: number; withServerId: number; list: string[] }
       products: { total: number; withServerId: number }
       tables: { total: number; withServerId: number; list: string[] }
-      token: string | null
+      hasToken: boolean
       branchId: string | null
     }>
     testOrderCreate: (roomServerId: string, waiterServerId: string, productServerId: string) => Promise<{ ok: boolean; orderId?: string; error?: string; raw?: any }>

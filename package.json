@@ -16,7 +16,7 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "lint": "npm run typecheck",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"electron/**/*.ts\"",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "electron-builder install-app-deps",

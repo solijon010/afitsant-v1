@@ -14,6 +14,17 @@ import * as imageCache from './services/imageCache'
 import { fetchVisibleOrders } from './services/orderApi'
 import { resetApi } from './services/apiClient'
 
+function assertServerAdmin(): void {
+  const s = settings.getSettings()
+  const token = s.apiToken
+  if (!token) throw new Error('Admin token topilmadi')
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()) as { role?: string }
+    if (payload.role === 'SUPERADMIN' || payload.role === 'ADMIN') return
+  } catch {}
+  throw new Error('Bu amal uchun server admin huquqi kerak')
+}
+
 export function registerIpc(): void {
   ipcMain.handle(IPC.ping, () => 'pong')
 
@@ -51,25 +62,29 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.ordersRemoveItem, (_e, itemId: number) => orders.removeItem(itemId))
   ipcMain.handle(IPC.ordersSyncAll, (_e, input: any) => orders.syncAllItems(input))
   ipcMain.handle(IPC.ordersClose, async (_e, orderId: number, serverOrderId?: string) => {
+    let serverSynced = false
     if (serverOrderId) {
       try {
         await orders.closeOrderOnServer(serverOrderId)
+        serverSynced = true
       } catch (e: any) {
         console.warn('[IPC] closeOrderOnServer xato (mahalliy yopiladi):', e?.message)
       }
     }
-    if (orderId > 0) return orders.closeOrder(orderId)
+    if (orderId > 0) return orders.closeOrder(orderId, undefined, serverSynced ? 'synced' : 'pending', serverOrderId)
     return null
   })
   ipcMain.handle(IPC.ordersCancel, async (_e, orderId: number, serverOrderId?: string) => {
+    let serverSynced = false
     if (serverOrderId) {
       try {
         await orders.cancelOrderOnServer(serverOrderId)
+        serverSynced = true
       } catch (e: any) {
         console.warn('[IPC] cancelOrderOnServer xato (mahalliy bekor qilinadi):', e?.message)
       }
     }
-    if (orderId > 0) return orders.cancelOrder(orderId)
+    if (orderId > 0) return orders.cancelOrder(orderId, serverSynced ? 'synced' : 'pending', serverOrderId)
     return null
   })
 
@@ -239,7 +254,7 @@ export function registerIpc(): void {
         withServerId: tablesAll.filter((t: any) => t.server_id).length,
         list: tablesAll.map((t: any) => `${t.name} -> ${t.server_id ?? "YO'Q"}`)
       },
-      token: s.apiToken ? `${s.apiToken.slice(0, 20)}...` : null,
+      hasToken: !!s.apiToken,
       branchId: s.branchId
     }
   })
@@ -314,6 +329,7 @@ export function registerIpc(): void {
   ipcMain.handle(
     IPC.diagTestOrderCreate,
     async (_e, roomServerId: string, waiterServerId: string, productServerId: string) => {
+      assertServerAdmin()
       const { getApi } = await import('./services/apiClient')
       const s = settings.getSettings()
       if (!s.apiToken) return { ok: false, error: "Token yo'q" }
@@ -342,6 +358,7 @@ export function registerIpc(): void {
   )
 
   ipcMain.handle(IPC.diagCancelAllServerOrders, async () => {
+    assertServerAdmin()
     const { getApi } = await import('./services/apiClient')
     const { fetchVisibleOrders } = await import('./services/orderApi')
     const s = settings.getSettings()

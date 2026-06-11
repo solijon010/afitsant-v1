@@ -2,6 +2,11 @@ import { getApi } from './apiClient'
 import { getSettings } from './settings'
 
 const toArray = (raw: unknown): any[] => (Array.isArray(raw) ? raw : ((raw as any)?.data ?? []))
+const CLOSED_STATUSES = new Set(['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED'])
+
+export function isActiveServerOrder(order: any): boolean {
+  return !CLOSED_STATUSES.has(String(order?.status ?? '').toUpperCase())
+}
 
 export async function fetchVisibleOrders(limit = 200): Promise<any[]> {
   const s = getSettings()

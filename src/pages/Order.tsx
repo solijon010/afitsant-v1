@@ -47,6 +47,8 @@ const getCatIcon = (name: string): JSX.Element => {
   return <Package size={16} />
 }
 
+const syncCount = (quantity: number): number => Number(quantity.toFixed(3))
+
 export default function OrderPage(): JSX.Element {
   const { tableId } = useParams<{ tableId: string }>()
   const tId = Number(tableId)
@@ -352,7 +354,7 @@ export default function OrderPage(): JSX.Element {
       const syncItems = [
         ...itemsWithServerId.map((l) => ({
           productServerId: l.productServerId!,
-          count: Math.round(l.quantity)
+          count: syncCount(l.quantity)
         })),
         ...removedFromServer.map((item) => ({
           productServerId: item.productServerId!,
@@ -410,11 +412,8 @@ export default function OrderPage(): JSX.Element {
       const roomServerId = useCart.getState().roomServerId
       const currentServerOrderId = useCart.getState().serverOrderId
       const fee = settings?.serviceFeePercent ?? 0
-
-      // Mahsulotlar snapshot — navigate oldidan saqlaymiz
       const savedLines = [...cart.lines]
 
-      // Lazy order creation — mahsulot bor bo'lsa SQLite buyurtma yaratamiz
       let orderId = cart.orderId
       if (!orderId && savedLines.length > 0) {
         const baseOrder = await window.afisant.orders.upsert({
@@ -426,8 +425,6 @@ export default function OrderPage(): JSX.Element {
         useCart.setState({ orderId: baseOrder.id })
       }
 
-      // Items ni SQLite ga saqlash — offline bo'lganda sync uchun ZARUR
-      // Bu bo'lmasdan syncPendingOrders items topa olmaydi va server ga yubora olmaydi
       if (orderId && savedLines.length > 0) {
         await window.afisant.orders.replaceItems(
           orderId,
@@ -442,18 +439,13 @@ export default function OrderPage(): JSX.Element {
         )
       }
 
-      // Mahalliy yopamiz (tez, faqat SQLite) — navigatsiyani bloklash yo'q
-      if (orderId && orderId > 0) {
-        await window.afisant.orders.close(orderId)
-      }
-
       const payload: ReceiptPayload = {
         organizationName: settings?.organizationName ?? 'Restoran',
         organizationAddress: settings?.organizationAddress ?? null,
         organizationPhone: settings?.organizationPhone ?? null,
         tableName: table.name,
         waiterName: `${waiter.firstName} ${waiter.lastName}`,
-        orderLocalUuid: currentServerOrderId ?? String(orderId ?? 'unkwn'),
+        orderLocalUuid: currentServerOrderId ?? String(orderId ?? 'unknown'),
         items: savedLines.map((l) => ({
           name: l.productName,
           quantity: l.quantity,
@@ -471,7 +463,17 @@ export default function OrderPage(): JSX.Element {
         receiptQrLabel: settings?.receiptQrLabel ?? null
       }
 
-      // Tarixga yozamiz va chop etilgan deb belgilaymiz
+      const printResult = await window.afisant.printer.receipt(payload)
+      if (!printResult.ok) {
+        if (settings?.printerType) {
+          toast.error("Chek chiqarib bo'lmadi", { description: (printResult as any).error })
+          return
+        }
+        toast.message("Printer ulanmagan — chek o'tkazib yuborildi")
+      } else {
+        toast.success('Chek chiqdi (2 nusxa)')
+      }
+
       const histId = useOrderHistory.getState().push({
         tableId: tId,
         tableName: table.name,
@@ -482,32 +484,21 @@ export default function OrderPage(): JSX.Element {
         serviceFee: payload.serviceFee,
         total: payload.total
       })
-      useOrderHistory.getState().markPrinted(histId)
+      if (printResult.ok) useOrderHistory.getState().markPrinted(histId)
 
-      // Chek chiqarish
-      const res = await window.afisant.printer.receipt(payload)
-      if (!res.ok) {
-        if (settings?.printerType) {
-          toast.error("Chek chiqarib bo'lmadi", { description: (res as any).error })
-        } else {
-          toast.message("Printer ulanmagan — chek o'tkazib yuborildi")
-        }
-      } else {
-        toast.success('Chek chiqdi (2 nusxa)')
+      if (orderId && orderId > 0) {
+        await window.afisant.orders.close(orderId)
       }
 
-      // Darhol navigatsiya — server yopishini kutmaymiz
       cart.clear()
       cart.setOrder(null, null)
       await refreshTable(tId)
       navigate('/tables')
 
-      // Fon rejimida: server sinxronlash + server da yopish
       if (roomServerId || currentServerOrderId) {
         void (async () => {
           try {
             let serverOrderId = currentServerOrderId
-            // serverOrderId bo'lsa ham bo'lmasa ham — har doim items ni sync qilamiz
             if (roomServerId && savedLines.length > 0) {
               const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
               if (itemsWithServerId.length > 0) {
@@ -516,17 +507,13 @@ export default function OrderPage(): JSX.Element {
                   roomServerId,
                   items: itemsWithServerId.map((l) => ({
                     productServerId: l.productServerId!,
-                    count: Math.round(l.quantity)
+                    count: syncCount(l.quantity)
                   }))
                 })
                 serverOrderId = syncRes.serverId
               }
             }
-            if (serverOrderId) {
-              // Server da yopamiz — orderId ham uzatamiz, close muvaffaqiyatsiz bo'lsa
-              // closeOrder sync_status='pending' ga qaytaradi va syncPendingOrders qayta urinadi
-              await window.afisant.orders.close(orderId ?? 0, serverOrderId)
-            }
+            if (serverOrderId) await window.afisant.orders.close(orderId ?? 0, serverOrderId)
           } catch (e: any) {
             console.warn('[handleCloseAndPrint] Background server close failed:', e?.message)
           }

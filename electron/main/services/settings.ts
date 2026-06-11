@@ -1,4 +1,5 @@
 import { getDb } from '../db/connection'
+import { safeStorage } from 'electron'
 import type { Lang, Settings } from '@shared/types'
 
 const DEFAULTS: Settings = {
@@ -28,10 +29,41 @@ const DEFAULTS: Settings = {
   offlineBranchId: null
 }
 
+const ENCRYPTED_KEYS = new Set<keyof Settings>(['apiToken', 'offlineToken'])
+const ENCRYPTED_PREFIX = 'enc:'
+
+function canEncrypt(): boolean {
+  try {
+    return safeStorage.isEncryptionAvailable()
+  } catch {
+    return false
+  }
+}
+
+function encodeSetting(key: string, value: string): string {
+  if (!ENCRYPTED_KEYS.has(key as keyof Settings) || value === '' || value.startsWith(ENCRYPTED_PREFIX)) {
+    return value
+  }
+  if (!canEncrypt()) return value
+  return `${ENCRYPTED_PREFIX}${safeStorage.encryptString(value).toString('base64')}`
+}
+
+function decodeSetting(key: string, value: string | null): string | null {
+  if (!value || !ENCRYPTED_KEYS.has(key as keyof Settings) || !value.startsWith(ENCRYPTED_PREFIX)) {
+    return value
+  }
+  if (!canEncrypt()) return null
+  try {
+    return safeStorage.decryptString(Buffer.from(value.slice(ENCRYPTED_PREFIX.length), 'base64'))
+  } catch {
+    return null
+  }
+}
+
 export function getSettings(): Settings {
   const db = getDb()
   const rows = db.prepare(`SELECT key, value FROM settings`).all() as Array<{ key: string; value: string | null }>
-  const map = new Map(rows.map((r) => [r.key, r.value]))
+  const map = new Map(rows.map((r) => [r.key, decodeSetting(r.key, r.value)]))
 
   const get = <K extends keyof Settings>(k: K, parse: (v: string | null | undefined) => Settings[K]): Settings[K] =>
     parse(map.get(k as string) ?? null)
@@ -69,9 +101,22 @@ export function setSettings(patch: Partial<Settings>): Settings {
   const stmt = db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
   const tx = db.transaction(() => {
     for (const [k, v] of Object.entries(patch)) {
-      stmt.run(k, v === null || v === undefined ? '' : String(v))
+      const raw = v === null || v === undefined ? '' : String(v)
+      stmt.run(k, encodeSetting(k, raw))
     }
   })
   tx()
   return getSettings()
+}
+
+export function migrateSensitiveSettings(): void {
+  const db = getDb()
+  const rows = db.prepare(`SELECT key, value FROM settings`).all() as Array<{ key: string; value: string | null }>
+  const patch: Partial<Settings> = {}
+  for (const row of rows) {
+    if (!ENCRYPTED_KEYS.has(row.key as keyof Settings)) continue
+    if (!row.value || row.value.startsWith(ENCRYPTED_PREFIX)) continue
+    ;(patch as Record<string, string>)[row.key] = row.value
+  }
+  if (Object.keys(patch).length > 0) setSettings(patch)
 }

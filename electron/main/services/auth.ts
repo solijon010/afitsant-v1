@@ -8,6 +8,7 @@ import type { ServerLoginResult, ServerUser, Waiter } from '@shared/types'
 
 const MAX_ATTEMPTS = 5
 const LOCK_MS = 60_000
+const BCRYPT_ROUNDS = 10
 
 function mapRole(backendRole: string): string {
   switch (backendRole) {
@@ -65,7 +66,7 @@ async function persistServerUsers(users: ServerUser[], deactivateOthers = false)
   for (const user of normalized) {
     const existing = db.prepare(`SELECT pin_hash FROM waiters WHERE server_id = ?`).get(user.id) as { pin_hash?: string } | undefined
     const phone = user.phoneNumer ?? ''
-    const pinHash = existing?.pin_hash ?? await bcrypt.hash(phone.length >= 4 ? phone.slice(-4) : '1234', 8)
+    const pinHash = existing?.pin_hash ?? await bcrypt.hash(phone.length >= 4 ? phone.slice(-4) : '1234', BCRYPT_ROUNDS)
     stmt.run(user.id, user.firstName, user.lastName ?? '', phone, pinHash, mapRole(user.role), now, now)
   }
 }
@@ -109,7 +110,7 @@ export async function loginWithServer(identifier: string, password: string): Pro
     await syncWaitersForBranch(branchId)
 
     // Offline login uchun credentials saqlash
-    const passwordHash = await bcrypt.hash(password, 8)
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
     setSettings({
       offlineIdentifier: identifier,
       offlinePasswordHash: passwordHash,
@@ -227,7 +228,7 @@ export async function setWaiterPin(waiterId: number, pin: string): Promise<{ ok:
   const db = getDb()
   const row = db.prepare(`SELECT id FROM waiters WHERE id = ?`).get(waiterId) as any
   if (!row) return { ok: false, message: 'Afitsant topilmadi' }
-  const hash = await bcrypt.hash(pin, 8)
+  const hash = await bcrypt.hash(pin, BCRYPT_ROUNDS)
   db.prepare(`UPDATE waiters SET pin_hash = ?, updated_at = ? WHERE id = ?`)
     .run(hash, Date.now(), waiterId)
   return { ok: true }

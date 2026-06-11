@@ -1,6 +1,6 @@
 import { getDb } from '../db/connection'
 import { mapArea, mapOrder, mapOrderItem, mapTable } from '../db/mappers'
-import { fetchVisibleOrders } from './orderApi'
+import { fetchVisibleOrders, isActiveServerOrder } from './orderApi'
 import { getSettings } from './settings'
 import type { Area, OrderWithItems, TableEntity, TableWithOrder } from '@shared/types'
 
@@ -40,7 +40,7 @@ export async function snapshot(): Promise<TableWithOrder[]> {
   let activeOrders: any[] = []
   try {
     const all = await fetchVisibleOrders(200)
-    activeOrders = all.filter((o: any) => o.status === 'PENDING' || o.status === 'READY')
+    activeOrders = all.filter(isActiveServerOrder)
   } catch (e: any) {
     console.error('snapshot orders fetch error:', e?.message)
   }

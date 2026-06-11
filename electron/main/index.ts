@@ -6,6 +6,7 @@ import { getDb, closeDb } from './db/connection'
 import { seedIfEmpty } from './db/seed'
 import { startSync, stopSync } from './services/syncEngine'
 import { setUnauthorizedHandler } from './services/apiClient'
+import { migrateSensitiveSettings } from './services/settings'
 import { IPC } from '@shared/ipc'
 
 // Electron terminal pipe yopiq bo'lganda EPIPE xatosi chiqmasligi uchun
@@ -75,7 +76,7 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       spellcheck: false
     }
   })
@@ -90,7 +91,14 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        shell.openExternal(url)
+      }
+    } catch {
+      // Malformed URLs are denied below.
+    }
     return { action: 'deny' }
   })
 
@@ -110,6 +118,7 @@ app.whenReady().then(() => {
 
   const db = getDb()
   seedIfEmpty(db)
+  migrateSensitiveSettings()
 
   registerIpc()
   createWindow()
@@ -123,11 +132,12 @@ app.whenReady().then(() => {
     }
   })
 
-  // F12 → DevTools (debug uchun, production da ham)
-  globalShortcut.register('F12', () => {
-    const win = getMainWindow()
-    if (win) win.webContents.toggleDevTools()
-  })
+  if (!app.isPackaged) {
+    globalShortcut.register('F12', () => {
+      const win = getMainWindow()
+      if (win) win.webContents.toggleDevTools()
+    })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
