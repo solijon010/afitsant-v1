@@ -184,6 +184,15 @@ async function syncPendingOrders(): Promise<void> {
       try {
         let serverId = order.server_id
 
+        // room_server_id yo'q va server_id ham yo'q — server da hech qanday manzil yo'q
+        // Bu holatda sync qilish mumkin emas: local-only buyurtma deb belgilaymiz
+        if (!order.room_server_id && !serverId) {
+          db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`)
+            .run(Date.now(), order.id)
+          console.log(`[SYNC] Order ${order.id} has no server info — marked local-only`)
+          continue
+        }
+
         // Har doim items ni serverga yuboramiz — serverId bo'lsa ham bo'lmasa ham
         if (order.room_server_id) {
           const items = db.prepare(`
