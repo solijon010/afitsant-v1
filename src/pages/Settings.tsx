@@ -174,9 +174,12 @@ export default function SettingsPage(): JSX.Element {
 
   if (!form) return <div className="grid h-full place-items-center"><div className="card h-24 w-72 animate-pulse" /></div>
 
-  /* Faqat SUPERADMIN server foydalanuvchisi yoki manager/super_waiter afitsanti texnik ma'lumotlarni ko'radi */
-  const isAdmin = serverUser?.role === 'SUPERADMIN' ||
+  /* Faqat SUPERADMIN/ADMIN server foydalanuvchisi yoki manager/super_waiter afitsanti texnik ma'lumotlarni ko'radi */
+  const isAdmin = serverUser?.role === 'SUPERADMIN' || serverUser?.role === 'ADMIN' ||
     (waiter !== null && (waiter.role === 'manager' || waiter.role === 'super_waiter'))
+
+  /* Xavfli server operatsiyalari uchun faqat haqiqiy server admin (JWT roli) */
+  const isServerAdmin = serverUser?.role === 'SUPERADMIN' || serverUser?.role === 'ADMIN'
 
   const update = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
     setForm((f) => (f ? { ...f, [key]: value } : f))
@@ -828,7 +831,7 @@ export default function SettingsPage(): JSX.Element {
           </div>
         </Section>
 
-        {isAdmin && (
+        {isServerAdmin && (
           <Section title="Server Zakazlar" icon={<ClipboardList size={16} />}>
             {/* ── DB Holati ── */}
             <button
