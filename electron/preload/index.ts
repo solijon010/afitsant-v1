@@ -87,7 +87,8 @@ const api: BridgeAPI = {
     testOrderCreate: (roomServerId: string, waiterServerId: string, productServerId: string) =>
       ipcRenderer.invoke(IPC.diagTestOrderCreate, roomServerId, waiterServerId, productServerId),
     testRooms: (): Promise<Record<string, any>> => ipcRenderer.invoke(IPC.diagTestRooms),
-    cancelAllServerOrders: () => ipcRenderer.invoke(IPC.diagCancelAllServerOrders)
+    cancelAllServerOrders: () => ipcRenderer.invoke(IPC.diagCancelAllServerOrders),
+    clearAllServerOrders: () => ipcRenderer.invoke(IPC.diagClearAllServerOrders)
   },
 
   on: {

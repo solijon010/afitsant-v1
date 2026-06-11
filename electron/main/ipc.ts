@@ -389,4 +389,42 @@ export function registerIpc(): void {
       return { cancelled: 0, failed: 0, total: 0 }
     }
   })
+
+  // Barcha serverorderlari tozalash: PENDING + SUCCESS + barchasi
+  ipcMain.handle(IPC.diagClearAllServerOrders, async () => {
+    assertServerAdmin()
+    const { getApi } = await import('./services/apiClient')
+    const { fetchVisibleOrders } = await import('./services/orderApi')
+    const s = settings.getSettings()
+    if (!s.apiToken) return { cancelled: 0, failed: 0, total: 0 }
+    const api = getApi()
+    try {
+      const all = await fetchVisibleOrders(1000)
+      // CANCELED va DELETE_REQUEST larni o'tkazib yuboramiz — qolganlarini cancel qilamiz
+      const targets = all.filter((o: any) =>
+        o.status !== 'CANCELED' && o.status !== 'DELETE_REQUEST' && o.status !== 'DELETED'
+      )
+      let cancelled = 0, failed = 0
+      for (const o of targets) {
+        try {
+          await api.patch(`/api/order/status/${o.id}`, null, { params: { status: 'CANCELED' } })
+          cancelled++
+        } catch {
+          failed++
+        }
+      }
+      // Local DB ni ham to'liq tozalaymiz
+      const db = getDb()
+      db.transaction(() => {
+        db.prepare(`DELETE FROM sync_queue`).run()
+        db.prepare(`DELETE FROM order_items`).run()
+        db.prepare(`DELETE FROM orders`).run()
+      })()
+      console.log(`[DIAG] clearAllServerOrders: cancelled=${cancelled} failed=${failed} total=${targets.length}`)
+      return { cancelled, failed, total: targets.length }
+    } catch (e: any) {
+      console.error('[DIAG] clearAllServerOrders error:', e?.message)
+      return { cancelled: 0, failed: 0, total: 0 }
+    }
+  })
 }

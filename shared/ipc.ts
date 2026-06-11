@@ -77,6 +77,7 @@ export const IPC = {
   diagTestOrderCreate: 'diag:testOrderCreate',
   diagTestRooms: 'diag:testRooms',
   diagCancelAllServerOrders: 'diag:cancelAllServerOrders',
+  diagClearAllServerOrders: 'diag:clearAllServerOrders',
 
   onSyncEvent: 'event:sync',
   onSyncStatus: 'event:syncStatus',
@@ -227,6 +228,7 @@ export interface BridgeAPI {
     testOrderCreate: (roomServerId: string, waiterServerId: string, productServerId: string) => Promise<{ ok: boolean; orderId?: string; error?: string; raw?: any }>
     testRooms: () => Promise<Record<string, any>>
     cancelAllServerOrders: () => Promise<{ cancelled: number; failed: number; total: number }>
+    clearAllServerOrders: () => Promise<{ cancelled: number; failed: number; total: number }>
   }
 
   on: {

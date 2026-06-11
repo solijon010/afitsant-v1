@@ -87,6 +87,8 @@ export default function SettingsPage(): JSX.Element {
   const [confirmClearHistory, setConfirmClearHistory] = useState(false)
   const [confirmCancelServer, setConfirmCancelServer] = useState(false)
   const [cancellingServer, setCancellingServer] = useState(false)
+  const [confirmClearAllServer, setConfirmClearAllServer] = useState(false)
+  const [clearingAllServer, setClearingAllServer] = useState(false)
   const [prodSortCatId, setProdSortCatId] = useState<string>('')
   const [prodRows, setProdRows] = useState<Array<{ serverId: string; name: string; sortOrder: number }>>([])
   const [prodSortSaving, setProdSortSaving] = useState(false)
@@ -1126,6 +1128,52 @@ export default function SettingsPage(): JSX.Element {
                   <button
                     onClick={() => setConfirmCancelServer(false)}
                     disabled={cancellingServer}
+                    className="btn-ghost flex-1 text-xs"
+                  >
+                    Bekor
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-line pt-3" />
+            {!confirmClearAllServer ? (
+              <button
+                onClick={() => setConfirmClearAllServer(true)}
+                className="btn-ghost w-full text-brand-danger hover:bg-brand-danger/10"
+              >
+                <X size={13} />
+                Barcha buyurtmalarni tozalash (PENDING + YAKUNLANGAN)
+              </button>
+            ) : (
+              <div className="rounded-xl border border-brand-danger/40 bg-brand-danger/5 p-3 space-y-2">
+                <p className="text-xs text-brand-danger font-semibold">
+                  ⚠️ Serverdagi BARCHA buyurtmalar (kutilmoqda + yakunlangan) CANCELED bo'ladi va mahalliy DB tozalanadi. Bu amalni qaytarib bo'lmaydi!
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setClearingAllServer(true)
+                      try {
+                        const res = await window.afisant.diag.clearAllServerOrders()
+                        setConfirmClearAllServer(false)
+                        if (res.total === 0) toast.info("Serverda buyurtma yo'q edi")
+                        else if (res.failed === 0) toast.success(`${res.cancelled} ta buyurtma tozalandi`)
+                        else toast.warning(`${res.cancelled} ta tozalandi, ${res.failed} ta xato`)
+                      } catch (e: any) {
+                        toast.error('Xatolik', { description: e?.message })
+                      } finally {
+                        setClearingAllServer(false)
+                      }
+                    }}
+                    disabled={clearingAllServer}
+                    className="btn-danger flex-1 text-xs"
+                  >
+                    {clearingAllServer ? 'Tozalanmoqda…' : 'Ha, hammasini tozala'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmClearAllServer(false)}
+                    disabled={clearingAllServer}
                     className="btn-ghost flex-1 text-xs"
                   >
                     Bekor
