@@ -3,7 +3,7 @@ import { getSettings } from './settings'
 
 const toArray = (raw: unknown): any[] => (Array.isArray(raw) ? raw : ((raw as any)?.data ?? []))
 
-export async function fetchVisibleOrders(limit = 200): Promise<any[]> {
+export async function fetchVisibleOrders(limit = 500): Promise<any[]> {
   const s = getSettings()
   if (!s.apiToken) return []
 

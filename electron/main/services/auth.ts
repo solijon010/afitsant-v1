@@ -62,12 +62,21 @@ async function persistServerUsers(users: ServerUser[], deactivateOthers = false)
        updated_at = excluded.updated_at`
   )
 
+  // bcrypt.hash async — avval barcha hash'larni hisoblaymiz, keyin bitta transaksiyada saqlaymiz
+  type UserRow = { user: ServerUser; phone: string; pinHash: string }
+  const rows: UserRow[] = []
   for (const user of normalized) {
     const existing = db.prepare(`SELECT pin_hash FROM waiters WHERE server_id = ?`).get(user.id) as { pin_hash?: string } | undefined
     const phone = user.phoneNumer ?? ''
     const pinHash = existing?.pin_hash ?? await bcrypt.hash(phone.length >= 4 ? phone.slice(-4) : '1234', 8)
-    stmt.run(user.id, user.firstName, user.lastName ?? '', phone, pinHash, mapRole(user.role), now, now)
+    rows.push({ user, phone, pinHash })
   }
+
+  db.transaction(() => {
+    for (const { user, phone, pinHash } of rows) {
+      stmt.run(user.id, user.firstName, user.lastName ?? '', phone, pinHash, mapRole(user.role), now, now)
+    }
+  })()
 }
 
 export async function loginWithServer(identifier: string, password: string): Promise<ServerLoginResult> {

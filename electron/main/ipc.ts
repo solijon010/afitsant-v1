@@ -149,7 +149,7 @@ export function registerIpc(): void {
     const s = settings.getSettings()
     if (!s.apiToken) return []
     try {
-      const visibleOrders = await fetchVisibleOrders(200)
+      const visibleOrders = await fetchVisibleOrders(500)
       return visibleOrders.slice(0, 20).map((o: any) => ({
         id: String(o.id ?? ''),
         status: String(o.status ?? ''),

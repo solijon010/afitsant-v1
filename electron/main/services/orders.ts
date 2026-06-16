@@ -52,7 +52,7 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
   if (!s.apiToken) return null
 
   try {
-    const orders = await fetchVisibleOrders(200)
+    const orders = await fetchVisibleOrders(500)
     const active = orders.find(
       (o: any) =>
         o.room?.id === roomServerId &&
@@ -141,7 +141,7 @@ export async function syncAllItems(input: {
 
   // Xona bo'yicha aktiv buyurtmani topish — room endpointidan to'g'ridan qidiramiz
   const findActiveForRoom = async (): Promise<any> => {
-    const list = await fetchVisibleOrders(200)
+    const list = await fetchVisibleOrders(500)
     return list.find((o: any) =>
       (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
     ) ?? null
@@ -150,7 +150,7 @@ export async function syncAllItems(input: {
   // Mavjud aktiv orderni topamiz (barcha statuslar tekshiriladi, nafaqat PENDING/READY)
   let existing: any = null
   try {
-    const orders = await fetchVisibleOrders(200)
+    const orders = await fetchVisibleOrders(500)
     existing = orders.find((o: any) =>
       (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
     ) ?? null
@@ -324,14 +324,21 @@ export function addItems(
   const ts = now()
   const inserted: OrderItem[] = []
 
-  const insert = db.prepare(
+  // UPSERT: yangi bo'lsa INSERT, mavjud bo'lsa miqdor va eslatmani yangilash
+  const upsert = db.prepare(
     `INSERT INTO order_items (local_uuid, order_id, product_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+     ON CONFLICT(local_uuid) DO UPDATE SET
+       quantity    = excluded.quantity,
+       notes       = excluded.notes,
+       unit_price  = excluded.unit_price,
+       sync_status = 'pending',
+       updated_at  = excluded.updated_at`
   )
 
   const tx = db.transaction(() => {
     for (const it of items) {
-      const info = insert.run(
+      upsert.run(
         it.localUuid,
         orderId,
         it.productId,
@@ -342,8 +349,8 @@ export function addItems(
         ts,
         ts
       )
-      const row = db.prepare(`SELECT * FROM order_items WHERE id = ?`).get(info.lastInsertRowid) as any
-      inserted.push(mapOrderItem(row))
+      const row = db.prepare(`SELECT * FROM order_items WHERE local_uuid = ?`).get(it.localUuid) as any
+      if (row) inserted.push(mapOrderItem(row))
     }
     recalculateOrder(orderId)
     markOrderPending(orderId, ts)

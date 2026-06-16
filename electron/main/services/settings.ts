@@ -57,11 +57,11 @@ export function getSettings(): Settings {
 export function setSettings(patch: Partial<Settings>): Settings {
   const db = getDb()
   const stmt = db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
-  const tx = db.transaction(() => {
+  db.transaction(() => {
     for (const [k, v] of Object.entries(patch)) {
-      stmt.run(k, v === null || v === undefined ? '' : String(v))
+      // null va undefined → NULL saqlash (bo'sh satr emas) — getSettings() NULL ni to'g'ri qaytaradi
+      stmt.run(k, v == null ? null : String(v))
     }
-  })
-  tx()
+  })()
   return getSettings()
 }

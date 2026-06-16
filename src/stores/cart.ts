@@ -48,10 +48,15 @@ export const useCart = create<CartState>((set, get) => ({
   hydrateFromOrder: (lines) => set({ lines }),
   add: (product, quantity = 1) => {
     const lines = get().lines
-    const same = lines.find((l) => l.productId === product.id && !l.flushed)
+    // Flushed bo'lsin yoki bo'lmasin — bir xil mahsulot birlashtiriladi
+    const same = lines.find((l) => l.productId === product.id)
     if (same) {
       set({
-        lines: lines.map((l) => (l.localUuid === same.localUuid ? { ...l, quantity: l.quantity + quantity } : l))
+        lines: lines.map((l) =>
+          l.localUuid === same.localUuid
+            ? { ...l, quantity: l.quantity + quantity, flushed: false }
+            : l
+        )
       })
       return
     }

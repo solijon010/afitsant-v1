@@ -6,12 +6,14 @@ import { getDb } from '../db/connection'
 import { dequeueBatch, markDone, markFailed, queuedCount } from './syncQueue'
 import { syncWaitersForBranch } from './auth'
 import { applyProductCategoryOverrides } from './categoryConfig'
+import { syncAllItems, closeOrderOnServer, cancelOrderOnServer } from './orders'
 
 let socket: Socket | null = null
 let flushTimer: NodeJS.Timeout | null = null
 let online = false
 let lastSyncAt: number | null = null
 let mainWindowGetter: (() => BrowserWindow | null) | null = null
+let syncingPendingOrders = false
 
 const BATCH = 25
 const TICK_MS = 15_000
@@ -33,7 +35,11 @@ export function restartSync(): void {
 function setupSocket(getMainWindow: () => BrowserWindow | null): void {
   const s = getSettings()
   if (!s.serverWsUrl) return
-  if (socket) socket.disconnect()
+  if (socket) {
+    // disconnect eventini oldini olish — biz qo'lda yopmoqdamiz
+    socket.removeAllListeners()
+    socket.disconnect()
+  }
 
   socket = io(s.serverWsUrl, {
     transports: ['websocket'],
@@ -46,6 +52,10 @@ function setupSocket(getMainWindow: () => BrowserWindow | null): void {
   socket.on('connect', () => {
     online = true
     broadcastStatus(getMainWindow)
+    // Internet qayta ulanganda pending buyurtmalarni sinxronlaymiz
+    setTimeout(() => {
+      void syncPendingOrders().catch((e: any) => console.warn('[SYNC] syncPendingOrders on connect error:', e?.message))
+    }, 2000)
   })
 
   socket.on('disconnect', () => {
@@ -90,27 +100,122 @@ function broadcastStatus(getMainWindow: () => BrowserWindow | null): void {
 
 export async function flush(): Promise<{ ok: boolean; flushed: number }> {
   const items = dequeueBatch(BATCH)
-  if (items.length === 0) return { ok: true, flushed: 0 }
-
-  const api = getApi()
   let flushed = 0
-  const doneIds: number[] = []
 
-  for (const item of items) {
-    try {
-      const path = `/api/sync/${item.entity}/${item.action}`
-      await api.post(path, item.payload)
-      doneIds.push(item.id)
-      flushed++
-    } catch (err: any) {
-      const backoff = Math.min(2_000 * 2 ** item.attempts, MAX_BACKOFF)
-      markFailed(item.id, err?.message ?? 'unknown', backoff)
+  if (items.length > 0) {
+    const api = getApi()
+    const doneIds: number[] = []
+
+    for (const item of items) {
+      try {
+        const path = `/api/sync/${item.entity}/${item.action}`
+        await api.post(path, item.payload)
+        doneIds.push(item.id)
+        flushed++
+      } catch (err: any) {
+        const backoff = Math.min(2_000 * 2 ** item.attempts, MAX_BACKOFF)
+        markFailed(item.id, err?.message ?? 'unknown', backoff)
+      }
     }
+
+    if (doneIds.length > 0) markDone(doneIds)
+    lastSyncAt = Date.now()
   }
 
-  if (doneIds.length > 0) markDone(doneIds)
-  lastSyncAt = Date.now()
+  // Online bo'lganda pending buyurtmalarni sinxronlaymiz
+  if (online) {
+    void syncPendingOrders().catch((e: any) => console.warn('[SYNC] syncPendingOrders in flush error:', e?.message))
+  }
+
   return { ok: true, flushed }
+}
+
+async function syncPendingOrders(): Promise<void> {
+  if (syncingPendingOrders) return
+  const s = getSettings()
+  if (!s.apiToken) return
+
+  syncingPendingOrders = true
+  try {
+    const db = getDb()
+
+    // 1. Pending ochiq buyurtmalar — server bilan sinxronlaymiz
+    const pendingOpen = db.prepare(`
+      SELECT o.id, t.server_id AS room_server_id
+      FROM orders o
+      JOIN tables t ON o.table_id = t.id
+      WHERE o.sync_status = 'pending' AND o.status = 'open' AND t.server_id IS NOT NULL
+    `).all() as Array<{ id: number; room_server_id: string }>
+
+    for (const order of pendingOpen) {
+      const items = db.prepare(`
+        SELECT oi.quantity, p.server_id AS product_server_id
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = ?
+      `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
+
+      const syncItems = items
+        .filter((it) => it.product_server_id && it.quantity > 0)
+        .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
+
+      if (syncItems.length === 0) continue
+      try {
+        await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+        console.log(`[SYNC] Pending open order ${order.id} synced to server`)
+      } catch (e: any) {
+        console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)
+      }
+    }
+
+    // 2. Pending yopilgan/bekor qilingan buyurtmalar — serverni xabardor qilamiz
+    const pendingClosed = db.prepare(`
+      SELECT o.id, o.status, o.server_id, t.server_id AS room_server_id
+      FROM orders o
+      JOIN tables t ON o.table_id = t.id
+      WHERE o.sync_status = 'pending' AND o.status IN ('closed', 'cancelled')
+    `).all() as Array<{ id: number; status: string; server_id: string | null; room_server_id: string | null }>
+
+    for (const order of pendingClosed) {
+      try {
+        let serverId = order.server_id
+
+        // Server ID yo'q bo'lsa — avval mahsulotlarni sinxronlab server ID olamiz
+        if (!serverId && order.room_server_id) {
+          const items = db.prepare(`
+            SELECT oi.quantity, p.server_id AS product_server_id
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.id
+            WHERE oi.order_id = ?
+          `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
+
+          const syncItems = items
+            .filter((it) => it.product_server_id && it.quantity > 0)
+            .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
+
+          if (syncItems.length > 0) {
+            const res = await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+            serverId = res.serverId
+          }
+        }
+
+        if (serverId) {
+          if (order.status === 'closed') {
+            await closeOrderOnServer(serverId)
+          } else {
+            await cancelOrderOnServer(serverId)
+          }
+          db.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(?, server_id), updated_at = ? WHERE id = ?`)
+            .run(serverId, Date.now(), order.id)
+          console.log(`[SYNC] Pending ${order.status} order ${order.id} closed on server`)
+        }
+      } catch (e: any) {
+        console.warn(`[SYNC] Pending closed order ${order.id} failed: ${e?.message}`)
+      }
+    }
+  } finally {
+    syncingPendingOrders = false
+  }
 }
 
 export async function fullPull(): Promise<{
@@ -149,8 +254,8 @@ export async function fullPull(): Promise<{
       fetchWithFallback(branchId ? `/api/category/all/${branchId}` : null, `/api/category/all`),
       fetchWithFallback(branchId ? `/api/room-category/all/${branchId}` : null, `/api/room-category/all`),
       fetchWithFallback(
-        branchId ? `/api/product/all/${branchId}?page=1&limit=500` : null,
-        `/api/product/all?page=1&limit=500`
+        branchId ? `/api/product/all/${branchId}?page=1&limit=2000` : null,
+        `/api/product/all?page=1&limit=2000`
       ),
       fetchWithFallback(branchId ? `/api/room/all/${branchId}` : null, `/api/room/all`)
     ])
@@ -164,8 +269,6 @@ export async function fullPull(): Promise<{
     if (catsRes.status === 'fulfilled') {
       const cats = toArray(catsRes.value.data)
       console.log(`[SYNC] categories raw count: ${cats.length}`)
-      // Oldingilarni deaktivlaymiz, yangilar upsert bilan aktivlanadi
-      db.prepare(`UPDATE categories SET is_active = 0`).run()
       const upsertCat = db.prepare(
         `INSERT INTO categories (server_id, name_uz_latn, name_uz_cyrl, icon, color, sort_order, is_active)
          VALUES (?, ?, NULL, NULL, NULL, ?, ?)
@@ -174,7 +277,9 @@ export async function fullPull(): Promise<{
            sort_order   = excluded.sort_order,
            is_active    = excluded.is_active`
       )
+      // Deaktivatsiya va upsert BITTA transaksiyada — agar xato chiqsa rollback bo'ladi
       db.transaction(() => {
+        db.prepare(`UPDATE categories SET is_active = 0`).run()
         const seenIds = new Set<string>()
         const seenNames = new Set<string>()
         for (let i = 0; i < cats.length; i++) {
@@ -325,6 +430,40 @@ export async function fullPull(): Promise<{
     }
 
     console.log(`[SYNC] fullPull done — areas:${areaCount} tables:${tableCount} cats:${categoryCount} prods:${productCount}`)
+
+    // Narxlar yangilangandan keyin ochiq buyurtmalar unit_price ni ham yangilaymiz
+    if (productCount > 0) {
+      try {
+        db.transaction(() => {
+          db.prepare(`
+            UPDATE order_items
+            SET unit_price = (
+              SELECT p.price FROM products p WHERE p.id = order_items.product_id
+            )
+            WHERE EXISTS (
+              SELECT 1 FROM orders o WHERE o.id = order_items.order_id AND o.status = 'open'
+            )
+              AND EXISTS (
+              SELECT 1 FROM products p WHERE p.id = order_items.product_id
+            )
+          `).run()
+          // Ochiq buyurtmalar summalarini qayta hisoblaymiz
+          const openOrders = db.prepare(`SELECT id FROM orders WHERE status = 'open'`).all() as Array<{ id: number }>
+          const recalc = db.prepare(`
+            UPDATE orders SET
+              subtotal = (SELECT COALESCE(SUM(unit_price * quantity), 0) FROM order_items WHERE order_id = orders.id),
+              total    = subtotal + service_fee,
+              updated_at = ?
+            WHERE id = ?
+          `)
+          for (const o of openOrders) recalc.run(Date.now(), o.id)
+        })()
+        console.log('[SYNC] Open order prices refreshed after product sync')
+      } catch (e: any) {
+        console.warn('[SYNC] Price refresh error:', e?.message)
+      }
+    }
+
     lastSyncAt = Date.now()
     return {
       ok: true,

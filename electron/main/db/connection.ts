@@ -53,15 +53,15 @@ function runMigrations(d: Database.Database): void {
     .map(Number)
     .sort((a, b) => a - b)
 
-  const tx = d.transaction(() => {
-    for (const v of versions) {
-      if (v > current) d.exec(MIGRATIONS[v])
+  // Har bir migration alohida exec qilinadi — DDL transaksiya tashqarisida xavfsizroq
+  for (const v of versions) {
+    if (v > current) {
+      d.exec(MIGRATIONS[v])
     }
-    d.prepare(`INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)`).run(
-      String(SCHEMA_VERSION)
-    )
-  })
-  tx()
+  }
+  d.prepare(`INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)`).run(
+    String(SCHEMA_VERSION)
+  )
 }
 
 export function closeDb(): void {
