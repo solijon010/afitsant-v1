@@ -324,14 +324,21 @@ export function addItems(
   const ts = now()
   const inserted: OrderItem[] = []
 
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO order_items (local_uuid, order_id, product_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+  // UPSERT: yangi bo'lsa INSERT, mavjud bo'lsa miqdor va eslatmani yangilash
+  const upsert = db.prepare(
+    `INSERT INTO order_items (local_uuid, order_id, product_id, product_name, unit_price, quantity, notes, sync_status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+     ON CONFLICT(local_uuid) DO UPDATE SET
+       quantity    = excluded.quantity,
+       notes       = excluded.notes,
+       unit_price  = excluded.unit_price,
+       sync_status = 'pending',
+       updated_at  = excluded.updated_at`
   )
 
   const tx = db.transaction(() => {
     for (const it of items) {
-      const info = insert.run(
+      upsert.run(
         it.localUuid,
         orderId,
         it.productId,
@@ -342,14 +349,8 @@ export function addItems(
         ts,
         ts
       )
-      if (info.changes > 0) {
-        const row = db.prepare(`SELECT * FROM order_items WHERE id = ?`).get(info.lastInsertRowid) as any
-        inserted.push(mapOrderItem(row))
-      } else {
-        // Allaqachon mavjud — UUID bo'yicha topib qaytaramiz
-        const row = db.prepare(`SELECT * FROM order_items WHERE local_uuid = ?`).get(it.localUuid) as any
-        if (row) inserted.push(mapOrderItem(row))
-      }
+      const row = db.prepare(`SELECT * FROM order_items WHERE local_uuid = ?`).get(it.localUuid) as any
+      if (row) inserted.push(mapOrderItem(row))
     }
     recalculateOrder(orderId)
     markOrderPending(orderId, ts)

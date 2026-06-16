@@ -359,16 +359,21 @@ export default function OrderPage(): JSX.Element {
       if (!roomServerId) return
 
       const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
-      const syncItems = [
-        ...itemsWithServerId.map((l) => ({
-          productServerId: l.productServerId!,
-          count: Math.round(l.quantity)
-        })),
-        ...removedFromServer.map((item) => ({
-          productServerId: item.productServerId!,
-          count: 0
-        }))
-      ]
+      // Dublikat productServerId bo'lmang — bitta map orqali birlashtirish
+      const syncMap = new Map<string, number>()
+      for (const l of itemsWithServerId) {
+        const prev = syncMap.get(l.productServerId!) ?? 0
+        syncMap.set(l.productServerId!, prev + Math.round(l.quantity))
+      }
+      for (const item of removedFromServer) {
+        if (!syncMap.has(item.productServerId!)) {
+          syncMap.set(item.productServerId!, 0)
+        }
+      }
+      const syncItems = Array.from(syncMap.entries()).map(([productServerId, count]) => ({
+        productServerId,
+        count
+      }))
 
       if (syncItems.length > 0) {
         void window.afisant.orders.syncAll({
@@ -504,13 +509,16 @@ export default function OrderPage(): JSX.Element {
             if (!serverOrderId && roomServerId && savedLines.length > 0) {
               const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
               if (itemsWithServerId.length > 0) {
+                // Dublikat productServerId birlashtirish
+                const closeMap = new Map<string, number>()
+                for (const l of itemsWithServerId) {
+                  const prev = closeMap.get(l.productServerId!) ?? 0
+                  closeMap.set(l.productServerId!, prev + Math.round(l.quantity))
+                }
                 const syncRes = await window.afisant.orders.syncAll({
                   localOrderId: orderId ?? undefined,
                   roomServerId,
-                  items: itemsWithServerId.map((l) => ({
-                    productServerId: l.productServerId!,
-                    count: Math.round(l.quantity)
-                  }))
+                  items: Array.from(closeMap.entries()).map(([productServerId, count]) => ({ productServerId, count }))
                 })
                 serverOrderId = syncRes.serverId
               }

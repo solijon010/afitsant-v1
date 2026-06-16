@@ -5,8 +5,8 @@ const BATCH_SIZE = 5
 const DEBOUNCE_MS = 10_000
 
 /**
- * Buyurtma savatidan SQLite/server'ga avtomatik flush.
- * 5 ta yangi mahsulot to'planganda yoki 10 soniya o'tsa — bitta IPC chaqirig'ida yuboradi.
+ * Buyurtma savatidan SQLite + serverga avtomatik flush.
+ * 5 ta o'zgarish to'planganda yoki 10 soniya o'tsa — SQLite'ga saqlaydi va serverga yuboradi.
  */
 export function useCartFlush(): { flushNow: () => Promise<void> } {
   const orderId = useCart((s) => s.orderId)
@@ -15,14 +15,16 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
   const inFlight = useRef(false)
 
   const flushNow = async (): Promise<void> => {
-    const oId = useCart.getState().orderId
+    const state = useCart.getState()
+    const oId = state.orderId
     if (!oId || inFlight.current) return
-    const pending = useCart.getState().lines.filter((l) => !l.flushed && l.quantity > 0)
+    const pending = state.lines.filter((l) => !l.flushed && l.quantity > 0)
     if (pending.length === 0) return
 
     inFlight.current = true
     try {
-      const created = await window.afisant.orders.addItems(
+      // 1. SQLite'ga UPSERT — yangi va o'zgargan itemlar saqlanadi
+      const saved = await window.afisant.orders.addItems(
         oId,
         pending.map((l) => ({
           productId: l.productId,
@@ -35,10 +37,32 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
       )
       useCart.setState({
         lines: useCart.getState().lines.map((l) => {
-          const match = created.find((c) => c.localUuid === l.localUuid)
+          const match = saved.find((c) => c.localUuid === l.localUuid)
           return match ? { ...l, flushed: true, itemId: match.id } : l
         })
       })
+
+      // 2. Server sinxroni — barcha faol itemlar yuboriladi (fon rejimida)
+      const roomServerId = useCart.getState().roomServerId
+      if (roomServerId) {
+        const allLines = useCart.getState().lines.filter((l) => l.productServerId && l.quantity > 0)
+        // Dublikat productServerId ni birlashtirish
+        const serverMap = new Map<string, number>()
+        for (const l of allLines) {
+          const prev = serverMap.get(l.productServerId!) ?? 0
+          serverMap.set(l.productServerId!, prev + Math.round(l.quantity))
+        }
+        if (serverMap.size > 0) {
+          void window.afisant.orders.syncAll({
+            localOrderId: oId,
+            roomServerId,
+            items: Array.from(serverMap.entries()).map(([productServerId, count]) => ({ productServerId, count }))
+          }).catch((e: any) => {
+            // Server sync xatosi — keyingi background tick da qayta urinadi
+            console.warn('[useCartFlush] Server sync failed (will retry):', e?.message)
+          })
+        }
+      }
     } finally {
       inFlight.current = false
     }
