@@ -330,25 +330,6 @@ export default function OrderPage(): JSX.Element {
         }))
       )
 
-      // Tarixga faqat yangi o'zgarish bo'lganda yozamiz
-      if (table && hasChanges) {
-        useOrderHistory.getState().push({
-          tableId: tId,
-          tableName: table.name,
-          waiterName: `${waiter.firstName} ${waiter.lastName}`,
-          savedAt: Date.now(),
-          items: savedLines.map((l) => ({
-            name: l.productName,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            total: Math.round(l.unitPrice * l.quantity)
-          })),
-          subtotal: cart.subtotal(),
-          serviceFee: cart.serviceFee(),
-          total: cart.total()
-        })
-      }
-
       // Darhol navigatsiya — server sinxronini kutmaymiz (sekinlikni hal qilish)
       await refreshTable(tId)
       cart.clear()
