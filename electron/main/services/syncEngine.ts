@@ -430,6 +430,40 @@ export async function fullPull(): Promise<{
     }
 
     console.log(`[SYNC] fullPull done — areas:${areaCount} tables:${tableCount} cats:${categoryCount} prods:${productCount}`)
+
+    // Narxlar yangilangandan keyin ochiq buyurtmalar unit_price ni ham yangilaymiz
+    if (productCount > 0) {
+      try {
+        db.transaction(() => {
+          db.prepare(`
+            UPDATE order_items
+            SET unit_price = (
+              SELECT p.price FROM products p WHERE p.id = order_items.product_id
+            )
+            WHERE EXISTS (
+              SELECT 1 FROM orders o WHERE o.id = order_items.order_id AND o.status = 'open'
+            )
+              AND EXISTS (
+              SELECT 1 FROM products p WHERE p.id = order_items.product_id
+            )
+          `).run()
+          // Ochiq buyurtmalar summalarini qayta hisoblaymiz
+          const openOrders = db.prepare(`SELECT id FROM orders WHERE status = 'open'`).all() as Array<{ id: number }>
+          const recalc = db.prepare(`
+            UPDATE orders SET
+              subtotal = (SELECT COALESCE(SUM(unit_price * quantity), 0) FROM order_items WHERE order_id = orders.id),
+              total    = subtotal + service_fee,
+              updated_at = ?
+            WHERE id = ?
+          `)
+          for (const o of openOrders) recalc.run(Date.now(), o.id)
+        })()
+        console.log('[SYNC] Open order prices refreshed after product sync')
+      } catch (e: any) {
+        console.warn('[SYNC] Price refresh error:', e?.message)
+      }
+    }
+
     lastSyncAt = Date.now()
     return {
       ok: true,
