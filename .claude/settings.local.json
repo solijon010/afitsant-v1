@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api-restaurant.hisobchim.uz)",
+      "Bash(cd \"/c/Users/Ikromov Solijon/Desktop/afisant\" && head -5 electron/main/ipc.ts)",
+      "Read(//c/c/Users/Ikromov Solijon/Desktop/afisant/electron/main/**)",
+      "Bash(cd \"/c/Users/Ikromov Solijon/Desktop/afisant\" && grep -n \"settings:\\\\|diag:\\\\|on:\" electron/preload/index.ts)",
+      "Read(//c/c/Users/Ikromov Solijon/Desktop/afisant/electron/preload/**)",
+      "Bash(cd \"/c/Users/Ikromov Solijon/Desktop/afisant\" && grep -n \"diagInfo\\\\|diagGetInfo\\\\|diag\\\\.\\\\|serverUrl\\\\|Globe\\\\|FolderOpen\\\\|CheckCircle\" src/pages/Settings.tsx | head -20)",
+      "Read(//c/c/Users/Ikromov Solijon/Desktop/afisant/src/pages/**)",
+      "Bash(npx tsc *)",
+      "Bash(npm install *)",
+      "Bash(npx shadcn@latest add avatar badge button card scroll-area separator skeleton tabs --yes)",
+      "Bash(cd \"c:\\\\Users\\\\Ikromov Solijon\\\\Desktop\\\\afisant\" && mkdir -p src/components/ui && cp \"@/components/ui/\"*.tsx src/components/ui/ && rm -rf \"@\" && ls src/components/ui/)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Rename to Hisobchim and redesign main screens *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'Add Hisobchim logo to app icon and UI headers *)",
+      "Bash(git commit -m 'Fix Login.tsx broken logo.png import and update branding *)",
+      "Bash(git commit -m 'Fix cart footer always visible and improve WaiterSelect *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Ikromov Solijon\\Desktop\\afisant\\@\\components\\ui"
+    ]
+  }
+}
