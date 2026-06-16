@@ -139,30 +139,25 @@ export async function syncAllItems(input: {
   const isActive = (o: any): boolean =>
     !CLOSED_STATUSES.includes((o.status ?? '').toUpperCase())
 
-  // Xona bo'yicha aktiv buyurtmani topish — room endpointidan to'g'ridan qidiramiz
-  const findActiveForRoom = async (): Promise<any> => {
-    const list = await fetchVisibleOrders(500)
-    return list.find((o: any) =>
-      (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
-    ) ?? null
-  }
-
-  // Mavjud aktiv orderni topamiz (barcha statuslar tekshiriladi, nafaqat PENDING/READY)
+  // Mavjud aktiv orderni topamiz — bitta fetch, qayta ishlatiladi
+  let allOrders: any[] = []
   let existing: any = null
   try {
-    const orders = await fetchVisibleOrders(500)
-    existing = orders.find((o: any) =>
+    allOrders = await fetchVisibleOrders(500)
+    existing = allOrders.find((o: any) =>
       (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
     ) ?? null
-
-    if (!existing) {
-      existing = await findActiveForRoom()
-    }
     console.log(`[ORDER] Existing order check — found: ${existing?.id ?? 'none'} (status: ${existing?.status ?? '-'})`)
   } catch (e: any) {
     console.warn('[ORDER] Existing order fetch failed:', e?.message)
     existing = null
   }
+
+  // 403 recovery uchun — allOrders dan qidiramiz (qo'shimcha fetch yo'q)
+  const findActiveForRoom = (): any =>
+    allOrders.find((o: any) =>
+      (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
+    ) ?? null
 
   if (existing) {
     if (activeItems.length === 0) {
@@ -212,9 +207,10 @@ export async function syncAllItems(input: {
   try {
     const createRes = await api.post('/api/order', body)
     const newId = createRes.data?.id ?? createRes.data?.serverId
+    if (!newId) throw new Error('Server order ID qaytarmadi')
     console.log('[ORDER] Created order:', newId)
-    if (localOrderId) markOrderSynced(localOrderId, newId)
-    return { serverId: newId }
+    if (localOrderId) markOrderSynced(localOrderId, String(newId))
+    return { serverId: String(newId) }
   } catch (e: any) {
     const errData = e?.response?.data
     const status = e?.response?.status
@@ -223,15 +219,15 @@ export async function syncAllItems(input: {
     // 403 "Bu honada odam bor yoki xona band" — serverda buyurtma bor, topib yangilaymiz
     if (status === 403) {
       console.warn('[ORDER] 403 — xonada aktiv buyurtma bor, topib patch qilamiz...')
-      const found = await findActiveForRoom()
+      const found = findActiveForRoom()
       if (found) {
         try {
           await api.patch(`/api/order/sync-items/${found.id}`, {
             items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
           })
           console.log('[ORDER] 403 recovery OK — patched order:', found.id)
-          if (localOrderId) markOrderSynced(localOrderId, found.id)
-          return { serverId: found.id }
+          if (localOrderId) markOrderSynced(localOrderId, String(found.id))
+          return { serverId: String(found.id) }
         } catch (patchErr: any) {
           console.warn('[ORDER] 403 recovery patch xato:', patchErr?.message)
         }

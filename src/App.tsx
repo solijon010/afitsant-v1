@@ -106,6 +106,19 @@ export default function App(): JSX.Element {
     return () => off()
   }, [loadMenu, loadTables])
 
+  // Internet/socket qayta ulanganda — ma'lumotlarni yangilaymiz
+  useEffect(() => {
+    let prevOnline = false
+    const off = window.afisant.on.syncStatus((s) => {
+      if (s.online && !prevOnline) {
+        void loadTables()
+        void loadMenu()
+      }
+      prevOnline = s.online
+    })
+    return () => off()
+  }, [loadTables, loadMenu])
+
   // Token muddati tugaganda (401) → server-login ga yo'naltiramiz
   useEffect(() => {
     const off = window.afisant.on.sessionExpired(() => {

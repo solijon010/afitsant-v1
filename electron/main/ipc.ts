@@ -49,9 +49,22 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.ordersSyncAll, (_e, input: any) => orders.syncAllItems(input))
   ipcMain.handle(IPC.ordersClose, async (_e, orderId: number, serverOrderId?: string) => {
     if (serverOrderId) {
-      await orders.closeOrderOnServer(serverOrderId)
+      try {
+        await orders.closeOrderOnServer(serverOrderId)
+      } catch (e: any) {
+        console.warn('[IPC] closeOrderOnServer error:', e?.message)
+      }
     }
-    if (orderId > 0) return orders.closeOrder(orderId)
+    if (orderId > 0) {
+      const result = orders.closeOrder(orderId)
+      // Server ID saqlaymiz — keyingi syncPendingOrders uchun
+      if (serverOrderId) {
+        const db = (await import('./db/connection')).getDb()
+        db.prepare(`UPDATE orders SET server_id = ?, sync_status = 'synced', updated_at = ? WHERE id = ?`)
+          .run(serverOrderId, Date.now(), orderId)
+      }
+      return result
+    }
     return null
   })
   ipcMain.handle(IPC.ordersCancel, async (_e, orderId: number, serverOrderId?: string) => {

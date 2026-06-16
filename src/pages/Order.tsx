@@ -422,9 +422,37 @@ export default function OrderPage(): JSX.Element {
         useCart.setState({ orderId: baseOrder.id })
       }
 
-      // Avval mahalliy yopamiz (tez, faqat SQLite) — navigatsiyani bloklash yo'q
+      // Server sync — avval server ID olamiz (keyin local yopamiz)
+      let resolvedServerOrderId = currentServerOrderId
+      if (navigator.onLine && (roomServerId || currentServerOrderId)) {
+        try {
+          if (!resolvedServerOrderId && roomServerId && savedLines.length > 0) {
+            const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
+            if (itemsWithServerId.length > 0) {
+              const closeMap = new Map<string, number>()
+              for (const l of itemsWithServerId) {
+                const prev = closeMap.get(l.productServerId!) ?? 0
+                closeMap.set(l.productServerId!, prev + Math.round(l.quantity))
+              }
+              const syncRes = await window.afisant.orders.syncAll({
+                localOrderId: orderId ?? undefined,
+                roomServerId,
+                items: Array.from(closeMap.entries()).map(([productServerId, count]) => ({ productServerId, count }))
+              })
+              resolvedServerOrderId = syncRes.serverId
+            }
+          }
+          if (resolvedServerOrderId) {
+            await window.afisant.orders.close(0, resolvedServerOrderId)
+          }
+        } catch (e: any) {
+          console.warn('[handleCloseAndPrint] Server close failed (saved locally):', e?.message)
+        }
+      }
+
+      // Local yopamiz — sync_status='pending' bo'lsa background da qayta urinadi
       if (orderId && orderId > 0) {
-        await window.afisant.orders.close(orderId)
+        await window.afisant.orders.close(orderId, resolvedServerOrderId ?? undefined)
       }
 
       const payload: ReceiptPayload = {
@@ -433,7 +461,7 @@ export default function OrderPage(): JSX.Element {
         organizationPhone: settings?.organizationPhone ?? null,
         tableName: table.name,
         waiterName: `${waiter.firstName} ${waiter.lastName}`,
-        orderLocalUuid: currentServerOrderId ?? String(orderId ?? 'unkwn'),
+        orderLocalUuid: resolvedServerOrderId ?? String(orderId ?? 'unkwn'),
         items: savedLines.map((l) => ({
           name: l.productName,
           quantity: l.quantity,
@@ -476,43 +504,10 @@ export default function OrderPage(): JSX.Element {
         toast.success('Chek chiqdi')
       }
 
-      // Darhol navigatsiya — server yopishini kutmaymiz
       cart.clear()
       cart.setOrder(null, null)
       await refreshTable(tId)
       navigate('/tables')
-
-      // Fon rejimida: server sinxronlash + server da yopish
-      if (roomServerId || currentServerOrderId) {
-        void (async () => {
-          try {
-            let serverOrderId = currentServerOrderId
-            if (!serverOrderId && roomServerId && savedLines.length > 0) {
-              const itemsWithServerId = savedLines.filter((l) => l.productServerId && l.quantity > 0)
-              if (itemsWithServerId.length > 0) {
-                // Dublikat productServerId birlashtirish
-                const closeMap = new Map<string, number>()
-                for (const l of itemsWithServerId) {
-                  const prev = closeMap.get(l.productServerId!) ?? 0
-                  closeMap.set(l.productServerId!, prev + Math.round(l.quantity))
-                }
-                const syncRes = await window.afisant.orders.syncAll({
-                  localOrderId: orderId ?? undefined,
-                  roomServerId,
-                  items: Array.from(closeMap.entries()).map(([productServerId, count]) => ({ productServerId, count }))
-                })
-                serverOrderId = syncRes.serverId
-              }
-            }
-            if (serverOrderId) {
-              // Server da yopamiz (faqat server, local allaqachon yopilgan)
-              await window.afisant.orders.close(0, serverOrderId)
-            }
-          } catch (e: any) {
-            console.warn('[handleCloseAndPrint] Background server close failed:', e?.message)
-          }
-        })()
-      }
     } catch (e: any) {
       toast.error('Xatolik', { description: e?.message })
     } finally {
