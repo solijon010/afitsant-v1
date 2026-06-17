@@ -183,38 +183,70 @@ async function syncPendingOrders(): Promise<void> {
       WHERE o.sync_status = 'pending' AND o.status IN ('closed', 'cancelled')
     `).all() as Array<{ id: number; status: string; server_id: string | null; room_server_id: string | null }>
 
+    const api = getApi()
+
     for (const order of pendingClosed) {
       try {
         let serverId = order.server_id
 
-        // Server ID yo'q bo'lsa — avval mahsulotlarni sinxronlab server ID olamiz
+        // Buyurtma mahsulotlari (offline qo'shilgan itemlar ham)
+        const items = db.prepare(`
+          SELECT oi.quantity, p.server_id AS product_server_id
+          FROM order_items oi
+          JOIN products p ON oi.product_id = p.id
+          WHERE oi.order_id = ?
+        `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
+
+        const syncItems = items
+          .filter((it) => it.product_server_id && it.quantity > 0)
+          .map((it) => ({ productId: it.product_server_id!, count: Math.round(it.quantity) }))
+
         if (!serverId && order.room_server_id) {
-          const items = db.prepare(`
-            SELECT oi.quantity, p.server_id AS product_server_id
-            FROM order_items oi
-            JOIN products p ON oi.product_id = p.id
-            WHERE oi.order_id = ?
-          `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
-
-          const syncItems = items
-            .filter((it) => it.product_server_id && it.quantity > 0)
-            .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
-
+          // Server ID yo'q — avval items sync qilib server ID olamiz
           if (syncItems.length > 0) {
-            const res = await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+            const res = await syncAllItems({
+              localOrderId: order.id,
+              roomServerId: order.room_server_id,
+              items: syncItems.map((it) => ({ productServerId: it.productId, count: it.count }))
+            })
             serverId = res.serverId
+          }
+        } else if (serverId && syncItems.length > 0) {
+          // Server ID bor — offline qo'shilgan itemlarni yuboramiz (final state)
+          try {
+            await api.patch(`/api/order/sync-items/${serverId}`, { items: syncItems })
+          } catch (e: any) {
+            // Server order allaqachon yopilgan bo'lishi mumkin — davom etamiz
+            console.warn(`[SYNC] Pre-close item sync failed for order ${order.id}: ${e?.message}`)
           }
         }
 
         if (serverId) {
-          if (order.status === 'closed') {
-            await closeOrderOnServer(serverId)
-          } else {
-            await cancelOrderOnServer(serverId)
+          try {
+            if (order.status === 'closed') {
+              await closeOrderOnServer(serverId)
+            } else {
+              await cancelOrderOnServer(serverId)
+            }
+          } catch (e: any) {
+            const httpStatus = (e as any)?.response?.status
+            // 4xx = server allaqachon qayta ishlagan (band yoki yopiq) — synced deb belgilaymiz
+            if (httpStatus && httpStatus >= 400 && httpStatus < 500) {
+              console.log(`[SYNC] Order ${order.id} server ${httpStatus} → already processed, marking synced`)
+            } else {
+              throw e  // 5xx yoki network xato → keyingi tickda qayta urinsim
+            }
           }
           db.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(?, server_id), updated_at = ? WHERE id = ?`)
             .run(serverId, Date.now(), order.id)
           console.log(`[SYNC] Pending ${order.status} order ${order.id} closed on server`)
+        } else {
+          // server_id ham yo'q, room_server_id ham yo'q — lokal only, synced deb belgilaymiz
+          if (!order.room_server_id) {
+            db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`)
+              .run(Date.now(), order.id)
+            console.log(`[SYNC] Order ${order.id} has no server mapping — marked synced locally`)
+          }
         }
       } catch (e: any) {
         console.warn(`[SYNC] Pending closed order ${order.id} failed: ${e?.message}`)

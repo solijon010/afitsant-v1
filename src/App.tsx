@@ -106,17 +106,26 @@ export default function App(): JSX.Element {
     return () => off()
   }, [loadMenu, loadTables])
 
-  // Internet/socket qayta ulanganda — ma'lumotlarni yangilaymiz
+  // Internet/socket qayta ulanganda — sync tugagandan keyin ma'lumotlarni yangilaymiz
   useEffect(() => {
     let prevOnline = false
+    let reloadTimer: ReturnType<typeof setTimeout> | null = null
     const off = window.afisant.on.syncStatus((s) => {
       if (s.online && !prevOnline) {
-        void loadTables()
-        void loadMenu()
+        // Sync engine 3 soniya ichida pending orderlarni serverga yuborgandan keyin yuklaymiz
+        // (zombie: server hali PENDING, lokal yopilgan holatni oldini olish)
+        if (reloadTimer) clearTimeout(reloadTimer)
+        reloadTimer = setTimeout(() => {
+          void loadTables()
+          void loadMenu()
+        }, 3500)
       }
       prevOnline = s.online
     })
-    return () => off()
+    return () => {
+      off()
+      if (reloadTimer) clearTimeout(reloadTimer)
+    }
   }, [loadTables, loadMenu])
 
   // Token muddati tugaganda (401) → server-login ga yo'naltiramiz

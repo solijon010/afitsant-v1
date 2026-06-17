@@ -28,6 +28,14 @@ export function getOpenOrderByTable(tableId: number): OrderWithItems | null {
   return { ...mapOrder(order), items: items.map(mapOrderItem) }
 }
 
+/** Bu stol lokal yopilgan lekin server hali bilmaydi (pending sync) */
+function hasPendingClose(tableId: number): boolean {
+  const row = getDb()
+    .prepare(`SELECT 1 FROM orders WHERE table_id = ? AND status IN ('closed','cancelled') AND sync_status = 'pending' LIMIT 1`)
+    .get(tableId)
+  return !!row
+}
+
 export async function snapshot(): Promise<TableWithOrder[]> {
   const s = getSettings()
   const db = getDb()
@@ -48,6 +56,12 @@ export async function snapshot(): Promise<TableWithOrder[]> {
   const now = Date.now()
 
   return tables.map((table) => {
+    // Lokal yopilgan lekin server hali PENDING ko'rsatayotgan bo'lsa — bo'sh qaytaramiz
+    // (zombie orderni oldini olish: internet kelganda server hali yopmagan)
+    if (hasPendingClose(table.id)) {
+      return { table, order: null }
+    }
+
     const backendOrder = activeOrders.find((o: any) => o.room?.id === table.serverId)
     if (!backendOrder) {
       return { table, order: getOpenOrderByTable(table.id) }
