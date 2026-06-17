@@ -12,6 +12,7 @@ import * as settings from './services/settings'
 import * as catConfig from './services/categoryConfig'
 import { fetchVisibleOrders } from './services/orderApi'
 import { resetApi } from './services/apiClient'
+import { tgError, tgOfflineClose } from './services/telegramLogger'
 
 export function registerIpc(): void {
   ipcMain.handle(IPC.ping, () => 'pong')
@@ -62,6 +63,13 @@ export function registerIpc(): void {
         const db = (await import('./db/connection')).getDb()
         db.prepare(`UPDATE orders SET server_id = ?, sync_status = 'synced', updated_at = ? WHERE id = ?`)
           .run(serverOrderId, Date.now(), orderId)
+      } else {
+        // Offline yopilgan — Telegram ga xabar
+        try {
+          const db = (await import('./db/connection')).getDb()
+          const row = db.prepare(`SELECT total, table_id FROM orders WHERE id = ?`).get(orderId) as any
+          if (row) tgOfflineClose(row.table_id, row.total)
+        } catch {}
       }
       return result
     }

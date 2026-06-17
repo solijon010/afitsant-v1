@@ -7,6 +7,7 @@ import { dequeueBatch, markDone, markFailed, queuedCount } from './syncQueue'
 import { syncWaitersForBranch } from './auth'
 import { applyProductCategoryOverrides } from './categoryConfig'
 import { syncAllItems, closeOrderOnServer, cancelOrderOnServer } from './orders'
+import { tgError, tgWarn, tgConnectStatus, tgOfflineClose } from './telegramLogger'
 
 let socket: Socket | null = null
 let flushTimer: NodeJS.Timeout | null = null
@@ -54,7 +55,7 @@ function setupSocket(getMainWindow: () => BrowserWindow | null): void {
   socket.on('connect', () => {
     online = true
     broadcastStatus(getMainWindow)
-    // Internet qayta ulanganda pending buyurtmalarni sinxronlaymiz
+    tgConnectStatus(true)
     setTimeout(() => {
       void syncPendingOrders().catch((e: any) => console.warn('[SYNC] syncPendingOrders on connect error:', e?.message))
     }, 2000)
@@ -63,6 +64,7 @@ function setupSocket(getMainWindow: () => BrowserWindow | null): void {
   socket.on('disconnect', () => {
     online = false
     broadcastStatus(getMainWindow)
+    tgConnectStatus(false)
   })
 
   for (const channel of [
@@ -172,6 +174,7 @@ async function syncPendingOrders(): Promise<void> {
         console.log(`[SYNC] Pending open order ${order.id} synced to server`)
       } catch (e: any) {
         console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)
+        tgWarn(`Ochiq buyurtma sinxron #${order.id}`, e?.message ?? 'noma\'lum xato')
       }
     }
 
@@ -250,6 +253,7 @@ async function syncPendingOrders(): Promise<void> {
         }
       } catch (e: any) {
         console.warn(`[SYNC] Pending closed order ${order.id} failed: ${e?.message}`)
+        tgError(`Yopilgan buyurtma sinxron #${order.id}`, e?.message ?? 'noma\'lum xato')
       }
     }
   } finally {
