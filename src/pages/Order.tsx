@@ -344,7 +344,7 @@ export default function OrderPage(): JSX.Element {
       const syncMap = new Map<string, number>()
       for (const l of itemsWithServerId) {
         const prev = syncMap.get(l.productServerId!) ?? 0
-        syncMap.set(l.productServerId!, prev + Math.round(l.quantity))
+        syncMap.set(l.productServerId!, prev + l.quantity)
       }
       for (const item of removedFromServer) {
         if (!syncMap.has(item.productServerId!)) {
@@ -432,7 +432,7 @@ export default function OrderPage(): JSX.Element {
               const closeMap = new Map<string, number>()
               for (const l of itemsWithServerId) {
                 const prev = closeMap.get(l.productServerId!) ?? 0
-                closeMap.set(l.productServerId!, prev + Math.round(l.quantity))
+                closeMap.set(l.productServerId!, prev + l.quantity)
               }
               const syncRes = await window.afisant.orders.syncAll({
                 localOrderId: orderId ?? undefined,
@@ -947,7 +947,7 @@ function KgModal({ product, onClose, onAdd }: { product: Product; onClose: () =>
               boxShadow: canAdd ? '0 6px 16px rgba(34,197,94,0.40)' : 'none',
             }}
           >
-            {canAdd ? `+ Qo'shish (${finalKg.toFixed(2).replace(/\.?0+$/, '')} kg)` : `+ Qo'shish`}
+            {canAdd ? `+ Qo'shish (${finalKg.toFixed(2).replace(/\.?0+$/, '')} ${unitLabel.toLowerCase()})` : `+ Qo'shish`}
           </button>
         </div>
       </div>

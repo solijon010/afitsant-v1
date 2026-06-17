@@ -50,7 +50,7 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
         const serverMap = new Map<string, number>()
         for (const l of allLines) {
           const prev = serverMap.get(l.productServerId!) ?? 0
-          serverMap.set(l.productServerId!, prev + Math.round(l.quantity))
+          serverMap.set(l.productServerId!, prev + l.quantity)
         }
         if (serverMap.size > 0) {
           void window.afisant.orders.syncAll({

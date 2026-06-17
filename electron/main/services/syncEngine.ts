@@ -164,7 +164,7 @@ async function syncPendingOrders(): Promise<void> {
 
       const syncItems = items
         .filter((it) => it.product_server_id && it.quantity > 0)
-        .map((it) => ({ productServerId: it.product_server_id!, count: Math.round(it.quantity) }))
+        .map((it) => ({ productServerId: it.product_server_id!, count: it.quantity }))
 
       if (syncItems.length === 0) continue
       try {
@@ -199,7 +199,7 @@ async function syncPendingOrders(): Promise<void> {
 
         const syncItems = items
           .filter((it) => it.product_server_id && it.quantity > 0)
-          .map((it) => ({ productId: it.product_server_id!, count: Math.round(it.quantity) }))
+          .map((it) => ({ productId: it.product_server_id!, count: it.quantity }))
 
         if (!serverId && order.room_server_id) {
           // Server ID yo'q — avval items sync qilib server ID olamiz
