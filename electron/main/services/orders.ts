@@ -23,21 +23,32 @@ function markOrderPending(orderId: number, ts = now()): void {
 function markOrderSynced(orderId: number, serverOrderId?: string): void {
   const db = getDb()
   const ts = now()
-  db.transaction(() => {
-    db.prepare(
-      `UPDATE orders
-       SET server_id = COALESCE(?, server_id),
-           sync_status = 'synced',
-           updated_at = ?
-       WHERE id = ?`
-    ).run(serverOrderId ?? null, ts, orderId)
-    db.prepare(
-      `UPDATE order_items
-       SET sync_status = 'synced',
-           updated_at = ?
-       WHERE order_id = ?`
-    ).run(ts, orderId)
-  })()
+  try {
+    db.transaction(() => {
+      if (serverOrderId) {
+        // Boshqa buyurtma allaqachon bu server_id ni egallab turganmi?
+        const conflict = db.prepare(
+          `SELECT id FROM orders WHERE server_id = ? AND id != ?`
+        ).get(serverOrderId, orderId) as any
+        if (conflict) {
+          // Conflict bor — server_id ni o'zgartirmasdan faqat synced belgilaymiz
+          db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(ts, orderId)
+        } else {
+          db.prepare(
+            `UPDATE orders SET server_id = COALESCE(?, server_id), sync_status = 'synced', updated_at = ? WHERE id = ?`
+          ).run(serverOrderId, ts, orderId)
+        }
+      } else {
+        db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(ts, orderId)
+      }
+      db.prepare(`UPDATE order_items SET sync_status = 'synced', updated_at = ? WHERE order_id = ?`).run(ts, orderId)
+    })()
+  } catch (e: any) {
+    // UNIQUE constraint yoki boshqa xato — server_id siz synced belgilaymiz
+    try {
+      db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(ts, orderId)
+    } catch {}
+  }
 }
 
 function buildOrderWithItems(orderId: number): OrderWithItems | null {

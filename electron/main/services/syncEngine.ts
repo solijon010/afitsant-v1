@@ -261,8 +261,15 @@ async function syncPendingOrders(): Promise<void> {
               throw e  // 5xx yoki network xato → keyingi tickda qayta urinsim
             }
           }
-          db.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(?, server_id), updated_at = ? WHERE id = ?`)
-            .run(serverId, Date.now(), order.id)
+          // UNIQUE constraint oldini olish — boshqa order shu server_id ni egallab turadimi?
+          const db2 = getDb()
+          const conflict = db2.prepare(`SELECT id FROM orders WHERE server_id = ? AND id != ?`).get(serverId, order.id) as any
+          if (conflict) {
+            db2.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), order.id)
+          } else {
+            db2.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(?, server_id), updated_at = ? WHERE id = ?`)
+              .run(serverId, Date.now(), order.id)
+          }
           console.log(`[SYNC] Pending ${order.status} order ${order.id} closed on server`)
         } else {
           // server_id ham yo'q, room_server_id ham yo'q — lokal only
