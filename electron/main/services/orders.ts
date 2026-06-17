@@ -4,6 +4,7 @@ import { mapOrder, mapOrderItem } from '../db/mappers'
 import { getApi } from './apiClient'
 import { fetchVisibleOrders } from './orderApi'
 import { getSettings } from './settings'
+import { tgError, tgWarn } from './telegramLogger'
 import type { Order, OrderItem, OrderWithItems } from '@shared/types'
 
 const now = () => Date.now()
@@ -132,7 +133,7 @@ export async function syncAllItems(input: {
 
   // count > 0 bo'lgan itemlarni ajratamiz — server 0 li itemlarni rad etadi
   const activeItems = items.filter((it) => it.count > 0)
-  const patchItems = items
+  const patchItems = activeItems
 
   // Yopilgan/bekor qilingan statuslar — bulardan boshqasi "aktiv" hisoblanadi
   const CLOSED_STATUSES = ['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED']
@@ -182,17 +183,16 @@ export async function syncAllItems(input: {
         existing = null
       } else if (patchStatus === 400) {
         // 400 "Bazi productlar mavjud emas" — nofaol productlarni chiqarib qayta urinib ko'ramiz
-        const activeOnly = activeItems.filter((it) => it.count > 0)
-        if (activeOnly.length > 0) {
+        tgWarn(`sync-items PATCH 400 (order ${existing.id})`, e)
+        if (activeItems.length > 0) {
           try {
             await api.patch(`/api/order/sync-items/${existing.id}`, {
-              items: activeOnly.map((it) => ({ productId: it.productServerId, count: it.count }))
+              items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
             })
             console.log(`[ORDER] sync-items retry OK (filtered) for order ${existing.id}`)
             if (localOrderId) markOrderSynced(localOrderId, existing.id)
           } catch (retryErr: any) {
-            console.warn('[ORDER] sync-items retry xato:', retryErr?.message)
-            // Baribir synced deb belgilaymiz — cheksiz retry bo'lmasin
+            tgError(`sync-items PATCH retry xato (order ${existing.id})`, retryErr)
             if (localOrderId) markOrderSynced(localOrderId, existing.id)
           }
         } else {
@@ -200,6 +200,7 @@ export async function syncAllItems(input: {
         }
       } else {
         // Boshqa xato — synced deb belgilaymiz (cheksiz retry oldini olish)
+        tgError(`sync-items PATCH ${patchStatus} xato (order ${existing.id})`, e)
         if (localOrderId) markOrderSynced(localOrderId, existing.id)
       }
     }
@@ -252,15 +253,13 @@ export async function syncAllItems(input: {
             if (localOrderId) markOrderSynced(localOrderId, String(found.id))
             return { serverId: String(found.id) }
           } catch (patchErr: any) {
-            const patchStatus = patchErr?.response?.status
-            console.warn('[ORDER] 403 recovery patch xato:', patchErr?.message)
-            // Patch ham xato bersa — server ID ni saqlab synced qilamiz
+            tgWarn(`POST 403 recovery patch xato (order ${found.id})`, patchErr)
             if (localOrderId) markOrderSynced(localOrderId, String(found.id))
             return { serverId: String(found.id) }
           }
         }
       } catch (fetchErr: any) {
-        console.warn('[ORDER] 403 recovery fresh fetch xato:', fetchErr?.message)
+        tgWarn('POST 403 recovery fresh fetch xato', fetchErr)
       }
       // Server topilmasa ham — lokal synced deb belgilaymiz (qayta-qayta retry bo'lmasin)
       if (localOrderId) {
@@ -272,7 +271,7 @@ export async function syncAllItems(input: {
 
     // 404 — mahsulotlar nofaol, synced deb belgilaymiz
     if (status === 404) {
-      console.warn('[ORDER] 404 — nofaol mahsulotlar, synced deb belgilaymiz')
+      tgWarn(`POST /api/order 404 (nofaol mahsulotlar)`, e)
       if (localOrderId) {
         const db = getDb()
         db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), localOrderId)
@@ -280,6 +279,7 @@ export async function syncAllItems(input: {
       return { serverId: '' }
     }
 
+    tgError(`POST /api/order xato (${status})`, e)
     throw new Error(`Order yaratishda xato (${status ?? e?.code}): "${JSON.stringify(errData?.message ?? errData ?? e?.message)}"`)
   }
 }
