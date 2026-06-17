@@ -4,7 +4,6 @@ import { getSettings } from './settings'
 const BOT_TOKEN = '8961588864:AAH1szI4i3OVfGM1XJH845hMJpN3LxZmqxM'
 const CHAT_ID = '-1003961907645'
 
-// Bir xil xato 60 soniya ichida bir marta — spam oldini olish
 const recentErrors = new Map<string, number>()
 const DEDUP_MS = 60_000
 
@@ -13,8 +12,7 @@ function dedupKey(msg: string): string {
 }
 
 function sendToTelegram(text: string): void {
-  // Telegram 4096 belgi limitni qisqartirish
-  const safe = text.length > 4000 ? text.slice(0, 4000) + '\n…(qisqartirildi)' : text
+  const safe = text.length > 4000 ? text.slice(0, 3950) + '\n\n…(matn qisqartirildi)' : text
   const body = JSON.stringify({ chat_id: CHAT_ID, text: safe, parse_mode: 'HTML' })
   const req = https.request(
     {
@@ -42,85 +40,116 @@ function nowStr(): string {
   })
 }
 
-function branchInfo(): string {
+function branchLine(): string {
   try {
     const s = getSettings()
-    return s.organizationName ? `<b>${escHtml(s.organizationName)}</b>` : `Branch: <code>${s.branchId ?? 'noma\'lum'}</code>`
+    const name = s.organizationName ? escHtml(s.organizationName) : null
+    const bid = s.branchId ? `<code>${s.branchId}</code>` : null
+    return [name, bid].filter(Boolean).join(' · ') || 'POS'
   } catch {
     return 'POS'
   }
 }
 
-/** Axios xato obyektidan to'liq ma'lumot olish */
-function formatAxiosError(err: any): string {
-  const lines: string[] = []
-  const status = err?.response?.status
-  const statusText = err?.response?.statusText
-  const data = err?.response?.data
-  const url = err?.config?.url ?? err?.request?.path ?? ''
+function parseAxiosError(err: any): { status: string; endpoint: string; body: string; message: string } {
+  const status = err?.response?.status ? `HTTP ${err.response.status}` : (err?.code ?? 'NETWORK_ERROR')
   const method = (err?.config?.method ?? '').toUpperCase()
-
-  if (method && url) lines.push(`${method} ${url}`)
-  if (status) lines.push(`HTTP ${status}${statusText ? ` ${statusText}` : ''}`)
+  const url = err?.config?.url ?? err?.request?.path ?? ''
+  const endpoint = method && url ? `${method} ${url}` : ''
+  const data = err?.response?.data
+  let body = ''
   if (data) {
-    const dataStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
-    lines.push(`Response: ${dataStr}`)
-  } else if (err?.message) {
-    lines.push(`Message: ${err.message}`)
+    body = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
   }
-  if (err?.stack && !status) {
-    // Network xato — stack ham qo'shamiz
-    lines.push(`Stack: ${err.stack.split('\n').slice(0, 5).join('\n')}`)
-  }
-  return lines.join('\n')
+  const message = err?.message ?? 'Noma\'lum xato'
+  return { status, endpoint, body, message }
 }
 
-export function tgError(context: string, errOrMessage: any): void {
-  const detail = typeof errOrMessage === 'string' ? errOrMessage : formatAxiosError(errOrMessage)
-  const key = dedupKey(`err:${context}:${detail}`)
+export function tgError(context: string, errOrMsg: any): void {
+  const raw = typeof errOrMsg === 'string' ? errOrMsg : null
+  const parsed = raw ? null : parseAxiosError(errOrMsg)
+
+  const key = dedupKey(`err:${context}:${raw ?? parsed?.status ?? ''}:${raw ?? parsed?.body ?? ''}`)
   const last = recentErrors.get(key) ?? 0
   if (Date.now() - last < DEDUP_MS) return
   recentErrors.set(key, Date.now())
 
-  const text =
-    `🔴 <b>XATO</b> — ${branchInfo()}\n` +
-    `📍 <b>Joy:</b> ${escHtml(context)}\n` +
-    `❌ <b>Xato:</b>\n<code>${escHtml(detail)}</code>\n` +
-    `🕐 ${nowStr()}`
+  const lines: string[] = []
+  lines.push(`❌ <b>Xatolik Ogohlantirishi</b> ❌`)
+  lines.push(``)
+  lines.push(`🏪 <b>Filial:</b> ${branchLine()}`)
+  lines.push(`📍 <b>Joy:</b> ${escHtml(context)}`)
+  lines.push(``)
 
-  sendToTelegram(text)
+  if (raw) {
+    lines.push(`✍️ <b>Xabar:</b> ${escHtml(raw)}`)
+  } else if (parsed) {
+    lines.push(`✍️ <b>Xabar:</b> ${escHtml(parsed.message)}`)
+    if (parsed.status) lines.push(`🔢 <b>Status:</b> ${escHtml(parsed.status)}`)
+    if (parsed.endpoint) lines.push(`🌐 <b>Endpoint:</b> <code>${escHtml(parsed.endpoint)}</code>`)
+    if (parsed.body) {
+      lines.push(`🔖 <b>Server javobi:</b>`)
+      lines.push(`<pre>${escHtml(parsed.body.slice(0, 800))}</pre>`)
+    }
+  }
+
+  lines.push(``)
+  lines.push(`🕐 <b>Vaqt:</b> ${nowStr()}`)
+
+  sendToTelegram(lines.join('\n'))
 }
 
-export function tgWarn(context: string, errOrMessage: any): void {
-  const detail = typeof errOrMessage === 'string' ? errOrMessage : formatAxiosError(errOrMessage)
-  const key = dedupKey(`warn:${context}:${detail}`)
+export function tgWarn(context: string, errOrMsg: any): void {
+  const raw = typeof errOrMsg === 'string' ? errOrMsg : null
+  const parsed = raw ? null : parseAxiosError(errOrMsg)
+
+  const key = dedupKey(`warn:${context}:${raw ?? parsed?.status ?? ''}:${raw ?? parsed?.body ?? ''}`)
   const last = recentErrors.get(key) ?? 0
   if (Date.now() - last < DEDUP_MS) return
   recentErrors.set(key, Date.now())
 
-  const text =
-    `🟡 <b>OGOHLANTIRISH</b> — ${branchInfo()}\n` +
-    `📍 <b>Joy:</b> ${escHtml(context)}\n` +
-    `⚠️ <b>Xabar:</b>\n<code>${escHtml(detail)}</code>\n` +
-    `🕐 ${nowStr()}`
+  const lines: string[] = []
+  lines.push(`⚠️ <b>Ogohlantirish</b> ⚠️`)
+  lines.push(``)
+  lines.push(`🏪 <b>Filial:</b> ${branchLine()}`)
+  lines.push(`📍 <b>Joy:</b> ${escHtml(context)}`)
+  lines.push(``)
 
-  sendToTelegram(text)
+  if (raw) {
+    lines.push(`✍️ <b>Xabar:</b> ${escHtml(raw)}`)
+  } else if (parsed) {
+    lines.push(`✍️ <b>Xabar:</b> ${escHtml(parsed.message)}`)
+    if (parsed.status) lines.push(`🔢 <b>Status:</b> ${escHtml(parsed.status)}`)
+    if (parsed.endpoint) lines.push(`🌐 <b>Endpoint:</b> <code>${escHtml(parsed.endpoint)}</code>`)
+    if (parsed.body) {
+      lines.push(`🔖 <b>Server javobi:</b>`)
+      lines.push(`<pre>${escHtml(parsed.body.slice(0, 800))}</pre>`)
+    }
+  }
+
+  lines.push(``)
+  lines.push(`🕐 <b>Vaqt:</b> ${nowStr()}`)
+
+  sendToTelegram(lines.join('\n'))
 }
 
 export function tgOfflineClose(tableId: number, total: number): void {
-  const key = dedupKey(`offlineClose:${tableId}:${total}`)
+  const key = dedupKey(`offline:${tableId}:${total}`)
   const last = recentErrors.get(key) ?? 0
   if (Date.now() - last < DEDUP_MS) return
   recentErrors.set(key, Date.now())
 
-  const text =
-    `📴 <b>OFFLAYN YOPISH</b> — ${branchInfo()}\n` +
-    `🪑 <b>Stol ID:</b> ${tableId}\n` +
-    `💰 <b>Summa:</b> ${String(Math.round(total)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} so'm\n` +
-    `ℹ️ Internet kelganda serverga yuboriladi\n` +
-    `🕐 ${nowStr()}`
+  const lines: string[] = []
+  lines.push(`📴 <b>Oflayn Yopish</b> 📴`)
+  lines.push(``)
+  lines.push(`🏪 <b>Filial:</b> ${branchLine()}`)
+  lines.push(`🪑 <b>Stol ID:</b> ${tableId}`)
+  lines.push(`💰 <b>Summa:</b> ${String(Math.round(total)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} so'm`)
+  lines.push(``)
+  lines.push(`ℹ️ Internet tiklanganda serverga yuboriladi`)
+  lines.push(`🕐 <b>Vaqt:</b> ${nowStr()}`)
 
-  sendToTelegram(text)
+  sendToTelegram(lines.join('\n'))
 }
 
 export function tgConnectStatus(online: boolean): void {
@@ -129,11 +158,24 @@ export function tgConnectStatus(online: boolean): void {
   if (Date.now() - last < 5 * 60_000) return
   recentErrors.set(key, Date.now())
 
-  const text = online
-    ? `🟢 <b>ULANISH TIKLANDI</b> — ${branchInfo()}\n🕐 ${nowStr()}`
-    : `🔴 <b>INTERNET UZILDI</b> — ${branchInfo()}\n🕐 ${nowStr()}`
-
-  sendToTelegram(text)
+  if (online) {
+    const lines = [
+      `🟢 <b>Ulanish Tiklandi</b> 🟢`,
+      ``,
+      `🏪 <b>Filial:</b> ${branchLine()}`,
+      `🕐 <b>Vaqt:</b> ${nowStr()}`
+    ]
+    sendToTelegram(lines.join('\n'))
+  } else {
+    const lines = [
+      `🔴 <b>Internet Uzildi</b> 🔴`,
+      ``,
+      `🏪 <b>Filial:</b> ${branchLine()}`,
+      `⚠️ Oflayn rejimda ishlashda davom etilmoqda`,
+      `🕐 <b>Vaqt:</b> ${nowStr()}`
+    ]
+    sendToTelegram(lines.join('\n'))
+  }
 }
 
 function escHtml(s: string): string {

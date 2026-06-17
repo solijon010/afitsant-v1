@@ -207,20 +207,42 @@ async function syncPendingOrders(): Promise<void> {
         if (!serverId && order.room_server_id) {
           // Server ID yo'q — avval items sync qilib server ID olamiz
           if (syncItems.length > 0) {
-            const res = await syncAllItems({
-              localOrderId: order.id,
-              roomServerId: order.room_server_id,
-              items: syncItems.map((it) => ({ productServerId: it.productId, count: it.count }))
-            })
-            serverId = res.serverId
+            try {
+              const res = await syncAllItems({
+                localOrderId: order.id,
+                roomServerId: order.room_server_id,
+                items: syncItems.map((it) => ({ productServerId: it.productId, count: it.count }))
+              })
+              serverId = res.serverId || null  // bo'sh string → null
+            } catch (e: any) {
+              const httpStatus = e?.response?.status ?? 0
+              if (httpStatus >= 400 && httpStatus < 500) {
+                // 4xx — server qayta ishlamaydi, synced deb belgilaymiz
+                console.warn(`[SYNC] syncAllItems ${httpStatus} for order ${order.id} — marking synced`)
+                db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), order.id)
+                continue
+              }
+              throw e  // 5xx — keyingi tickda qayta urinish
+            }
+          }
+          // syncAllItems serverId qaytarmagan (nofaol mahsulot sabab) — synced
+          if (!serverId) {
+            db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), order.id)
+            console.log(`[SYNC] Order ${order.id} — no serverId after sync, marked synced`)
+            continue
           }
         } else if (serverId && syncItems.length > 0) {
           // Server ID bor — offline qo'shilgan itemlarni yuboramiz (final state)
           try {
             await api.patch(`/api/order/sync-items/${serverId}`, { items: syncItems })
           } catch (e: any) {
-            // Server order allaqachon yopilgan bo'lishi mumkin — davom etamiz
-            console.warn(`[SYNC] Pre-close item sync failed for order ${order.id}: ${e?.message}`)
+            const httpStatus = e?.response?.status ?? 0
+            if (httpStatus >= 400 && httpStatus < 500) {
+              // 4xx patch — server allaqachon yopgan, davom etamiz (close qilishga urinib ko'ramiz)
+              console.warn(`[SYNC] Pre-close item sync ${httpStatus} for order ${order.id}, continuing`)
+            } else {
+              console.warn(`[SYNC] Pre-close item sync failed for order ${order.id}: ${e?.message}`)
+            }
           }
         }
 
@@ -233,7 +255,6 @@ async function syncPendingOrders(): Promise<void> {
             }
           } catch (e: any) {
             const httpStatus = (e as any)?.response?.status
-            // 4xx = server allaqachon qayta ishlagan (band yoki yopiq) — synced deb belgilaymiz
             if (httpStatus && httpStatus >= 400 && httpStatus < 500) {
               console.log(`[SYNC] Order ${order.id} server ${httpStatus} → already processed, marking synced`)
             } else {
@@ -244,7 +265,7 @@ async function syncPendingOrders(): Promise<void> {
             .run(serverId, Date.now(), order.id)
           console.log(`[SYNC] Pending ${order.status} order ${order.id} closed on server`)
         } else {
-          // server_id ham yo'q, room_server_id ham yo'q — lokal only, synced deb belgilaymiz
+          // server_id ham yo'q, room_server_id ham yo'q — lokal only
           if (!order.room_server_id) {
             db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`)
               .run(Date.now(), order.id)
