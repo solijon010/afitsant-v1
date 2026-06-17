@@ -436,6 +436,7 @@ export async function fullPull(): Promise<{
            sort_order = excluded.sort_order,
            area_id = excluded.area_id`
       )
+      const activeRoomServerIds: string[] = []
       db.transaction(() => {
         for (let i = 0; i < rooms.length; i++) {
           const r = rooms[i]
@@ -453,9 +454,22 @@ export async function fullPull(): Promise<{
             if ((result.changes ?? 0) > 0 || (result as any).lastInsertRowid) {
               tableCount++
             }
+            activeRoomServerIds.push(String(r.id))
           } catch (err: any) {
             console.warn(`[SYNC] room skip: ${r.name} — ${err?.message}`)
           }
+        }
+
+        // Serverda nofaol/o'chirilgan xonalarni SQLite dan ham o'chiramiz
+        // Ochiq buyurtmasi bor stol o'chirilmaydi (xavfsizlik uchun)
+        if (activeRoomServerIds.length > 0) {
+          const ph = activeRoomServerIds.map(() => '?').join(',')
+          db.prepare(`
+            DELETE FROM tables
+            WHERE server_id IS NOT NULL
+              AND server_id NOT IN (${ph})
+              AND id NOT IN (SELECT DISTINCT table_id FROM orders WHERE status = 'open')
+          `).run(...activeRoomServerIds)
         }
       })()
       console.log(`[SYNC] rooms saved: ${tableCount}`)
