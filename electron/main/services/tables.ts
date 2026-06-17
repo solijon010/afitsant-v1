@@ -56,21 +56,20 @@ export async function snapshot(): Promise<TableWithOrder[]> {
   const now = Date.now()
 
   return tables.map((table) => {
-    // Lokal yopilgan lekin server hali PENDING ko'rsatayotgan bo'lsa — bo'sh qaytaramiz
-    // (zombie orderni oldini olish: internet kelganda server hali yopmagan)
+    // Lokal ochiq order — har doim ustuvor (offline va online holatlarda ham)
+    const localOpen = getOpenOrderByTable(table.id)
+    if (localOpen) {
+      return { table, order: localOpen }
+    }
+
+    // Lokal ochiq order yo'q, lekin pending yopilgan bor — zombie bo'lmasin
     if (hasPendingClose(table.id)) {
       return { table, order: null }
     }
 
     const backendOrder = activeOrders.find((o: any) => o.room?.id === table.serverId)
     if (!backendOrder) {
-      return { table, order: getOpenOrderByTable(table.id) }
-    }
-
-    // Lokal open order ustuvor — narx va miqdor SQLite da to'g'ri saqlangan
-    const localOrder = getOpenOrderByTable(table.id)
-    if (localOrder && localOrder.items.length > 0) {
-      return { table, order: localOrder }
+      return { table, order: null }
     }
 
     const waiter = backendOrder.user

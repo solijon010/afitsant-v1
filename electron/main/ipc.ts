@@ -68,10 +68,25 @@ export function registerIpc(): void {
     return null
   })
   ipcMain.handle(IPC.ordersCancel, async (_e, orderId: number, serverOrderId?: string) => {
+    let serverCancelled = false
     if (serverOrderId) {
-      await orders.cancelOrderOnServer(serverOrderId)
+      try {
+        await orders.cancelOrderOnServer(serverOrderId)
+        serverCancelled = true
+      } catch (e: any) {
+        console.warn('[IPC] cancelOrderOnServer error:', e?.message)
+      }
     }
-    if (orderId > 0) return orders.cancelOrder(orderId)
+    if (orderId > 0) {
+      const result = orders.cancelOrder(orderId)
+      // Server da allaqachon bekor qilindi — syncPendingOrders qayta urinmasin
+      if (serverCancelled || serverOrderId) {
+        const db = (await import('./db/connection')).getDb()
+        db.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(server_id, ?), updated_at = ? WHERE id = ?`)
+          .run(serverOrderId ?? null, Date.now(), orderId)
+      }
+      return result
+    }
     return null
   })
 
