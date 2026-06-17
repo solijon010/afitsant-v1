@@ -9,6 +9,9 @@ directories:
 files:
   - out/**/*
   - package.json
+  - src/assets/receipt-header-thermal-clean.png
+  - src/assets/receipt-header-thermal.png
+  - src/assets/receipt-header.png
   - '!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,test,__tests__,tests,powered-test,example,examples}'
   - '!**/node_modules/.bin'
   - '!**/*.{map,md,markdown,ts}'
