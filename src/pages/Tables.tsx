@@ -369,6 +369,8 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
           border: '2px dashed #d1d5db', padding: '24px 16px',
           minHeight: 148, cursor: 'pointer', textAlign: 'center',
           boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
+          touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+          userSelect: 'none', WebkitUserSelect: 'none',
         }}
       >
         <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', border: '2px solid #fca5a5', display: 'grid', placeItems: 'center' }}>
@@ -394,6 +396,8 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
         minHeight: 148, cursor: 'pointer', textAlign: 'left',
         boxShadow: '0 4px 16px rgba(22,163,74,0.20), 0 2px 8px rgba(0,0,0,0.10)',
         overflow: 'hidden',
+        touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+        userSelect: 'none', WebkitUserSelect: 'none',
       }}
     >
       {/* Sarlavha */}

@@ -42,9 +42,9 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
         })
       })
 
-      // 2. Server sinxroni — barcha faol itemlar yuboriladi (fon rejimida)
+      // 2. Server sinxroni — faqat online bo'lganda (fon rejimida)
       const roomServerId = useCart.getState().roomServerId
-      if (roomServerId) {
+      if (roomServerId && navigator.onLine) {
         const allLines = useCart.getState().lines.filter((l) => l.productServerId && l.quantity > 0)
         // Dublikat productServerId ni birlashtirish
         const serverMap = new Map<string, number>()

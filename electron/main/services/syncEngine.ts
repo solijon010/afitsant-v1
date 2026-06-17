@@ -12,11 +12,13 @@ let socket: Socket | null = null
 let flushTimer: NodeJS.Timeout | null = null
 let online = false
 let lastSyncAt: number | null = null
+let lastFullPullAt: number | null = null
 let mainWindowGetter: (() => BrowserWindow | null) | null = null
 let syncingPendingOrders = false
 
 const BATCH = 25
 const TICK_MS = 15_000
+const FULL_PULL_INTERVAL = 5 * 60_000  // har 5 daqiqada
 const MAX_BACKOFF = 60_000 * 5
 
 export function startSync(getMainWindow: () => BrowserWindow | null): void {
@@ -122,9 +124,14 @@ export async function flush(): Promise<{ ok: boolean; flushed: number }> {
     lastSyncAt = Date.now()
   }
 
-  // Online bo'lganda pending buyurtmalarni sinxronlaymiz
-  if (online) {
-    void syncPendingOrders().catch((e: any) => console.warn('[SYNC] syncPendingOrders in flush error:', e?.message))
+  // Har doim pending buyurtmalarni urinib ko'ramiz — socket bilan bog'liq emas
+  void syncPendingOrders().catch((e: any) => console.warn('[SYNC] syncPendingOrders in flush error:', e?.message))
+
+  // Har 5 daqiqada bir fullPull — mahsulot narxlari va menyu yangi bo'lsin
+  const now = Date.now()
+  if (online && (!lastFullPullAt || now - lastFullPullAt > FULL_PULL_INTERVAL)) {
+    lastFullPullAt = now
+    void fullPull().catch((e: any) => console.warn('[SYNC] periodic fullPull error:', e?.message))
   }
 
   return { ok: true, flushed }
