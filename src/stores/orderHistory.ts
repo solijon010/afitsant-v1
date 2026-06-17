@@ -33,7 +33,16 @@ export const useOrderHistory = create<OrderHistoryState>()(
     (set, get) => ({
       entries: [],
       push: (entry) => {
-        const id = `${entry.tableId}-${entry.savedAt}-${Math.random().toString(36).slice(2, 6)}`
+        // Bir xona uchun 5 soniya ichida bir xil summa — duplikat hisoblaymiz
+        const recent = get().entries.find(
+          (e) =>
+            e.tableId === entry.tableId &&
+            Math.abs(e.savedAt - entry.savedAt) < 5000 &&
+            e.total === entry.total
+        )
+        if (recent) return recent.id
+
+        const id = `${entry.tableId}-${entry.savedAt}`
         set({ entries: [...get().entries.slice(-500), { ...entry, id, printCount: 0, printedAt: null }] })
         return id
       },
