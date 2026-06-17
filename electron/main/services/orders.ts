@@ -173,15 +173,35 @@ export async function syncAllItems(input: {
       console.log(`[ORDER] Updated existing order ${existing.id}`)
       if (localOrderId) markOrderSynced(localOrderId, existing.id)
     } catch (e: any) {
-      // sync-items 400/404 bersa, to'liq yangi order yaratishga urinib ko'ramiz
-      console.warn(`[ORDER] sync-items xato (${e?.response?.status}), yangi order yaratilmoqda...`)
-      const errData = e?.response?.data
-      console.warn('[ORDER] sync-items error body:', JSON.stringify(errData ?? e?.message))
-      // existing orderni o'chirib, yangi yaratamiz
-      try {
-        await updateServerOrderStatus(existing.id, 'CANCELED')
-      } catch { /* ignore */ }
-      existing = null
+      const patchStatus = e?.response?.status
+      const patchData = e?.response?.data
+      console.warn(`[ORDER] sync-items xato (${patchStatus}):`, JSON.stringify(patchData ?? e?.message))
+
+      if (patchStatus === 404) {
+        // Order serverda yo'q — yangi yaratishga o'tamiz
+        existing = null
+      } else if (patchStatus === 400) {
+        // 400 "Bazi productlar mavjud emas" — nofaol productlarni chiqarib qayta urinib ko'ramiz
+        const activeOnly = activeItems.filter((it) => it.count > 0)
+        if (activeOnly.length > 0) {
+          try {
+            await api.patch(`/api/order/sync-items/${existing.id}`, {
+              items: activeOnly.map((it) => ({ productId: it.productServerId, count: it.count }))
+            })
+            console.log(`[ORDER] sync-items retry OK (filtered) for order ${existing.id}`)
+            if (localOrderId) markOrderSynced(localOrderId, existing.id)
+          } catch (retryErr: any) {
+            console.warn('[ORDER] sync-items retry xato:', retryErr?.message)
+            // Baribir synced deb belgilaymiz — cheksiz retry bo'lmasin
+            if (localOrderId) markOrderSynced(localOrderId, existing.id)
+          }
+        } else {
+          if (localOrderId) markOrderSynced(localOrderId, existing.id)
+        }
+      } else {
+        // Boshqa xato — synced deb belgilaymiz (cheksiz retry oldini olish)
+        if (localOrderId) markOrderSynced(localOrderId, existing.id)
+      }
     }
     if (existing) return { serverId: existing.id }
   }
@@ -189,7 +209,6 @@ export async function syncAllItems(input: {
   if (activeItems.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
 
   // Yangi order yaratish
-  // waiterId ni JWT tokendan olamiz — server authorization header orqali user ni biladi
   let waiterId: string | null = null
   try {
     const payload = JSON.parse(Buffer.from(s.apiToken.split('.')[1], 'base64').toString())
@@ -216,25 +235,52 @@ export async function syncAllItems(input: {
     const status = e?.response?.status
     console.error('[ORDER] POST /api/order xato:', JSON.stringify(errData ?? e?.message))
 
-    // 403 "Bu honada odam bor yoki xona band" — serverda buyurtma bor, topib yangilaymiz
+    // 403 "Bu honada odam bor yoki xona band" — fresh fetch bilan topib patch qilamiz
     if (status === 403) {
-      console.warn('[ORDER] 403 — xonada aktiv buyurtma bor, topib patch qilamiz...')
-      const found = findActiveForRoom()
-      if (found) {
-        try {
-          await api.patch(`/api/order/sync-items/${found.id}`, {
-            items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
-          })
-          console.log('[ORDER] 403 recovery OK — patched order:', found.id)
-          if (localOrderId) markOrderSynced(localOrderId, String(found.id))
-          return { serverId: String(found.id) }
-        } catch (patchErr: any) {
-          console.warn('[ORDER] 403 recovery patch xato:', patchErr?.message)
+      console.warn('[ORDER] 403 — fresh fetch bilan xonadagi aktiv orderni topamiz...')
+      try {
+        const freshOrders = await fetchVisibleOrders(500)
+        const found = freshOrders.find((o: any) =>
+          (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
+        )
+        if (found) {
+          try {
+            await api.patch(`/api/order/sync-items/${found.id}`, {
+              items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+            })
+            console.log('[ORDER] 403 recovery OK — patched order:', found.id)
+            if (localOrderId) markOrderSynced(localOrderId, String(found.id))
+            return { serverId: String(found.id) }
+          } catch (patchErr: any) {
+            const patchStatus = patchErr?.response?.status
+            console.warn('[ORDER] 403 recovery patch xato:', patchErr?.message)
+            // Patch ham xato bersa — server ID ni saqlab synced qilamiz
+            if (localOrderId) markOrderSynced(localOrderId, String(found.id))
+            return { serverId: String(found.id) }
+          }
         }
+      } catch (fetchErr: any) {
+        console.warn('[ORDER] 403 recovery fresh fetch xato:', fetchErr?.message)
       }
+      // Server topilmasa ham — lokal synced deb belgilaymiz (qayta-qayta retry bo'lmasin)
+      if (localOrderId) {
+        const db = getDb()
+        db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), localOrderId)
+      }
+      return { serverId: '' }
     }
 
-    throw new Error(`Order yaratishda xato (${status ?? e?.code}): "${errData?.message ?? errData ?? e?.message}"`)
+    // 404 — mahsulotlar nofaol, synced deb belgilaymiz
+    if (status === 404) {
+      console.warn('[ORDER] 404 — nofaol mahsulotlar, synced deb belgilaymiz')
+      if (localOrderId) {
+        const db = getDb()
+        db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), localOrderId)
+      }
+      return { serverId: '' }
+    }
+
+    throw new Error(`Order yaratishda xato (${status ?? e?.code}): "${JSON.stringify(errData?.message ?? errData ?? e?.message)}"`)
   }
 }
 

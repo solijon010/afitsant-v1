@@ -174,7 +174,7 @@ async function syncPendingOrders(): Promise<void> {
         console.log(`[SYNC] Pending open order ${order.id} synced to server`)
       } catch (e: any) {
         console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)
-        tgWarn(`Ochiq buyurtma sinxron #${order.id}`, e?.message ?? 'noma\'lum xato')
+        tgWarn(`Ochiq buyurtma sinxron #${order.id}`, e)
       }
     }
 
@@ -253,7 +253,7 @@ async function syncPendingOrders(): Promise<void> {
         }
       } catch (e: any) {
         console.warn(`[SYNC] Pending closed order ${order.id} failed: ${e?.message}`)
-        tgError(`Yopilgan buyurtma sinxron #${order.id}`, e?.message ?? 'noma\'lum xato')
+        tgError(`Yopilgan buyurtma sinxron #${order.id}`, e)
       }
     }
   } finally {
