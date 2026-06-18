@@ -24,7 +24,12 @@
     "pack:linux:appimage": "npm run build && electron-builder --linux AppImage --x64",
     "pack:win": "npm run build && electron-builder --win --x64",
     "pack:win:portable": "npm run build && electron-builder --win portable --x64",
-    "pack:win:nsis": "npm run build && electron-builder --win nsis --x64"
+    "pack:win:nsis": "npm run build && electron-builder --win nsis --x64",
+    "test": "node test/sync.test.mjs",
+    "server:install": "cd server && npm install",
+    "server:dev": "cd server && npm run dev",
+    "server:build": "cd server && npm run build",
+    "server:start": "cd server && npm start"
   },
   "dependencies": {
     "@iconify-icons/icons8": "^1.2.3",

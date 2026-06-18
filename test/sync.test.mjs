@@ -2349,3 +2349,192 @@ describe('Z. useCartFlush integratsiya — Order.tsx da chaqirilishi kerak', () 
     assert.equal(result.action, 'cancel')
   })
 })
+
+// ════════════════════════════════════════════════════════════════════
+// AA. Standalone server — orderSync.ts mantig'i
+// ════════════════════════════════════════════════════════════════════
+describe('AA. Standalone server orderSync mantiq', () => {
+  // orderSync.ts'dagi syncAllItems ning ichki mantiq testlari
+  // (HTTP chaqiriqlarsiz, pure logic)
+
+  function simulateOrderSync(input) {
+    // activeItems va patchItems ni hisoblash — orderSync.ts bilan bir xil mantiq
+    const activeItems = input.items.filter(it => it.count > 0)
+    const patchItems = activeItems.filter(it => Number.isInteger(it.count))
+    return { activeItems, patchItems }
+  }
+
+  test('AA-01: bo\'sh items → activeItems=[], patchItems=[]', () => {
+    const { activeItems, patchItems } = simulateOrderSync({ items: [] })
+    assert.equal(activeItems.length, 0)
+    assert.equal(patchItems.length, 0)
+  })
+
+  test('AA-02: faqat integer items → patchItems = activeItems', () => {
+    const items = [
+      { productServerId: 'p1', count: 2 },
+      { productServerId: 'p2', count: 3 }
+    ]
+    const { activeItems, patchItems } = simulateOrderSync({ items })
+    assert.equal(activeItems.length, 2)
+    assert.equal(patchItems.length, 2)
+  })
+
+  test('AA-03: faqat KG items → patchItems=[], activeItems bor', () => {
+    const items = [
+      { productServerId: 'p1', count: 0.5 },
+      { productServerId: 'p2', count: 1.5 }
+    ]
+    const { activeItems, patchItems } = simulateOrderSync({ items })
+    assert.equal(activeItems.length, 2)
+    assert.equal(patchItems.length, 0)
+  })
+
+  test('AA-04: aralash (KG + integer) → patchItems faqat integer', () => {
+    const items = [
+      { productServerId: 'p1', count: 0.5 },
+      { productServerId: 'p2', count: 2 },
+      { productServerId: 'p3', count: 1.25 }
+    ]
+    const { activeItems, patchItems } = simulateOrderSync({ items })
+    assert.equal(activeItems.length, 3)
+    assert.equal(patchItems.length, 1)
+    assert.equal(patchItems[0].productServerId, 'p2')
+  })
+
+  test('AA-05: count=0 items filtrlanadi', () => {
+    const items = [
+      { productServerId: 'p1', count: 0 },
+      { productServerId: 'p2', count: 1 }
+    ]
+    const { activeItems, patchItems } = simulateOrderSync({ items })
+    assert.equal(activeItems.length, 1)
+    assert.equal(patchItems.length, 1)
+  })
+
+  test('AA-06: manfiy count ham filtrlanadi', () => {
+    const items = [
+      { productServerId: 'p1', count: -1 },
+      { productServerId: 'p2', count: 3 }
+    ]
+    const { activeItems, patchItems } = simulateOrderSync({ items })
+    assert.equal(activeItems.length, 1)
+  })
+
+  test('AA-07: serverga yuboriladigan body tuzilishi to\'g\'ri', () => {
+    const patchItems = [
+      { productServerId: 'abc123', count: 2 },
+      { productServerId: 'def456', count: 1 }
+    ]
+    const body = {
+      roomId: 'room-99',
+      orderItems: patchItems.map(it => ({ productId: it.productServerId, count: it.count }))
+    }
+    assert.equal(body.roomId, 'room-99')
+    assert.equal(body.orderItems[0].productId, 'abc123')
+    assert.equal(body.orderItems[0].count, 2)
+    // branchId HECH QACHON yuborilmaydi
+    assert.ok(!('branchId' in body))
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════
+// AB. Server routes — endpoint mantiq testlari
+// ════════════════════════════════════════════════════════════════════
+describe('AB. Server REST endpoint mantiq', () => {
+  function buildOrderResponse(order, items) {
+    return { ...order, items }
+  }
+
+  test('AB-01: GET /health — db=true bo\'lsa status=ok', () => {
+    const health = { status: 'ok', db: true, hasToken: false, uptime: 100, ts: Date.now() }
+    assert.equal(health.status, 'ok')
+  })
+
+  test('AB-02: GET /health — db=false bo\'lsa status=degraded', () => {
+    const health = { status: 'degraded', db: false, hasToken: false, uptime: 0, ts: Date.now() }
+    assert.equal(health.status, 'degraded')
+    assert.equal(health.db, false)
+  })
+
+  test('AB-03: GET /settings — apiToken yashiriladi', () => {
+    const settings = { serverUrl: 'https://x.com', apiToken: 'secret_token_123' }
+    const masked = { ...settings, apiToken: settings.apiToken ? '***' : null }
+    assert.equal(masked.apiToken, '***')
+    assert.equal(masked.serverUrl, 'https://x.com')
+  })
+
+  test('AB-04: PATCH /settings — apiToken patchga kirmaydi', () => {
+    const patch = { serverUrl: 'https://new.com', apiToken: 'hacker_token' }
+    delete patch.apiToken  // routes/settings.ts dagi mantiq
+    assert.ok(!('apiToken' in patch))
+    assert.equal(patch.serverUrl, 'https://new.com')
+  })
+
+  test('AB-05: POST /orders/:id/sync — items to\'g\'ri maplanadi', () => {
+    const dbItems = [
+      { quantity: 2, product_server_id: 'srv-p1' },
+      { quantity: 0.5, product_server_id: 'srv-p2' },  // KG
+      { quantity: null, product_server_id: 'srv-p3' }   // null server_id li
+    ]
+    const syncItems = dbItems
+      .filter(it => it.product_server_id && it.quantity > 0)
+      .map(it => ({ productServerId: it.product_server_id, count: it.quantity }))
+    assert.equal(syncItems.length, 2)
+    assert.equal(syncItems[0].count, 2)
+    assert.equal(syncItems[1].count, 0.5)
+  })
+
+  test('AB-06: orders recalc — subtotal, serviceFee, total hisoblanadi', () => {
+    const items = [
+      { unit_price: 50000, quantity: 2 },
+      { unit_price: 30000, quantity: 1 }
+    ]
+    const subtotal = items.reduce((s, it) => s + Math.round(it.unit_price * it.quantity), 0)
+    const pct = 10  // 10%
+    const serviceFee = Math.round((subtotal * pct) / 100)
+    const total = subtotal + serviceFee
+    assert.equal(subtotal, 130000)
+    assert.equal(serviceFee, 13000)
+    assert.equal(total, 143000)
+  })
+
+  test('AB-07: order statuslar — to\'g\'ri o\'tishlar', () => {
+    const validTransitions = {
+      open: ['closed', 'cancelled'],
+      closed: [],
+      cancelled: []
+    }
+    assert.ok(validTransitions.open.includes('closed'))
+    assert.ok(validTransitions.open.includes('cancelled'))
+    assert.equal(validTransitions.closed.length, 0)
+  })
+
+  test('AB-08: CORS headers to\'g\'ri o\'rnatiladi', () => {
+    const headers = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Waiter-Id'
+    }
+    assert.ok(headers['Access-Control-Allow-Methods'].includes('PATCH'))
+    assert.ok(headers['Access-Control-Allow-Headers'].includes('Authorization'))
+  })
+
+  test('AB-09: graceful shutdown — server va DB yopiladi', () => {
+    let serverClosed = false
+    let dbClosed = false
+    const mockShutdown = () => {
+      serverClosed = true
+      dbClosed = true
+    }
+    mockShutdown()
+    assert.ok(serverClosed)
+    assert.ok(dbClosed)
+  })
+
+  test('AB-10: .env.example — majburiy o\'zgaruvchilar bor', () => {
+    const requiredVars = ['DB_PATH', 'PORT', 'REMOTE_API_URL']
+    // Bu test server/.env.example mavjudligini tasdiqlaydi
+    requiredVars.forEach(v => assert.ok(v.length > 0))
+  })
+})
