@@ -144,7 +144,6 @@ export async function syncAllItems(input: {
 
   // count > 0 bo'lgan itemlarni ajratamiz — server 0 li itemlarni rad etadi
   const activeItems = items.filter((it) => it.count > 0)
-  const patchItems = activeItems
 
   // Yopilgan/bekor qilingan statuslar — bulardan boshqasi "aktiv" hisoblanadi
   const CLOSED_STATUSES = ['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED']
@@ -180,7 +179,7 @@ export async function syncAllItems(input: {
     // Mavjud orderni yangilash — sync-items endpointi
     try {
       await api.patch(`/api/order/sync-items/${existing.id}`, {
-        items: patchItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+        items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
       })
       console.log(`[ORDER] Updated existing order ${existing.id}`)
       if (localOrderId) markOrderSynced(localOrderId, existing.id)

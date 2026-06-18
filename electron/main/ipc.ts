@@ -49,22 +49,29 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.ordersRemoveItem, (_e, itemId: number) => orders.removeItem(itemId))
   ipcMain.handle(IPC.ordersSyncAll, (_e, input: any) => orders.syncAllItems(input))
   ipcMain.handle(IPC.ordersClose, async (_e, orderId: number, serverOrderId?: string) => {
+    let closedOnServer = false
     if (serverOrderId) {
       try {
         await orders.closeOrderOnServer(serverOrderId)
+        closedOnServer = true
       } catch (e: any) {
         console.warn('[IPC] closeOrderOnServer error:', e?.message)
       }
     }
     if (orderId > 0) {
       const result = orders.closeOrder(orderId)
-      // Server ID saqlaymiz — keyingi syncPendingOrders uchun
-      if (serverOrderId) {
-        const db = (await import('./db/connection')).getDb()
+      const db = (await import('./db/connection')).getDb()
+      if (closedOnServer) {
+        // Serverda haqiqatan yopildi — synced deb belgilaymiz
         db.prepare(`UPDATE orders SET server_id = ?, sync_status = 'synced', updated_at = ? WHERE id = ?`)
           .run(serverOrderId, Date.now(), orderId)
       } else {
-        // Offline yopilgan — Telegram ga xabar
+        // Offline yoki server xato — closeOrder() allaqachon pending qilib qo'ygan,
+        // background syncPendingOrders qayta urinadi (offline qo'shilgan itemlar bilan birga)
+        if (serverOrderId) {
+          db.prepare(`UPDATE orders SET server_id = COALESCE(server_id, ?), updated_at = ? WHERE id = ?`)
+            .run(serverOrderId, Date.now(), orderId)
+        }
         try {
           const db = (await import('./db/connection')).getDb()
           const row = db.prepare(`

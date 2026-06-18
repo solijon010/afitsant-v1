@@ -209,7 +209,7 @@ export default function TablesPage(): JSX.Element {
                     {totalOccupied} ta band
                   </span>
                   <div style={{ width: 1, height: 18, background: 'rgba(74,222,128,0.3)' }} />
-                  <span style={{ fontSize: 16, fontWeight: 900, color: '#4ade80', letterSpacing: '-0.5px', fontFamily: 'monospace', textShadow: '0 0 16px rgba(74,222,128,0.6)' }}>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: '#4ade80', letterSpacing: '-0.5px', fontFamily: 'monospace', textShadow: '0 0 16px rgba(74,222,128,0.6)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {totalSum.toLocaleString()} <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(74,222,128,0.75)' }}>so'm</span>
                   </span>
                 </div>
@@ -424,9 +424,9 @@ function TableCard({ tw, idx, onClick }: { tw: TableWithOrder; idx: number; onCl
       </div>
 
       {/* Yashil summa paneli */}
-      <div style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', padding: '12px 16px', display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontSize: 24, fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', fontFamily: 'monospace', textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{fmtMoney(total)}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>so'm</span>
+      <div style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', padding: '12px 16px', display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'nowrap', overflow: 'hidden' }}>
+        <span style={{ fontSize: String(total).length > 6 ? 18 : 24, fontWeight: 900, color: '#ffffff', letterSpacing: '-1px', fontFamily: 'monospace', textShadow: '0 1px 3px rgba(0,0,0,0.25)', whiteSpace: 'nowrap', minWidth: 0 }}>{fmtMoney(total)}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', whiteSpace: 'nowrap', flexShrink: 0 }}>so'm</span>
       </div>
     </button>
   )
