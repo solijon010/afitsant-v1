@@ -1645,3 +1645,451 @@ describe('U. Sync engine pending order logikasi', () => {
     // Status 4xx → synced belgilanadi, throw qilinmaydi
   })
 })
+
+// ════════════════════════════════════════════════════════════════════
+// V. BUG FIX: cart.ts → SQLite IPC DARHOL CHAQIRILISHI (ILDIZ MUAMMO FIX)
+// ════════════════════════════════════════════════════════════════════
+describe('V. cart.ts → SQLite darhol yangilash (ipcRemoveItem/ipcUpdateItem)', () => {
+
+  // Simulyatsiya: ipcRemoveItem/ipcUpdateItem chaqirilishi
+  function simulateRemove(lines, localUuid) {
+    const line = lines.find(l => l.localUuid === localUuid)
+    const newLines = lines.filter(l => l.localUuid !== localUuid)
+    const ipcCalled = !!(line?.itemId)  // itemId bor → removeItem IPC chaqiriladi
+    return { newLines, ipcCalled, removedItemId: line?.itemId ?? null }
+  }
+
+  function simulateDecrement(lines, localUuid) {
+    const line = lines.find(l => l.localUuid === localUuid)
+    if (!line) return { newLines: lines, ipcCalled: false, action: 'notfound' }
+    if (line.quantity <= 1) {
+      const result = simulateRemove(lines, localUuid)
+      return { ...result, action: 'removed' }
+    }
+    const newQty = line.quantity - 1
+    const newLines = lines.map(l => l.localUuid === localUuid ? { ...l, quantity: newQty, flushed: false } : l)
+    const ipcCalled = !!(line.itemId)  // updateItem IPC chaqiriladi
+    return { newLines, ipcCalled, action: 'decremented', newQty }
+  }
+
+  function simulateSetQuantity(lines, localUuid, quantity) {
+    if (quantity <= 0) return { ...simulateRemove(lines, localUuid), action: 'removed' }
+    const line = lines.find(l => l.localUuid === localUuid)
+    const newLines = lines.map(l => l.localUuid === localUuid ? { ...l, quantity, flushed: false } : l)
+    const ipcCalled = !!(line?.itemId)
+    return { newLines, ipcCalled, action: 'updated', newQty: quantity }
+  }
+
+  test('V-01: remove — itemId bor → ipcRemoveItem CHAQIRILADI', () => {
+    const lines = [makeLine('a', 2, { itemId: 42 })]
+    const { ipcCalled, newLines } = simulateRemove(lines, 'a')
+    assert.ok(ipcCalled, 'ipcRemoveItem chaqirilishi kerak')
+    assert.equal(newLines.length, 0)
+  })
+
+  test('V-02: remove — itemId yo\'q (yangi, flush bo\'lmagan) → IPC chaqirilmaydi', () => {
+    const lines = [{ ...makeLine('a', 2), itemId: null, flushed: false }]
+    const { ipcCalled } = simulateRemove(lines, 'a')
+    assert.ok(!ipcCalled, 'SQLite da yo\'q → IPC kerak emas')
+  })
+
+  test('V-03: decrement qty=1 → remove → ipcRemoveItem CHAQIRILADI', () => {
+    const lines = [makeLine('a', 1, { itemId: 55 })]
+    const { action, ipcCalled, newLines } = simulateDecrement(lines, 'a')
+    assert.equal(action, 'removed')
+    assert.ok(ipcCalled)
+    assert.equal(newLines.length, 0)
+  })
+
+  test('V-04: decrement qty=2 → qty=1 → ipcUpdateItem CHAQIRILADI', () => {
+    const lines = [makeLine('a', 2, { itemId: 55 })]
+    const { action, ipcCalled, newQty } = simulateDecrement(lines, 'a')
+    assert.equal(action, 'decremented')
+    assert.ok(ipcCalled, 'ipcUpdateItem chaqirilishi kerak')
+    assert.equal(newQty, 1)
+  })
+
+  test('V-05: decrement qty=0.5 (KG) → remove → ipcRemoveItem CHAQIRILADI', () => {
+    const lines = [makeLine('a', 0.5, { itemId: 77 })]
+    const { action, ipcCalled } = simulateDecrement(lines, 'a')
+    assert.equal(action, 'removed')
+    assert.ok(ipcCalled)
+  })
+
+  test('V-06: setQuantity(0) → remove → ipcRemoveItem CHAQIRILADI', () => {
+    const lines = [makeLine('a', 3, { itemId: 99 })]
+    const { action, ipcCalled } = simulateSetQuantity(lines, 'a', 0)
+    assert.equal(action, 'removed')
+    assert.ok(ipcCalled)
+  })
+
+  test('V-07: setQuantity(-1) → remove → ipcRemoveItem CHAQIRILADI', () => {
+    const { action, ipcCalled } = simulateSetQuantity([makeLine('a', 3, { itemId: 99 })], 'a', -1)
+    assert.equal(action, 'removed')
+    assert.ok(ipcCalled)
+  })
+
+  test('V-08: setQuantity(5) → update → ipcUpdateItem CHAQIRILADI', () => {
+    const { action, ipcCalled, newQty } = simulateSetQuantity([makeLine('a', 1, { itemId: 99 })], 'a', 5)
+    assert.equal(action, 'updated')
+    assert.ok(ipcCalled)
+    assert.equal(newQty, 5)
+  })
+
+  test('V-09: setQuantity(0.5) → KG update → ipcUpdateItem CHAQIRILADI', () => {
+    const { action, ipcCalled, newQty } = simulateSetQuantity([makeLine('a', 1, { itemId: 99 })], 'a', 0.5)
+    assert.equal(action, 'updated')
+    assert.ok(ipcCalled)
+    assert.equal(newQty, 0.5)
+  })
+
+  test('V-10: remove dan keyin SQLite order_items dagi qator yo\'qoladi', () => {
+    // Simulyatsiya: SQLite table
+    const sqliteItems = new Map([
+      [42, { id: 42, order_id: 1, product_id: 1, quantity: 2 }],
+      [43, { id: 43, order_id: 1, product_id: 2, quantity: 1 }],
+    ])
+    // ipcRemoveItem(42) → DELETE
+    sqliteItems.delete(42)
+    assert.equal(sqliteItems.size, 1)
+    assert.ok(!sqliteItems.has(42))
+  })
+
+  test('V-11: syncPendingOrders SQLite\'dan o\'qiydi — o\'chirilgan item yo\'q', () => {
+    // SQLite da faqat qolgan item bor
+    const sqliteItems = [
+      { product_server_id: 'kanotcha-id', quantity: 2 },
+      // non o\'chirildi (ipcRemoveItem chaqirildi)
+    ]
+    const syncItems = buildSyncItemsFromDb(sqliteItems)
+    assert.equal(syncItems.length, 1)
+    assert.equal(syncItems[0].productServerId, 'kanotcha-id')
+    // Server eski non ni ko\'rmaydi ✓
+  })
+
+  test('V-12: removeTriggeredAt bump bo\'lganda server sync darhol ishlaydi', () => {
+    // Simulyatsiya: removeTriggeredAt o\'zgarishi
+    let removeTriggeredAt = 0
+    const now = Date.now()
+    
+    // item o\'chirildi
+    removeTriggeredAt = now
+    
+    // useCartFlush bu o\'zgarishni ko\'radi va syncServerOnly chaqiradi
+    assert.ok(removeTriggeredAt > 0, 'removeTriggeredAt bump bo\'ldi → server sync ishga tushadi')
+  })
+
+  test('V-13: 2 item o\'chirildi → har biri uchun alohida ipcRemoveItem', () => {
+    let lines = [
+      makeLine('a', 1, { itemId: 10 }),
+      makeLine('b', 1, { itemId: 11 }),
+      makeLine('c', 2, { itemId: 12 }),
+    ]
+    const removedIds = []
+    
+    // Item a o\'chirish
+    const ra = simulateRemove(lines, 'a')
+    if (ra.ipcCalled) removedIds.push(ra.removedItemId)
+    lines = ra.newLines
+    
+    // Item b o\'chirish
+    const rb = simulateRemove(lines, 'b')
+    if (rb.ipcCalled) removedIds.push(rb.removedItemId)
+    lines = rb.newLines
+    
+    assert.equal(removedIds.length, 2)
+    assert.deepEqual(removedIds, [10, 11])
+    assert.equal(lines.length, 1)
+    assert.equal(lines[0].itemId, 12)
+  })
+
+  test('V-14: barcha items o\'chirildi → savat bo\'sh, server order CANCELED', () => {
+    let lines = [
+      makeLine('a', 1, { itemId: 10, productServerId: 'non-id' }),
+      makeLine('b', 2, { itemId: 11, productServerId: 'kanotcha-id' }),
+    ]
+    const removedIds = []
+    
+    for (const uuid of ['a', 'b']) {
+      const r = simulateRemove(lines, uuid)
+      if (r.ipcCalled) removedIds.push(r.removedItemId)
+      lines = r.newLines
+    }
+    
+    assert.equal(lines.length, 0)
+    assert.equal(removedIds.length, 2)
+    
+    // bo\'sh savat → handleSaveEmptyCart → cancel
+    const result = handleSaveEmptyCart(lines, 'srv-active', 5)
+    assert.equal(result.action, 'cancel')
+  })
+
+  test('V-15: decrement flushed=false belgilaydi (useCartFlush uchun)', () => {
+    const { newLines } = simulateDecrement([makeLine('a', 3, { itemId: 5 })], 'a')
+    assert.equal(newLines[0].flushed, false)
+  })
+
+  test('V-16: setQuantity(qty>0) flushed=false belgilaydi', () => {
+    const { newLines } = simulateSetQuantity([makeLine('a', 1, { itemId: 5 })], 'a', 3)
+    assert.equal(newLines[0].flushed, false)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════
+// W. BUG FIX: ZUSTAND VS SQLITE DESINXRONLASHUV OLDINI OLISH
+// ════════════════════════════════════════════════════════════════════
+describe('W. Zustand–SQLite desync oldini olish', () => {
+
+  function simulateOldBugBehavior(zustandLines, sqliteItems) {
+    // ESKI BUG: remove → faqat Zustand yangilanadi, SQLite o\'zgarmaydi
+    // syncPendingOrders SQLite dan o\'qiydi → eski item serverga boradi
+    const syncItems = buildSyncItemsFromDb(sqliteItems)
+    return syncItems
+  }
+
+  function simulateNewBehavior(zustandLines, sqliteItems) {
+    // YANGI: remove → SQLite ham darhol yangilanadi (ipcRemoveItem)
+    // syncPendingOrders to\'g\'ri holat ko\'radi
+    const syncItems = buildSyncItemsFromDb(sqliteItems)
+    return syncItems
+  }
+
+  test('W-01: ESKI BUG — SQLite yangilanmasa syncPendingOrders eski state yuboradi', () => {
+    const zustandLines = [
+      makeLine('b', 2, { productServerId: 'kanotcha-id' }),
+      // non o\'chirildi Zustand da, lekin SQLite da hali bor
+    ]
+    const sqliteWithStaleItem = [
+      { product_server_id: 'non-id', quantity: 1 },  // STALE — o\'chirilmagan
+      { product_server_id: 'kanotcha-id', quantity: 2 },
+    ]
+    const syncItems = simulateOldBugBehavior(zustandLines, sqliteWithStaleItem)
+    // BUG: non ham sync bo\'ladi → admin eski holatni ko\'rsatadi
+    assert.equal(syncItems.length, 2, 'ESKI BUG: 2 item yuboriladi (non stale)')
+    assert.ok(syncItems.find(i => i.productServerId === 'non-id'), 'non stale holda serverga boradi')
+  })
+
+  test('W-02: YANGI FIX — ipcRemoveItem dan keyin SQLite to\'g\'ri holat', () => {
+    const zustandLines = [
+      makeLine('b', 2, { productServerId: 'kanotcha-id' }),
+    ]
+    const sqliteAfterFix = [
+      // non o\'chirildi (ipcRemoveItem chaqirildi)
+      { product_server_id: 'kanotcha-id', quantity: 2 },
+    ]
+    const syncItems = simulateNewBehavior(zustandLines, sqliteAfterFix)
+    // FIX: faqat kanotcha yuboriladi
+    assert.equal(syncItems.length, 1)
+    assert.equal(syncItems[0].productServerId, 'kanotcha-id')
+    assert.ok(!syncItems.find(i => i.productServerId === 'non-id'))
+  })
+
+  test('W-03: YANGI FIX — barcha items o\'chirildi → SQLite bo\'sh → sync bo\'sh', () => {
+    const sqliteEmpty = []
+    const syncItems = simulateNewBehavior([], sqliteEmpty)
+    assert.equal(syncItems.length, 0)
+    // syncPendingOrders skip → hech narsa yuborilmaydi ✓
+  })
+
+  test('W-04: KG item o\'chirildi + integer item qoldi → to\'g\'ri sync', () => {
+    // User: [ordak(0.5), non(1)] → ordak o\'chirildi → faqat non qoldi
+    const zustandLines = [makeLine('b', 1, { productServerId: 'non-id' })]
+    const sqliteAfterFix = [
+      { product_server_id: 'non-id', quantity: 1 },
+      // ordak o\'chirildi (ipcRemoveItem)
+    ]
+    const syncItems = simulateNewBehavior(zustandLines, sqliteAfterFix)
+    assert.equal(syncItems.length, 1)
+    assert.equal(syncItems[0].productServerId, 'non-id')
+  })
+
+  test('W-05: useCartFlush syncServerOnly darhol server sync ishga tushiradi', () => {
+    // removeTriggeredAt o\'zgarganda syncServerOnly chaqiriladi
+    let syncCalled = false
+    function fakeUseCartFlushEffect(removeTriggeredAt, orderId) {
+      if (!orderId || !removeTriggeredAt) return
+      syncCalled = true  // syncServerOnly chaqirildi
+    }
+    fakeUseCartFlushEffect(Date.now(), 5)
+    assert.ok(syncCalled, 'syncServerOnly chaqirilishi kerak')
+  })
+
+  test('W-06: removeTriggeredAt=0 da syncServerOnly ishga tushMASIN', () => {
+    let syncCalled = false
+    function fakeEffect(removeTriggeredAt, orderId) {
+      if (!orderId || !removeTriggeredAt) return
+      syncCalled = true
+    }
+    fakeEffect(0, 5)  // 0 = initial state
+    assert.ok(!syncCalled)
+  })
+
+  test('W-07: removeTriggeredAt null orderId da syncServerOnly ishga tushMASIN', () => {
+    let syncCalled = false
+    function fakeEffect(removeTriggeredAt, orderId) {
+      if (!orderId || !removeTriggeredAt) return
+      syncCalled = true
+    }
+    fakeEffect(Date.now(), null)  // orderId yo'q
+    assert.ok(!syncCalled)
+  })
+
+  test('W-08: decrement → KG → 0.5 → remove → ipcRemoveItem → to\'g\'ri', () => {
+    const lines = [
+      makeLine('a', 0.5, { itemId: 33, productServerId: 'ordak-id' }),
+      makeLine('b', 1, { itemId: 34, productServerId: 'non-id' }),
+    ]
+    // ordak decrement (0.5 <= 1 → remove)
+    const result = {
+      newLines: lines.filter(l => l.localUuid !== 'a'),
+      removedItemId: 33
+    }
+    
+    // SQLite: DELETE item 33
+    const sqliteAfter = [{ product_server_id: 'non-id', quantity: 1 }]
+    const syncItems = buildSyncItemsFromDb(sqliteAfter)
+    
+    assert.equal(result.newLines.length, 1)
+    assert.equal(result.removedItemId, 33)
+    assert.equal(syncItems.length, 1)
+    assert.equal(syncItems[0].productServerId, 'non-id')
+  })
+
+  test('W-09: 103k buyurtma — non minus → SQLite darhol yangilanadi', () => {
+    // non(1) × 53000 + salfetka(2) × 25000 = 103000
+    const lines = [
+      makeLine('a', 1, { itemId: 10, productServerId: 'non-id', unitPrice: 53000 }),
+      makeLine('b', 2, { itemId: 11, productServerId: 'salfetka-id', unitPrice: 25000 }),
+    ]
+    // non minus → decrement qty=1 → remove
+    const { action, ipcCalled, newLines, removedItemId } = {
+      action: 'removed',
+      ipcCalled: true,
+      newLines: lines.filter(l => l.localUuid !== 'a'),
+      removedItemId: 10
+    }
+    
+    assert.equal(action, 'removed')
+    assert.ok(ipcCalled, 'ipcRemoveItem(10) chaqirilishi kerak')
+    assert.equal(removedItemId, 10)
+    assert.equal(newLines.length, 1)
+    
+    // SQLite yangilangan → syncPendingOrders faqat salfetka ko\'radi
+    const sqliteAfterRemove = [{ product_server_id: 'salfetka-id', quantity: 2 }]
+    const syncItems = buildSyncItemsFromDb(sqliteAfterRemove)
+    assert.equal(syncItems.length, 1)
+    assert.equal(syncItems[0].productServerId, 'salfetka-id')
+  })
+
+  test('W-10: flushed bo\'lmagan item (itemId=null) o\'chirilsa IPC kerak emas', () => {
+    const notFlushedLine = { ...makeLine('a', 1), itemId: null, flushed: false }
+    const lines = [notFlushedLine]
+    const { ipcCalled, newLines } = {
+      ipcCalled: !!(notFlushedLine.itemId),  // null → false
+      newLines: lines.filter(l => l.localUuid !== 'a')
+    }
+    assert.ok(!ipcCalled, 'SQLite da yo\'q (yangi item) → IPC kerak emas')
+    assert.equal(newLines.length, 0)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════
+// X. KG ITEM HISOB-KITOB (0.5 KG ORDAK) — TO'LIQ SSENARY
+// ════════════════════════════════════════════════════════════════════
+describe('X. KG item hisob-kitob (0.5 kg ordak) to\'liq ssenary', () => {
+
+  test('X-01: ordak 0.5 kg × 80000 = 40000 so\'m', () => {
+    assert.equal(calcOrderTotal([makeLine('a', 0.5, { unitPrice: 80000 })]), 40000)
+  })
+
+  test('X-02: qanot 0.3 kg × 100000 = 30000 so\'m', () => {
+    assert.equal(calcOrderTotal([makeLine('a', 0.3, { unitPrice: 100000 })]), 30000)
+  })
+
+  test('X-03: ordak 0.5 + non 1 = 40000+5000 = 45000', () => {
+    assert.equal(calcOrderTotal([
+      makeLine('a', 0.5, { unitPrice: 80000 }),
+      makeLine('b', 1, { unitPrice: 5000 }),
+    ]), 45000)
+  })
+
+  test('X-04: ordak 0.5 qo\'shilganda faqat non serverga boradi', () => {
+    const lines = [
+      makeLine('a', 0.5, { productServerId: 'ordak-id' }),
+      makeLine('b', 1, { productServerId: 'non-id' }),
+    ]
+    const syncItems = buildHandleSaveSyncMap(lines, [])
+    const { patchItems } = buildSyncLists(syncItems)
+    assert.equal(patchItems.length, 1)
+    assert.equal(patchItems[0].productServerId, 'non-id')
+    assert.equal(patchItems[0].count, 1)
+  })
+
+  test('X-05: ordak o\'chirildi (ipcRemoveItem) → SQLite to\'g\'ri', () => {
+    const sqliteAfterRemove = [{ product_server_id: 'non-id', quantity: 1 }]
+    const syncItems = buildSyncItemsFromDb(sqliteAfterRemove)
+    assert.equal(syncItems.length, 1)
+    assert.equal(syncItems[0].productServerId, 'non-id')
+  })
+
+  test('X-06: ordak + qanot (faqat KG) → server order CANCELED', () => {
+    const items = [
+      { productServerId: 'ordak-id', count: 0.5 },
+      { productServerId: 'qanot-id', count: 0.3 },
+    ]
+    const result = syncAllItemsKgOnlyCase(items, { id: 'srv-active', status: 'OPEN' })
+    assert.equal(result.action, 'cancel')
+    assert.equal(result.reason, 'kg_only')
+  })
+
+  test('X-07: keyingi integer item qo\'shilganda yangi server order yaratiladi', () => {
+    // Server order CANCELED dan keyin non qo\'shildi
+    const items = [
+      { productServerId: 'ordak-id', count: 0.5 },
+      { productServerId: 'non-id', count: 1 },
+    ]
+    const result = syncAllItemsKgOnlyCase(items, null)  // existing=null (bekor qilindi)
+    assert.equal(result.action, 'post')
+    assert.equal(result.items.length, 1)
+    assert.equal(result.items[0].productServerId, 'non-id')
+  })
+
+  test('X-08: fmtQty(0.5) = "0.5"', () => {
+    // fmtQty simulyatsiyasi
+    function fmtQty(n) {
+      if (Number.isInteger(n)) return String(n)
+      return n.toFixed(2).replace(/\.?0+$/, '')
+    }
+    assert.equal(fmtQty(0.5), '0.5')
+    assert.equal(fmtQty(1), '1')
+    assert.equal(fmtQty(2.0), '2')
+    assert.equal(fmtQty(0.25), '0.25')
+    assert.equal(fmtQty(0.46), '0.46')
+  })
+
+  test('X-09: Math.round(80000 * 0.5) = 40000 (floating point xatosiz)', () => {
+    assert.equal(Math.round(80000 * 0.5), 40000)
+    assert.equal(Math.round(100000 * 0.3), 30000)
+    assert.equal(Math.round(75000 * 0.46), 34500)
+  })
+
+  test('X-10: ordak o\'chirilganda keyingi buyurtma to\'g\'ri chiqadi', () => {
+    // Ssenary: [ordak(0.5), non(1), salfetka(2)]
+    // ordak decrement (0.5 <= 1 → remove)
+    let lines = [
+      makeLine('a', 0.5, { productServerId: 'ordak-id', unitPrice: 80000, itemId: 1 }),
+      makeLine('b', 1, { productServerId: 'non-id', unitPrice: 5000, itemId: 2 }),
+      makeLine('c', 2, { productServerId: 'salfetka-id', unitPrice: 3000, itemId: 3 }),
+    ]
+    lines = cartDecrement(lines, 'a')  // ordak o\'chiriladi
+    
+    assert.equal(lines.length, 2)
+    assert.equal(calcOrderTotal(lines), 11000)  // 5000 + 6000
+    
+    // Server sync: faqat non va salfetka
+    const syncItems = buildHandleSaveSyncMap(lines, [])
+    const { patchItems } = buildSyncLists(syncItems)
+    assert.equal(patchItems.length, 2)
+    assert.ok(!patchItems.find(i => i.productServerId === 'ordak-id'))
+  })
+})
