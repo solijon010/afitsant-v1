@@ -169,9 +169,14 @@ async function syncPendingOrders(): Promise<void> {
         .filter((it) => it.product_server_id && it.quantity > 0 && Number.isInteger(it.quantity))
         .map((it) => ({ productServerId: it.product_server_id!, count: it.quantity }))
 
-      if (syncItems.length === 0) continue
+      // Bo'sh savat yoki KG-only: syncAllItems ga barcha (kasr ham) itemlarni beramiz
+      // U o'zi activeItems/patchItems filtrlaydi va server orderni to'g'ri bekor qiladi
+      const allActiveItems = items
+        .filter((it) => it.product_server_id && it.quantity > 0)
+        .map((it) => ({ productServerId: it.product_server_id!, count: it.quantity }))
+      const itemsToSync = syncItems.length > 0 ? syncItems : allActiveItems
       try {
-        await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
+        await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: itemsToSync })
         console.log(`[SYNC] Pending open order ${order.id} synced to server`)
       } catch (e: any) {
         console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)

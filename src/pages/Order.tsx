@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import type { Category, Product, ReceiptPayload, TableEntity } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useCart, type CartLine } from '@/stores/cart'
+import { useCartFlush } from '@/hooks/useCartFlush'
 import { useCachedImage } from '@/hooks/useCachedImage'
 import { useMenu } from '@/stores/menu'
 import { useSettings } from '@/stores/settings'
@@ -57,6 +58,8 @@ export default function OrderPage(): JSX.Element {
   const refreshTable = useTables((s) => s.refreshTable)
 
   const cart = useCart()
+  // Real-time SQLite flush va server sync (o'chirishlarda darhol ishlaydi)
+  const { flushNow } = useCartFlush()
 
   const [activeCatId, setActiveCatId] = useState<number | null>(null)
   const [table, setTable] = useState<TableEntity | null>(null)
@@ -390,17 +393,17 @@ export default function OrderPage(): JSX.Element {
         count
       }))
 
-      if (syncItems.length > 0) {
-        void window.afisant.orders.syncAll({
-          localOrderId: orderId ?? undefined,
-          roomServerId,
-          items: syncItems
-        }).catch((e: any) => {
-          console.warn('[handleSave] Background server sync failed:', e?.message)
-        })
-      } else if (savedLines.length > 0 && savedLines.every((l) => !l.productServerId)) {
+      // Har doim syncAll chaqiramiz — bo'sh savat ham server orderni bekor qiladi (REPLACE semantics)
+      if (savedLines.length > 0 && savedLines.every((l) => !l.productServerId)) {
         console.warn('[handleSave] Mahsulotlarda server ID yo\'q — To\'liq sinxronlash kerak')
       }
+      void window.afisant.orders.syncAll({
+        localOrderId: orderId ?? undefined,
+        roomServerId,
+        items: syncItems
+      }).catch((e: any) => {
+        console.warn('[handleSave] Background server sync failed:', e?.message)
+      })
     } catch (e: any) {
       toast.error('Saqlashda xatolik', { description: e?.message })
     } finally {
