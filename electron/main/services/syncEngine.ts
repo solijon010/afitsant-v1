@@ -174,7 +174,12 @@ async function syncPendingOrders(): Promise<void> {
         console.log(`[SYNC] Pending open order ${order.id} synced to server`)
       } catch (e: any) {
         console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)
-        tgWarn(`Ochiq buyurtma sinxron #${order.id}`, e)
+        tgWarn(`Ochiq buyurtma sinxron #${order.id}`, e, {
+          'Buyurtma ID': String(order.id),
+          'Xona server_id': order.room_server_id,
+          'Mahsulotlar soni': String(syncItems.length),
+          'Mahsulotlar': syncItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+        })
       }
     }
 
@@ -238,10 +243,16 @@ async function syncPendingOrders(): Promise<void> {
           } catch (e: any) {
             const httpStatus = e?.response?.status ?? 0
             if (httpStatus >= 400 && httpStatus < 500) {
-              // 4xx patch — server allaqachon yopgan, davom etamiz (close qilishga urinib ko'ramiz)
-              console.warn(`[SYNC] Pre-close item sync ${httpStatus} for order ${order.id}, continuing`)
+              tgWarn(`Pre-close PATCH ${httpStatus} (order ${order.id})`, e, {
+                'Buyurtma ID': String(order.id),
+                'Server order_id': serverId,
+                'Status': order.status
+              })
             } else {
-              console.warn(`[SYNC] Pre-close item sync failed for order ${order.id}: ${e?.message}`)
+              tgError(`Pre-close PATCH network xato (order ${order.id})`, e, {
+                'Buyurtma ID': String(order.id),
+                'Server order_id': serverId
+              })
             }
           }
         }
@@ -281,7 +292,12 @@ async function syncPendingOrders(): Promise<void> {
         }
       } catch (e: any) {
         console.warn(`[SYNC] Pending closed order ${order.id} failed: ${e?.message}`)
-        tgError(`Yopilgan buyurtma sinxron #${order.id}`, e)
+        tgError(`Yopilgan buyurtma sinxron #${order.id}`, e, {
+          'Buyurtma ID': String(order.id),
+          'Status': order.status,
+          'Server order_id': order.server_id ?? 'yo\'q',
+          'Xona server_id': order.room_server_id ?? 'yo\'q'
+        })
       }
     }
   } finally {

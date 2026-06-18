@@ -67,8 +67,13 @@ export function registerIpc(): void {
         // Offline yopilgan — Telegram ga xabar
         try {
           const db = (await import('./db/connection')).getDb()
-          const row = db.prepare(`SELECT total, table_id FROM orders WHERE id = ?`).get(orderId) as any
-          if (row) tgOfflineClose(row.table_id, row.total)
+          const row = db.prepare(`
+            SELECT o.total, o.table_id, t.name AS table_name,
+                   (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS item_count
+            FROM orders o LEFT JOIN tables t ON o.table_id = t.id
+            WHERE o.id = ?
+          `).get(orderId) as any
+          if (row) tgOfflineClose(row.table_id, row.table_name ?? `#${row.table_id}`, row.total, row.item_count ?? 0)
         } catch {}
       }
       return result

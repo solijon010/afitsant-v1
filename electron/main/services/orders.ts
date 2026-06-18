@@ -194,7 +194,10 @@ export async function syncAllItems(input: {
         existing = null
       } else if (patchStatus === 400) {
         // 400 "Bazi productlar mavjud emas" — nofaol productlarni chiqarib qayta urinib ko'ramiz
-        tgWarn(`sync-items PATCH 400 (order ${existing.id})`, e)
+        tgWarn(`sync-items PATCH 400 (order ${existing.id})`, e, {
+          'Server order_id': existing.id,
+          'Yuborilgan itemlar': patchItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+        })
         if (activeItems.length > 0) {
           try {
             await api.patch(`/api/order/sync-items/${existing.id}`, {
@@ -203,7 +206,10 @@ export async function syncAllItems(input: {
             console.log(`[ORDER] sync-items retry OK (filtered) for order ${existing.id}`)
             if (localOrderId) markOrderSynced(localOrderId, existing.id)
           } catch (retryErr: any) {
-            tgError(`sync-items PATCH retry xato (order ${existing.id})`, retryErr)
+            tgError(`sync-items PATCH retry xato (order ${existing.id})`, retryErr, {
+              'Server order_id': existing.id,
+              'Active itemlar': activeItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+            })
             if (localOrderId) markOrderSynced(localOrderId, existing.id)
           }
         } else {
@@ -211,7 +217,9 @@ export async function syncAllItems(input: {
         }
       } else {
         // Boshqa xato — synced deb belgilaymiz (cheksiz retry oldini olish)
-        tgError(`sync-items PATCH ${patchStatus} xato (order ${existing.id})`, e)
+        tgError(`sync-items PATCH ${patchStatus} xato (order ${existing.id})`, e, {
+          'Server order_id': existing.id
+        })
         if (localOrderId) markOrderSynced(localOrderId, existing.id)
       }
     }
@@ -264,13 +272,17 @@ export async function syncAllItems(input: {
             if (localOrderId) markOrderSynced(localOrderId, String(found.id))
             return { serverId: String(found.id) }
           } catch (patchErr: any) {
-            tgWarn(`POST 403 recovery patch xato (order ${found.id})`, patchErr)
+            tgWarn(`POST 403 recovery patch xato (order ${found.id})`, patchErr, {
+              'Server order_id': String(found.id),
+              'Xona server_id': roomServerId,
+              'Itemlar': activeItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+            })
             if (localOrderId) markOrderSynced(localOrderId, String(found.id))
             return { serverId: String(found.id) }
           }
         }
       } catch (fetchErr: any) {
-        tgWarn('POST 403 recovery fresh fetch xato', fetchErr)
+        tgWarn('POST 403 recovery fresh fetch xato', fetchErr, { 'Xona server_id': roomServerId })
       }
       // Server topilmasa ham — lokal synced deb belgilaymiz (qayta-qayta retry bo'lmasin)
       if (localOrderId) {
@@ -282,7 +294,10 @@ export async function syncAllItems(input: {
 
     // 404 — mahsulotlar nofaol, synced deb belgilaymiz
     if (status === 404) {
-      tgWarn(`POST /api/order 404 (nofaol mahsulotlar)`, e)
+      tgWarn(`POST /api/order 404 (nofaol mahsulotlar)`, e, {
+        'Xona server_id': roomServerId,
+        'Itemlar': activeItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+      })
       if (localOrderId) {
         const db = getDb()
         db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), localOrderId)
@@ -290,7 +305,12 @@ export async function syncAllItems(input: {
       return { serverId: '' }
     }
 
-    tgError(`POST /api/order xato (${status})`, e)
+    tgError(`POST /api/order xato (${status})`, e, {
+      'Xona server_id': roomServerId,
+      'Waiter ID': waiterId ?? 'yo\'q',
+      'Itemlar soni': String(activeItems.length),
+      'Itemlar': activeItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+    })
     throw new Error(`Order yaratishda xato (${status ?? e?.code}): "${JSON.stringify(errData?.message ?? errData ?? e?.message)}"`)
   }
 }

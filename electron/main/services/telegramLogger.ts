@@ -12,7 +12,7 @@ function dedupKey(msg: string): string {
 }
 
 function sendToTelegram(text: string): void {
-  const safe = text.length > 4000 ? text.slice(0, 3950) + '\n\n…(matn qisqartirildi)' : text
+  const safe = text.length > 4096 ? text.slice(0, 4000) + '\n\n…<i>(matn qisqartirildi)</i>' : text
   const body = JSON.stringify({ chat_id: CHAT_ID, text: safe, parse_mode: 'HTML' })
   const req = https.request(
     {
@@ -23,6 +23,8 @@ function sendToTelegram(text: string): void {
     },
     (res) => {
       if (res.statusCode && res.statusCode >= 400) {
+        // Read response to avoid memory leak
+        res.resume()
         console.warn(`[TG] sendMessage HTTP ${res.statusCode}`)
       }
     }
@@ -44,100 +46,161 @@ function branchLine(): string {
   try {
     const s = getSettings()
     const name = s.organizationName ? escHtml(s.organizationName) : null
-    const bid = s.branchId ? `<code>${s.branchId}</code>` : null
+    const bid = s.branchId ? `<code>${escHtml(s.branchId)}</code>` : null
     return [name, bid].filter(Boolean).join(' · ') || 'POS'
   } catch {
     return 'POS'
   }
 }
 
-function parseAxiosError(err: any): { status: string; endpoint: string; body: string; message: string; stack: string } {
-  const status = err?.response?.status ? `HTTP ${err.response.status}` : (err?.code ?? 'NETWORK_ERROR')
-  const method = (err?.config?.method ?? '').toUpperCase()
-  const url = err?.config?.url ?? err?.request?.path ?? ''
-  const endpoint = method && url ? `${method} ${url}` : ''
-  const data = err?.response?.data
-  let body = ''
-  if (data) {
-    body = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
-  }
-  const message = err?.message ?? 'Noma\'lum xato'
-  const stack = (err?.stack ?? '').replace(/^[^\n]+\n/, '').trim()
-  return { status, endpoint, body, message, stack }
+function fmt(n: number): string {
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
-function buildErrorLines(icon: string, title: string, context: string, errOrMsg: any): string[] {
-  const raw = typeof errOrMsg === 'string' ? errOrMsg : null
-  const parsed = raw ? null : parseAxiosError(errOrMsg)
+interface ParsedErr {
+  message: string
+  code: string
+  httpStatus: string
+  httpMethod: string
+  httpUrl: string
+  requestBody: string
+  responseBody: string
+  stack: string
+}
 
+function parseErr(err: any): ParsedErr {
+  const isAxios = !!(err?.config || err?.response)
+  const message = err?.message ?? 'Noma\'lum xato'
+  const code = err?.code ?? (err?.response?.status ? '' : 'UNKNOWN')
+  const httpStatus = err?.response?.status ? `${err.response.status}` : ''
+  const httpMethod = isAxios ? (err?.config?.method ?? '').toUpperCase() : ''
+  const httpUrl = isAxios ? (err?.config?.url ?? err?.request?.path ?? '') : ''
+
+  // Request body (what was sent to server)
+  let requestBody = ''
+  if (isAxios && err?.config?.data) {
+    try {
+      const d = typeof err.config.data === 'string' ? JSON.parse(err.config.data) : err.config.data
+      requestBody = JSON.stringify(d, null, 2)
+    } catch {
+      requestBody = String(err.config.data)
+    }
+  }
+
+  // Response body (server's answer)
+  let responseBody = ''
+  if (err?.response?.data) {
+    const d = err.response.data
+    responseBody = typeof d === 'string' ? d : JSON.stringify(d, null, 2)
+  }
+
+  // Stack trace (skip first line = error message repeated)
+  const rawStack = err?.stack ?? ''
+  const stackLines = rawStack.split('\n').filter((l: string) => l.trim().startsWith('at '))
+  const stack = stackLines.slice(0, 12).join('\n')
+
+  return { message, code, httpStatus, httpMethod, httpUrl, requestBody, responseBody, stack }
+}
+
+function buildMsg(icon: string, label: string, context: string, err: any, extra?: Record<string, string>): string {
+  const isRaw = typeof err === 'string'
+  const p = isRaw ? null : parseErr(err)
+
+  const sep = '─'.repeat(30)
   const lines: string[] = []
-  lines.push(`${icon} <b>${escHtml(title)}</b> ${icon}`)
+
+  lines.push(`${icon} <b>${escHtml(label)}</b> ${icon}`)
   lines.push(``)
   lines.push(`🏪 <b>Filial:</b> ${branchLine()}`)
-  lines.push(`📍 <b>Joy:</b> ${escHtml(context)}`)
-  lines.push(``)
+  lines.push(`📍 <b>Amal:</b> <code>${escHtml(context)}</code>`)
 
-  if (raw) {
-    lines.push(`✍️ <b>Xabar:</b> ${escHtml(raw)}`)
-  } else if (parsed) {
-    lines.push(`✍️ <b>Xabar:</b> ${escHtml(parsed.message)}`)
-    if (parsed.status) lines.push(`🔢 <b>Status:</b> <code>${escHtml(parsed.status)}</code>`)
-    if (parsed.endpoint) lines.push(`🌐 <b>Endpoint:</b> <code>${escHtml(parsed.endpoint)}</code>`)
-    if (parsed.body) {
-      lines.push(``)
-      lines.push(`🔖 <b>Server javobi:</b>`)
-      lines.push(`<pre>${escHtml(parsed.body.slice(0, 1200))}</pre>`)
-    }
-    if (parsed.stack) {
-      lines.push(``)
-      lines.push(`📋 <b>Stack Trace:</b>`)
-      lines.push(`<pre>${escHtml(parsed.stack.slice(0, 1200))}</pre>`)
+  // Extra context (order id, table, items, etc.)
+  if (extra && Object.keys(extra).length > 0) {
+    lines.push(``)
+    for (const [k, v] of Object.entries(extra)) {
+      lines.push(`   ${escHtml(k)}: <code>${escHtml(v)}</code>`)
     }
   }
 
   lines.push(``)
+  lines.push(`${sep}`)
+
+  if (isRaw) {
+    lines.push(`✍️ <b>Xato xabari:</b>`)
+    lines.push(`<pre>${escHtml(String(err))}</pre>`)
+  } else if (p) {
+    lines.push(`✍️ <b>Xato xabari:</b> ${escHtml(p.message)}`)
+    if (p.code) lines.push(`🔑 <b>Xato kodi:</b> <code>${escHtml(p.code)}</code>`)
+
+    if (p.httpStatus || p.httpUrl) {
+      lines.push(``)
+      lines.push(`🌐 <b>So'rov:</b> <code>${escHtml(p.httpMethod)} ${escHtml(p.httpUrl)}</code>`)
+      if (p.httpStatus) lines.push(`🔢 <b>HTTP Status:</b> <code>${escHtml(p.httpStatus)}</code>`)
+    }
+
+    if (p.requestBody) {
+      lines.push(``)
+      lines.push(`📤 <b>Yuborilgan ma'lumot (Request Body):</b>`)
+      lines.push(`<pre>${escHtml(p.requestBody.slice(0, 800))}</pre>`)
+    }
+
+    if (p.responseBody) {
+      lines.push(``)
+      lines.push(`📥 <b>Server javobi (Response Body):</b>`)
+      lines.push(`<pre>${escHtml(p.responseBody.slice(0, 800))}</pre>`)
+    }
+
+    if (p.stack) {
+      lines.push(``)
+      lines.push(`📋 <b>Stack Trace:</b>`)
+      lines.push(`<pre>${escHtml(p.stack.slice(0, 900))}</pre>`)
+    }
+  }
+
+  lines.push(``)
+  lines.push(`${sep}`)
   lines.push(`🕐 <b>Vaqt:</b> ${nowStr()}`)
-  return lines
+
+  return lines.join('\n')
 }
 
-export function tgError(context: string, errOrMsg: any): void {
-  const raw = typeof errOrMsg === 'string' ? errOrMsg : null
-  const parsed = raw ? null : parseAxiosError(errOrMsg)
-
-  const key = dedupKey(`err:${context}:${raw ?? parsed?.status ?? ''}:${raw ?? parsed?.body ?? ''}`)
+export function tgError(context: string, errOrMsg: any, extra?: Record<string, string>): void {
+  const isRaw = typeof errOrMsg === 'string'
+  const p = isRaw ? null : parseErr(errOrMsg)
+  const key = dedupKey(`err:${context}:${isRaw ? errOrMsg : (p?.httpStatus ?? p?.code ?? '')}:${p?.responseBody ?? ''}`)
   const last = recentErrors.get(key) ?? 0
   if (Date.now() - last < DEDUP_MS) return
   recentErrors.set(key, Date.now())
-
-  sendToTelegram(buildErrorLines('❌', 'Xatolik Ogohlantirishi', context, errOrMsg).join('\n'))
+  sendToTelegram(buildMsg('❌', 'Xatolik Ogohlantirishi', context, errOrMsg, extra))
 }
 
-export function tgWarn(context: string, errOrMsg: any): void {
-  const raw = typeof errOrMsg === 'string' ? errOrMsg : null
-  const parsed = raw ? null : parseAxiosError(errOrMsg)
-
-  const key = dedupKey(`warn:${context}:${raw ?? parsed?.status ?? ''}:${raw ?? parsed?.body ?? ''}`)
+export function tgWarn(context: string, errOrMsg: any, extra?: Record<string, string>): void {
+  const isRaw = typeof errOrMsg === 'string'
+  const p = isRaw ? null : parseErr(errOrMsg)
+  const key = dedupKey(`warn:${context}:${isRaw ? errOrMsg : (p?.httpStatus ?? p?.code ?? '')}:${p?.responseBody ?? ''}`)
   const last = recentErrors.get(key) ?? 0
   if (Date.now() - last < DEDUP_MS) return
   recentErrors.set(key, Date.now())
-
-  sendToTelegram(buildErrorLines('⚠️', 'Ogohlantirish', context, errOrMsg).join('\n'))
+  sendToTelegram(buildMsg('⚠️', 'Ogohlantirish', context, errOrMsg, extra))
 }
 
-export function tgOfflineClose(tableId: number, total: number): void {
+export function tgOfflineClose(tableId: number, tableName: string, total: number, itemCount: number): void {
   const key = dedupKey(`offline:${tableId}:${total}`)
   const last = recentErrors.get(key) ?? 0
   if (Date.now() - last < DEDUP_MS) return
   recentErrors.set(key, Date.now())
 
+  const sep = '─'.repeat(30)
   const lines: string[] = []
   lines.push(`📴 <b>Oflayn Yopish</b> 📴`)
   lines.push(``)
   lines.push(`🏪 <b>Filial:</b> ${branchLine()}`)
-  lines.push(`🪑 <b>Stol ID:</b> ${tableId}`)
-  lines.push(`💰 <b>Summa:</b> ${String(Math.round(total)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} so'm`)
-  lines.push(``)
-  lines.push(`ℹ️ Internet tiklanganda serverga yuboriladi`)
+  lines.push(`${sep}`)
+  lines.push(`🪑 <b>Stol:</b> <code>${escHtml(tableName)}</code> (ID: ${tableId})`)
+  lines.push(`🛒 <b>Mahsulotlar:</b> ${itemCount} ta`)
+  lines.push(`💰 <b>Jami summa:</b> <b>${fmt(total)} so'm</b>`)
+  lines.push(`${sep}`)
+  lines.push(`ℹ️ Internet tiklangach serverga avtomatik yuboriladi`)
   lines.push(`🕐 <b>Vaqt:</b> ${nowStr()}`)
 
   sendToTelegram(lines.join('\n'))
@@ -149,11 +212,14 @@ export function tgConnectStatus(online: boolean): void {
   if (Date.now() - last < 5 * 60_000) return
   recentErrors.set(key, Date.now())
 
+  const sep = '─'.repeat(30)
   if (online) {
     const lines = [
-      `🟢 <b>Ulanish Tiklandi</b> 🟢`,
+      `🟢 <b>Internet Ulandi</b> 🟢`,
       ``,
       `🏪 <b>Filial:</b> ${branchLine()}`,
+      `${sep}`,
+      `✅ Barcha pending buyurtmalar sinxronlanadi`,
       `🕐 <b>Vaqt:</b> ${nowStr()}`
     ]
     sendToTelegram(lines.join('\n'))
@@ -162,7 +228,9 @@ export function tgConnectStatus(online: boolean): void {
       `🔴 <b>Internet Uzildi</b> 🔴`,
       ``,
       `🏪 <b>Filial:</b> ${branchLine()}`,
+      `${sep}`,
       `⚠️ Oflayn rejimda ishlashda davom etilmoqda`,
+      `💾 Barcha buyurtmalar qurilmada saqlanadi`,
       `🕐 <b>Vaqt:</b> ${nowStr()}`
     ]
     sendToTelegram(lines.join('\n'))
