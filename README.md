@@ -1,141 +1,98 @@
-# Afisant — POS tizimi
+# Hisobchim POS
 
-Choyxona, restoran va kafelar uchun **Electron + React + SQLite** asosida qurilgan zamonaviy POS terminal dasturi.
+Restoran va kafelar uchun zamonaviy Point-of-Sale tizimi.
 
-> Windows uchun mo'ljallangan (`.exe`). To'liq oflayn ishlaydi, internet kelganda backend bilan avtomatik sinxronlashadi.
+**Stack:** React + TypeScript + Tailwind CSS · Electron · SQLite (better-sqlite3) · Zustand
 
-## Asosiy imkoniyatlar
+---
 
-- **Card-asosli login**: afitsantni tanlab → 4 raqamli PIN-kod kiriting
-- **5 ta xato urinishdan keyin 1 daqiqaga blok**, bcrypt bilan PIN himoyalangan
-- **Stol/xona/katta xona** boshqaruvi (band/bo'sh holatlar, real-time pul ko'rsatkichi)
-- **Kategoriya bo'yicha tezkor buyurtma**: emoji, narx va miqdor
-- **Smart batch sync**: har 5 mahsulot yoki 10 soniyada bitta IPC chaqirig'ida saqlanadi
-- **ESC/POS chek printer** (USB / LAN / Windows)
-- **WebSocket real-time** menyu yangilanishlari
-- **Offline-first** — internet uzilsa SQLite queue ishlaydi, qaytganda flush qiladi
-- **Til**: O'zbek (lotin) va O'zbek (kirill)
-- **Default seed data** — birinchi ishga tushganda 4 afitsant, 21 stol, 6 kategoriya, 21 mahsulot avtomatik qo'shiladi
-
-## Texnik stack
-
-| Sloy | Texnologiya |
-|---|---|
-| Shell | Electron 32 |
-| UI | React 18 + TypeScript + Vite |
-| Style | TailwindCSS 3 (dark theme) |
-| State | Zustand |
-| Animatsiya | Framer Motion |
-| Local DB | better-sqlite3 (WAL, mmap, transactional) |
-| Backend API | axios |
-| Real-time | socket.io-client |
-| Printer | node-thermal-printer (ESC/POS) |
-| Build | electron-vite + electron-builder |
-
-## O'rnatish
-
-```powershell
-# Node.js 20+ kerak
-npm install
-npm run rebuild      # better-sqlite3 ni Electron uchun qayta build
-npm run dev          # dasturni rivojlanish rejimida ishga tushiradi
-```
-
-## .exe build qilish
-
-```powershell
-# NSIS installer
-npm run pack:win:nsis
-
-# Portable (yagona .exe, o'rnatish kerak emas)
-npm run pack:win:portable
-
-# Ikkalasi birga
-npm run pack:win
-```
-
-Build natijasi: `dist-app/` papkasida `Afisant-0.1.0-x64.exe` (installer) va `Afisant-0.1.0-portable.exe`.
-
-## Default afitsantlar (test uchun)
-
-| Ism | PIN | Rol |
-|---|---|---|
-| Bekzod Karimov | `1234` | Super afitsant |
-| Aziza G'ulomova | `2345` | Afitsant |
-| Javohir Saidov | `3456` | Afitsant |
-| Madina Rahmonova | `4567` | Afitsant |
-
-> Backend bilan sinxronlangach, bu afitsantlar admin tomonidan qo'shilgan ro'yxat bilan yangilanadi.
-
-## Backend integratsiyasi
-
-Tizim https://api-restaurant.hisobchim.uz API bilan ishlash uchun mo'ljallangan. Sozlamalar sahifasidan token kiriting:
-
-1. Sozlamalar → Server bo'limi → API URL va Token
-2. Sozlamalarni saqlang
-3. WebSocket avtomatik ulanadi va menyu/afitsantlarni serverdan tortib oladi
-
-## Loyiha tuzilishi
+## Loyiha tuzilmasi
 
 ```
-afisant/
+afitsiant-v1/
+├── src/                  # React frontend (Vite)
+│   ├── pages/            # Sahifalar (Login, Tables, Order, ...)
+│   ├── stores/           # Zustand store (cart.ts, auth.ts, ...)
+│   ├── hooks/            # Custom hooks (useCartFlush, ...)
+│   └── components/       # UI komponentlar
 ├── electron/
-│   ├── main/
-│   │   ├── index.ts              ← Asosiy process
-│   │   ├── ipc.ts                ← IPC handlerlar
-│   │   ├── db/                   ← SQLite schema, mappers, seed
-│   │   └── services/             ← auth, menu, orders, sync, printer
-│   └── preload/index.ts          ← contextBridge orqali xavfsiz API
-├── shared/                       ← Main + renderer o'rtasidagi tiplar
-│   ├── types.ts
-│   └── ipc.ts
-├── src/                          ← React renderer
-│   ├── App.tsx
-│   ├── main.tsx
-│   ├── pages/
-│   │   ├── WaiterSelect.tsx
-│   │   ├── PinEntry.tsx
-│   │   ├── Tables.tsx
-│   │   ├── Order.tsx
-│   │   └── Settings.tsx
-│   ├── components/
-│   ├── stores/                   ← Zustand
-│   ├── hooks/
-│   ├── lib/                      ← i18n, format, cn
-│   └── styles/globals.css
-└── electron-builder.yml
+│   └── main/             # Electron main process
+│       ├── db/           # SQLite schema, connection, mappers
+│       ├── services/     # orders, syncEngine, auth, menu, ...
+│       └── ipc.ts        # IPC handler registratsiyasi
+├── server/               # Standalone REST API server
+│   └── src/
+│       ├── routes/       # auth, menu, tables, orders, settings
+│       ├── services/     # orderSync, remoteApi, settings
+│       └── middleware/   # auth, error
+├── shared/               # Umumiy TypeScript types
+└── test/                 # Test suite (302 ta test)
 ```
 
-## Sync strategiyasi
+---
 
-```
-[Foydalanuvchi mahsulotni bosadi]
-        ↓
-   Zustand savatga qo'shadi (lokal, darhol)
-        ↓
-   ┌──────────────────────────────┐
-   │ Trigger: 5 mahsulot yoki 10s │
-   └──────────────┬───────────────┘
-                  ↓
-   window.afisant.orders.addItems()  ← bitta IPC chaqiruv
-                  ↓
-   SQLite (better-sqlite3 transaction)
-                  ↓
-   sync_queue jadvaliga payload qo'yiladi
-                  ↓
-   Har 8 soniyada queue worker serverga POST qiladi
-                  ↓
-   Backend → WebSocket orqali boshqa POS'larga yuboradi
+## Ishga tushirish
+
+### Electron app (asosiy POS)
+
+```bash
+npm install
+npm run dev
 ```
 
-## Xavfsizlik
+### Standalone REST API server
 
-- `contextIsolation: true`, `nodeIntegration: false`
-- Renderer faqat `window.afisant` orqali main process'ga murojaat qila oladi
-- PIN-kod bcrypt (`saltRounds: 10`) bilan hashlanadi
-- API token shifrlangan SQLite faylda saqlanadi (`userData`)
-- CSP: faqat o'z domen va sozlangan server URL'ga ulanish
+```bash
+npm run server:install
+cp server/.env.example server/.env
+# server/.env da DB_PATH ni to'ldiring
+npm run server:dev
+```
+
+Server `http://localhost:3001` da ishga tushadi.
+
+---
+
+## Asosiy buyruqlar
+
+| Buyruq | Nima qiladi |
+|--------|-------------|
+| `npm run dev` | Electron app development rejimida |
+| `npm test` | 302 ta test (barcha 100% o'tadi) |
+| `npm run server:dev` | REST API server (hot-reload) |
+| `npm run server:start` | REST API server production |
+| `npm run build` | Electron app build |
+| `npm run typecheck` | TypeScript tekshiruv |
+
+---
+
+## REST API endpointlari
+
+| Endpoint | Tavsif |
+|----------|--------|
+| `GET /health` | Server holati |
+| `POST /auth/login` | Waiter login |
+| `GET /menu` | Kategoriya + mahsulotlar |
+| `GET /tables` | Xonalar + stollar + aktiv orderlar |
+| `GET /orders` | Buyurtmalar ro'yxati |
+| `POST /orders` | Yangi buyurtma |
+| `POST /orders/:id/items` | Item qo'shish/yangilash |
+| `POST /orders/:id/sync` | Remote serverga sync |
+| `POST /orders/:id/close` | Buyurtmani yopish |
+| `POST /orders/:id/cancel` | Bekor qilish |
+| `GET /settings` | Sozlamalar |
+
+---
+
+## Muhim texnik detallar
+
+- **KG mahsulotlar** (0.5 kg, 1.5 kg): server faqat butun sonlarni qabul qiladi — kasrli miqdorlar lokal saqlanadi, server order bekor qilinadi
+- **Sync mexanizmi**: Zustand → SQLite IPC → WebSocket sync engine (15 soniyada bir)
+- **Offline qo'llab-quvvatlash**: barcha operatsiyalar SQLite ga yoziladi, internet tiklanganida avtomatik sync
+- **Double-count oldini olish**: `initialServerItemsRef` orqali server state bilan farq hisoblash
+
+---
 
 ## Litsenziya
 
-Maxfiy — faqat ichki foydalanish uchun.
+Private — Hisobchim © 2026

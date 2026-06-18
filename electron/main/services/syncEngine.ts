@@ -7,6 +7,7 @@ import { dequeueBatch, markDone, markFailed, queuedCount } from './syncQueue'
 import { syncWaitersForBranch } from './auth'
 import { applyProductCategoryOverrides } from './categoryConfig'
 import { syncAllItems, closeOrderOnServer, cancelOrderOnServer } from './orders'
+import { fetchVisibleOrders } from './orderApi'
 import { tgError, tgWarn, tgConnectStatus, tgOfflineClose } from './telegramLogger'
 
 let socket: Socket | null = null
@@ -147,52 +148,37 @@ async function syncPendingOrders(): Promise<void> {
   syncingPendingOrders = true
   try {
     const db = getDb()
+    const api = getApi()
+    const CLOSED_STATUSES = ['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED']
 
-    // 1. Pending ochiq buyurtmalar — server bilan sinxronlaymiz
-    const pendingOpen = db.prepare(`
-      SELECT o.id, t.server_id AS room_server_id
-      FROM orders o
-      JOIN tables t ON o.table_id = t.id
-      WHERE o.sync_status = 'pending' AND o.status = 'open' AND t.server_id IS NOT NULL
-    `).all() as Array<{ id: number; room_server_id: string }>
-
-    for (const order of pendingOpen) {
-      const items = db.prepare(`
-        SELECT oi.quantity, p.server_id AS product_server_id
-        FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
-        WHERE oi.order_id = ?
-      `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
-
-      const syncItems = items
-        .filter((it) => it.product_server_id && it.quantity > 0)
-        .map((it) => ({ productServerId: it.product_server_id!, count: it.quantity }))
-
-      if (syncItems.length === 0) continue
-      try {
-        await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: syncItems })
-        console.log(`[SYNC] Pending open order ${order.id} synced to server`)
-      } catch (e: any) {
-        console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)
-        tgWarn(`Ochiq buyurtma sinxron #${order.id}`, e)
-      }
-    }
-
-    // 2. Pending yopilgan/bekor qilingan buyurtmalar — serverni xabardor qilamiz
+    // ─────────────────────────────────────────────────────────────────────────
+    // 1. AVVAL: yopilgan/bekor buyurtmalar (opened_at ASC — eng eskisi birinchi)
+    //
+    // MUHIM TARTIB: Bir xonada ketma-ket offline buyurtmalar bo'lsa:
+    //   OrderA (6 ta, yopilgan) → OrderB (5 ta, ochiq)
+    //
+    // NOTO'G'RI tartib (ochiq avval):
+    //   → OrderB syncAllItems → server da aktiv order yo'q → yangi yaratadi (serverB)
+    //   → OrderA syncAllItems → serverB ni topadi → 6 ta item bilan patch → yopadi
+    //   → Natija: Admin da faqat 1 ta order, OrderB ning itemlari yo'qoladi
+    //
+    // TO'G'RI tartib (yopilgan avval):
+    //   → OrderA syncAllItems → aktiv server order yo'q → yangi yaratadi → yopadi
+    //   → OrderB syncAllItems → aktiv server order yo'q (A yopildi) → yangi yaratadi
+    //   → Natija: Admin da 2 ta order, ikkisi to'g'ri ✓
+    // ─────────────────────────────────────────────────────────────────────────
     const pendingClosed = db.prepare(`
       SELECT o.id, o.status, o.server_id, t.server_id AS room_server_id
       FROM orders o
       JOIN tables t ON o.table_id = t.id
       WHERE o.sync_status = 'pending' AND o.status IN ('closed', 'cancelled')
+      ORDER BY o.opened_at ASC, o.id ASC
     `).all() as Array<{ id: number; status: string; server_id: string | null; room_server_id: string | null }>
-
-    const api = getApi()
 
     for (const order of pendingClosed) {
       try {
         let serverId = order.server_id
 
-        // Buyurtma mahsulotlari (offline qo'shilgan itemlar ham)
         const items = db.prepare(`
           SELECT oi.quantity, p.server_id AS product_server_id
           FROM order_items oi
@@ -201,11 +187,10 @@ async function syncPendingOrders(): Promise<void> {
         `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
 
         const syncItems = items
-          .filter((it) => it.product_server_id && it.quantity > 0)
+          .filter((it) => it.product_server_id && it.quantity > 0 && Number.isInteger(it.quantity))
           .map((it) => ({ productId: it.product_server_id!, count: it.quantity }))
 
         if (!serverId && order.room_server_id) {
-          // Server ID yo'q — avval items sync qilib server ID olamiz
           if (syncItems.length > 0) {
             try {
               const res = await syncAllItems({
@@ -213,35 +198,55 @@ async function syncPendingOrders(): Promise<void> {
                 roomServerId: order.room_server_id,
                 items: syncItems.map((it) => ({ productServerId: it.productId, count: it.count }))
               })
-              serverId = res.serverId || null  // bo'sh string → null
+              serverId = res.serverId || null
             } catch (e: any) {
               const httpStatus = e?.response?.status ?? 0
               if (httpStatus >= 400 && httpStatus < 500) {
-                // 4xx — server qayta ishlamaydi, synced deb belgilaymiz
-                console.warn(`[SYNC] syncAllItems ${httpStatus} for order ${order.id} — marking synced`)
+                console.warn(`[SYNC] syncAllItems ${httpStatus} for closed order ${order.id} — marking synced`)
                 db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), order.id)
                 continue
               }
-              throw e  // 5xx — keyingi tickda qayta urinish
+              throw e
             }
           }
-          // syncAllItems serverId qaytarmagan (nofaol mahsulot sabab) — synced
+
+          if (!serverId) {
+            try {
+              const allOrders = await fetchVisibleOrders(500)
+              const found = allOrders.find((o: any) =>
+                (o.room?.id === order.room_server_id || o.roomId === order.room_server_id) &&
+                !CLOSED_STATUSES.includes((o.status ?? '').toUpperCase())
+              )
+              if (found) {
+                serverId = String(found.id)
+                console.log(`[SYNC] Found open server order for room ${order.room_server_id}: ${serverId}`)
+              }
+            } catch (fetchErr: any) {
+              console.warn(`[SYNC] Order ${order.id} — fetch for close failed: ${fetchErr?.message}`)
+            }
+          }
+
           if (!serverId) {
             db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), order.id)
-            console.log(`[SYNC] Order ${order.id} — no serverId after sync, marked synced`)
+            console.log(`[SYNC] Order ${order.id} — no serverId, marked synced locally`)
             continue
           }
         } else if (serverId && syncItems.length > 0) {
-          // Server ID bor — offline qo'shilgan itemlarni yuboramiz (final state)
           try {
             await api.patch(`/api/order/sync-items/${serverId}`, { items: syncItems })
           } catch (e: any) {
             const httpStatus = e?.response?.status ?? 0
             if (httpStatus >= 400 && httpStatus < 500) {
-              // 4xx patch — server allaqachon yopgan, davom etamiz (close qilishga urinib ko'ramiz)
-              console.warn(`[SYNC] Pre-close item sync ${httpStatus} for order ${order.id}, continuing`)
+              tgWarn(`Pre-close PATCH ${httpStatus} (order ${order.id})`, e, {
+                'Buyurtma ID': String(order.id),
+                'Server order_id': serverId,
+                'Status': order.status
+              })
             } else {
-              console.warn(`[SYNC] Pre-close item sync failed for order ${order.id}: ${e?.message}`)
+              tgError(`Pre-close PATCH network xato (order ${order.id})`, e, {
+                'Buyurtma ID': String(order.id),
+                'Server order_id': serverId
+              })
             }
           }
         }
@@ -258,23 +263,72 @@ async function syncPendingOrders(): Promise<void> {
             if (httpStatus && httpStatus >= 400 && httpStatus < 500) {
               console.log(`[SYNC] Order ${order.id} server ${httpStatus} → already processed, marking synced`)
             } else {
-              throw e  // 5xx yoki network xato → keyingi tickda qayta urinsim
+              throw e
             }
           }
-          db.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(?, server_id), updated_at = ? WHERE id = ?`)
-            .run(serverId, Date.now(), order.id)
-          console.log(`[SYNC] Pending ${order.status} order ${order.id} closed on server`)
-        } else {
-          // server_id ham yo'q, room_server_id ham yo'q — lokal only
-          if (!order.room_server_id) {
-            db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`)
-              .run(Date.now(), order.id)
-            console.log(`[SYNC] Order ${order.id} has no server mapping — marked synced locally`)
+          const conflict = db.prepare(`SELECT id FROM orders WHERE server_id = ? AND id != ?`).get(serverId, order.id) as any
+          if (conflict) {
+            db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), order.id)
+          } else {
+            db.prepare(`UPDATE orders SET sync_status = 'synced', server_id = COALESCE(?, server_id), updated_at = ? WHERE id = ?`)
+              .run(serverId, Date.now(), order.id)
           }
+          console.log(`[SYNC] Pending ${order.status} order ${order.id} synced+closed on server (${serverId})`)
+        } else if (!order.room_server_id) {
+          db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), order.id)
+          console.log(`[SYNC] Order ${order.id} has no server mapping — marked synced locally`)
         }
       } catch (e: any) {
         console.warn(`[SYNC] Pending closed order ${order.id} failed: ${e?.message}`)
-        tgError(`Yopilgan buyurtma sinxron #${order.id}`, e)
+        tgError(`Yopilgan buyurtma sinxron #${order.id}`, e, {
+          'Buyurtma ID': String(order.id),
+          'Status': order.status,
+          'Server order_id': order.server_id ?? 'yo\'q',
+          'Xona server_id': order.room_server_id ?? 'yo\'q'
+        })
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 2. KEYIN: ochiq buyurtmalar — yopilganlar allaqachon serverda yopilgan bo'ladi,
+    //    shuning uchun bu paytda xona bo'sh → yangi server order to'g'ri yaratiladi
+    // ─────────────────────────────────────────────────────────────────────────
+    const pendingOpen = db.prepare(`
+      SELECT o.id, t.server_id AS room_server_id
+      FROM orders o
+      JOIN tables t ON o.table_id = t.id
+      WHERE o.sync_status = 'pending' AND o.status = 'open' AND t.server_id IS NOT NULL
+      ORDER BY o.id ASC
+    `).all() as Array<{ id: number; room_server_id: string }>
+
+    for (const order of pendingOpen) {
+      const items = db.prepare(`
+        SELECT oi.quantity, p.server_id AS product_server_id
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = ?
+      `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
+
+      const syncItems = items
+        .filter((it) => it.product_server_id && it.quantity > 0 && Number.isInteger(it.quantity))
+        .map((it) => ({ productServerId: it.product_server_id!, count: it.quantity }))
+
+      const allActiveItems = items
+        .filter((it) => it.product_server_id && it.quantity > 0)
+        .map((it) => ({ productServerId: it.product_server_id!, count: it.quantity }))
+      const itemsToSync = syncItems.length > 0 ? syncItems : allActiveItems
+
+      try {
+        await syncAllItems({ localOrderId: order.id, roomServerId: order.room_server_id, items: itemsToSync })
+        console.log(`[SYNC] Pending open order ${order.id} synced to server`)
+      } catch (e: any) {
+        console.warn(`[SYNC] Pending open order ${order.id} failed: ${e?.message}`)
+        tgWarn(`Ochiq buyurtma sinxron #${order.id}`, e, {
+          'Buyurtma ID': String(order.id),
+          'Xona server_id': order.room_server_id,
+          'Mahsulotlar soni': String(syncItems.length),
+          'Mahsulotlar': syncItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+        })
       }
     }
   } finally {

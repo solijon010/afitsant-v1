@@ -4,6 +4,7 @@ import { mapOrder, mapOrderItem } from '../db/mappers'
 import { getApi } from './apiClient'
 import { fetchVisibleOrders } from './orderApi'
 import { getSettings } from './settings'
+import { tgError, tgWarn } from './telegramLogger'
 import type { Order, OrderItem, OrderWithItems } from '@shared/types'
 
 const now = () => Date.now()
@@ -22,21 +23,32 @@ function markOrderPending(orderId: number, ts = now()): void {
 function markOrderSynced(orderId: number, serverOrderId?: string): void {
   const db = getDb()
   const ts = now()
-  db.transaction(() => {
-    db.prepare(
-      `UPDATE orders
-       SET server_id = COALESCE(?, server_id),
-           sync_status = 'synced',
-           updated_at = ?
-       WHERE id = ?`
-    ).run(serverOrderId ?? null, ts, orderId)
-    db.prepare(
-      `UPDATE order_items
-       SET sync_status = 'synced',
-           updated_at = ?
-       WHERE order_id = ?`
-    ).run(ts, orderId)
-  })()
+  try {
+    db.transaction(() => {
+      if (serverOrderId) {
+        // Boshqa buyurtma allaqachon bu server_id ni egallab turganmi?
+        const conflict = db.prepare(
+          `SELECT id FROM orders WHERE server_id = ? AND id != ?`
+        ).get(serverOrderId, orderId) as any
+        if (conflict) {
+          // Conflict bor — server_id ni o'zgartirmasdan faqat synced belgilaymiz
+          db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(ts, orderId)
+        } else {
+          db.prepare(
+            `UPDATE orders SET server_id = COALESCE(?, server_id), sync_status = 'synced', updated_at = ? WHERE id = ?`
+          ).run(serverOrderId, ts, orderId)
+        }
+      } else {
+        db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(ts, orderId)
+      }
+      db.prepare(`UPDATE order_items SET sync_status = 'synced', updated_at = ? WHERE order_id = ?`).run(ts, orderId)
+    })()
+  } catch (e: any) {
+    // UNIQUE constraint yoki boshqa xato — server_id siz synced belgilaymiz
+    try {
+      db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(ts, orderId)
+    } catch {}
+  }
 }
 
 function buildOrderWithItems(orderId: number): OrderWithItems | null {
@@ -132,7 +144,9 @@ export async function syncAllItems(input: {
 
   // count > 0 bo'lgan itemlarni ajratamiz — server 0 li itemlarni rad etadi
   const activeItems = items.filter((it) => it.count > 0)
-  const patchItems = items
+  // Server faqat butun sonli miqdorlarni qabul qiladi (count must be integer >= 1)
+  // KG fractional itemlar (0.5, 0.46...) sync-items PATCH ga kirmaydi
+  const patchItems = activeItems.filter((it) => Number.isInteger(it.count))
 
   // Yopilgan/bekor qilingan statuslar — bulardan boshqasi "aktiv" hisoblanadi
   const CLOSED_STATUSES = ['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED']
@@ -163,14 +177,31 @@ export async function syncAllItems(input: {
     if (activeItems.length === 0) {
       // Savat bo'sh — mavjud orderni bekor qilamiz
       await updateServerOrderStatus(existing.id, 'CANCELED')
+      if (localOrderId) markOrderSynced(localOrderId, existing.id)
       return { serverId: existing.id }
     }
-    // Mavjud orderni yangilash — sync-items endpointi
+
+    // BUG FIX: faqat KG items qolsa (patchItems bo'sh) — server orderni bekor qilamiz
+    // Chunki `{items:[]}` serverga yuborib 400 olish mumkin, va server eski itemlarni ko'rsatishda davom etadi
+    // To'g'ri xulosa: integer items yo'q = server order bekor; keyingi integer item qo'shilganda yangi order yaratiladi
+    if (patchItems.length === 0) {
+      console.log(`[ORDER] KG-only: cancelling server order ${existing.id} (no integer items to sync)`)
+      try {
+        await updateServerOrderStatus(existing.id, 'CANCELED')
+      } catch (cancelErr: any) {
+        // Server allaqachon yopilgan bo'lishi mumkin — e'tibor bermay davom etamiz
+        console.warn(`[ORDER] KG-only cancel failed (${existing.id}): ${cancelErr?.message}`)
+      }
+      if (localOrderId) markOrderSynced(localOrderId, existing.id)
+      return { serverId: existing.id }
+    }
+
+    // Mavjud orderni yangilash — sync-items endpointi (faqat butun sonli itemlar)
     try {
       await api.patch(`/api/order/sync-items/${existing.id}`, {
         items: patchItems.map((it) => ({ productId: it.productServerId, count: it.count }))
       })
-      console.log(`[ORDER] Updated existing order ${existing.id}`)
+      console.log(`[ORDER] Updated existing order ${existing.id} with ${patchItems.length} items`)
       if (localOrderId) markOrderSynced(localOrderId, existing.id)
     } catch (e: any) {
       const patchStatus = e?.response?.status
@@ -181,32 +212,43 @@ export async function syncAllItems(input: {
         // Order serverda yo'q — yangi yaratishga o'tamiz
         existing = null
       } else if (patchStatus === 400) {
-        // 400 "Bazi productlar mavjud emas" — nofaol productlarni chiqarib qayta urinib ko'ramiz
-        const activeOnly = activeItems.filter((it) => it.count > 0)
-        if (activeOnly.length > 0) {
-          try {
-            await api.patch(`/api/order/sync-items/${existing.id}`, {
-              items: activeOnly.map((it) => ({ productId: it.productServerId, count: it.count }))
-            })
-            console.log(`[ORDER] sync-items retry OK (filtered) for order ${existing.id}`)
-            if (localOrderId) markOrderSynced(localOrderId, existing.id)
-          } catch (retryErr: any) {
-            console.warn('[ORDER] sync-items retry xato:', retryErr?.message)
-            // Baribir synced deb belgilaymiz — cheksiz retry bo'lmasin
-            if (localOrderId) markOrderSynced(localOrderId, existing.id)
-          }
-        } else {
+        // 400 — nofaol mahsulot yoki boshqa server xato
+        tgWarn(`sync-items PATCH 400 (order ${existing.id})`, e, {
+          'Server order_id': existing.id,
+          'Yuborilgan itemlar': patchItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+        })
+        // patchItems allaqachon integer filterlangan — qayta urinib ko'ramiz
+        try {
+          await api.patch(`/api/order/sync-items/${existing.id}`, {
+            items: patchItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+          })
+          console.log(`[ORDER] sync-items retry OK for order ${existing.id}`)
+          if (localOrderId) markOrderSynced(localOrderId, existing.id)
+        } catch (retryErr: any) {
+          tgError(`sync-items PATCH retry xato (order ${existing.id})`, retryErr, {
+            'Server order_id': existing.id,
+            'Itemlar': patchItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+          })
           if (localOrderId) markOrderSynced(localOrderId, existing.id)
         }
       } else {
         // Boshqa xato — synced deb belgilaymiz (cheksiz retry oldini olish)
+        tgError(`sync-items PATCH ${patchStatus} xato (order ${existing.id})`, e, {
+          'Server order_id': existing.id
+        })
         if (localOrderId) markOrderSynced(localOrderId, existing.id)
       }
     }
     if (existing) return { serverId: existing.id }
   }
 
-  if (activeItems.length === 0) throw new Error('Savat bo\'sh — order yaratilmadi')
+  // Server faqat butun sonlarni qabul qiladi — POST uchun ham filtr
+  const postItems = patchItems  // patchItems = activeItems.filter(Number.isInteger)
+  if (postItems.length === 0) {
+    // Faqat KG fractional itemlar bor — server qabul qilmaydi, lokal saqlangan
+    if (localOrderId) markOrderSynced(localOrderId)
+    return { serverId: '' }
+  }
 
   // Yangi order yaratish
   let waiterId: string | null = null
@@ -218,7 +260,7 @@ export async function syncAllItems(input: {
   // branchId HECH QACHON yuborilmaydi — server "property branchId should not exist" deydi
   const body: Record<string, any> = {
     roomId: roomServerId,
-    orderItems: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+    orderItems: postItems.map((it) => ({ productId: it.productServerId, count: it.count }))
   }
   if (waiterId) body.waiterId = waiterId
 
@@ -246,21 +288,23 @@ export async function syncAllItems(input: {
         if (found) {
           try {
             await api.patch(`/api/order/sync-items/${found.id}`, {
-              items: activeItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+              items: postItems.map((it) => ({ productId: it.productServerId, count: it.count }))
             })
             console.log('[ORDER] 403 recovery OK — patched order:', found.id)
             if (localOrderId) markOrderSynced(localOrderId, String(found.id))
             return { serverId: String(found.id) }
           } catch (patchErr: any) {
-            const patchStatus = patchErr?.response?.status
-            console.warn('[ORDER] 403 recovery patch xato:', patchErr?.message)
-            // Patch ham xato bersa — server ID ni saqlab synced qilamiz
+            tgWarn(`POST 403 recovery patch xato (order ${found.id})`, patchErr, {
+              'Server order_id': String(found.id),
+              'Xona server_id': roomServerId,
+              'Itemlar': postItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+            })
             if (localOrderId) markOrderSynced(localOrderId, String(found.id))
             return { serverId: String(found.id) }
           }
         }
       } catch (fetchErr: any) {
-        console.warn('[ORDER] 403 recovery fresh fetch xato:', fetchErr?.message)
+        tgWarn('POST 403 recovery fresh fetch xato', fetchErr, { 'Xona server_id': roomServerId })
       }
       // Server topilmasa ham — lokal synced deb belgilaymiz (qayta-qayta retry bo'lmasin)
       if (localOrderId) {
@@ -272,7 +316,10 @@ export async function syncAllItems(input: {
 
     // 404 — mahsulotlar nofaol, synced deb belgilaymiz
     if (status === 404) {
-      console.warn('[ORDER] 404 — nofaol mahsulotlar, synced deb belgilaymiz')
+      tgWarn(`POST /api/order 404 (nofaol mahsulotlar)`, e, {
+        'Xona server_id': roomServerId,
+        'Itemlar': postItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+      })
       if (localOrderId) {
         const db = getDb()
         db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), localOrderId)
@@ -280,6 +327,12 @@ export async function syncAllItems(input: {
       return { serverId: '' }
     }
 
+    tgError(`POST /api/order xato (${status})`, e, {
+      'Xona server_id': roomServerId,
+      'Waiter ID': waiterId ?? 'yo\'q',
+      'Itemlar soni': String(postItems.length),
+      'Itemlar': postItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+    })
     throw new Error(`Order yaratishda xato (${status ?? e?.code}): "${JSON.stringify(errData?.message ?? errData ?? e?.message)}"`)
   }
 }

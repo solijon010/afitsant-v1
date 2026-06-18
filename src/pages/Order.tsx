@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import type { Category, Product, ReceiptPayload, TableEntity } from '@shared/types'
 import { useAuth } from '@/stores/auth'
 import { useCart, type CartLine } from '@/stores/cart'
+import { useCartFlush } from '@/hooks/useCartFlush'
 import { useCachedImage } from '@/hooks/useCachedImage'
 import { useMenu } from '@/stores/menu'
 import { useSettings } from '@/stores/settings'
@@ -57,6 +58,8 @@ export default function OrderPage(): JSX.Element {
   const refreshTable = useTables((s) => s.refreshTable)
 
   const cart = useCart()
+  // Real-time SQLite flush va server sync (o'chirishlarda darhol ishlaydi)
+  const { flushNow } = useCartFlush()
 
   const [activeCatId, setActiveCatId] = useState<number | null>(null)
   const [table, setTable] = useState<TableEntity | null>(null)
@@ -95,6 +98,25 @@ export default function OrderPage(): JSX.Element {
           if (localOrder && localOrder.items.length > 0) {
             // Foydalanuvchi bu qurilmada saqlagan — local versiyani ishlatamiz
             // Server order ID ni saqlab qolamiz, future sync uchun
+
+            // BUG FIX: initialServerItemsRef ni SERVER dan yuklaymiz (local emas!)
+            // Bu holda o'chirilgan mahsulotlar handleSave da to'g'ri aniqlanadi
+            initialServerItemsRef.current = existingOrder.items.map<CartLine>((it) => {
+              const product = products.find((p) => p.id === it.productId || (it.serverId != null && p.serverId === it.serverId))
+              return {
+                localUuid: it.localUuid,
+                productId: it.productId,
+                productServerId: product?.serverId ?? null,
+                productName: it.productName,
+                unitPrice: it.unitPrice,
+                quantity: it.quantity,
+                notes: it.notes,
+                flushed: true,
+                itemId: it.id,
+                addedAt: it.createdAt
+              }
+            })
+
             cart.setOrder(localOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
             cart.hydrateFromOrder(
               localOrder.items.map<CartLine>((it) => {
@@ -285,6 +307,21 @@ export default function OrderPage(): JSX.Element {
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
+      // BUG FIX: savat bo'sh bo'lsa server orderni bekor qilamiz (admin'da eski items qolmaslik uchun)
+      const emptyServerOrderId = useCart.getState().serverOrderId
+      const emptyOrderId = useCart.getState().orderId
+      if (emptyServerOrderId || emptyOrderId) {
+        setSaving(true)
+        try {
+          await window.afisant.orders.cancel(emptyOrderId ?? 0, emptyServerOrderId ?? undefined)
+        } catch (e: any) {
+          console.warn('[handleSave] Empty cart cancel failed:', e?.message)
+        } finally {
+          setSaving(false)
+        }
+      }
+      cart.clear()
+      cart.setOrder(null, null)
       navigate('/tables')
       return
     }
@@ -356,17 +393,17 @@ export default function OrderPage(): JSX.Element {
         count
       }))
 
-      if (syncItems.length > 0) {
-        void window.afisant.orders.syncAll({
-          localOrderId: orderId ?? undefined,
-          roomServerId,
-          items: syncItems
-        }).catch((e: any) => {
-          console.warn('[handleSave] Background server sync failed:', e?.message)
-        })
-      } else if (savedLines.length > 0 && savedLines.every((l) => !l.productServerId)) {
+      // Har doim syncAll chaqiramiz — bo'sh savat ham server orderni bekor qiladi (REPLACE semantics)
+      if (savedLines.length > 0 && savedLines.every((l) => !l.productServerId)) {
         console.warn('[handleSave] Mahsulotlarda server ID yo\'q — To\'liq sinxronlash kerak')
       }
+      void window.afisant.orders.syncAll({
+        localOrderId: orderId ?? undefined,
+        roomServerId,
+        items: syncItems
+      }).catch((e: any) => {
+        console.warn('[handleSave] Background server sync failed:', e?.message)
+      })
     } catch (e: any) {
       toast.error('Saqlashda xatolik', { description: e?.message })
     } finally {
@@ -1090,13 +1127,13 @@ function CartPanel({
                         </button>
                       </div>
                       {/* Qty + narx */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 9, padding: '4px 7px', border: '1.5px solid rgba(255,255,255,0.10)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 9, padding: '4px 7px', border: '1.5px solid rgba(255,255,255,0.10)', flexShrink: 0 }}>
                           <QtyBtn onClick={() => dec(l.localUuid)} color="red"><Minus size={10} /></QtyBtn>
                           <span style={{ minWidth: 26, textAlign: 'center', fontSize: 16, fontWeight: 900, color: '#ffffff' }}>{fmtQty(l.quantity)}</span>
                           <QtyBtn onClick={() => inc(l.localUuid)} color="green"><Plus size={10} /></QtyBtn>
                         </div>
-                        <span style={{ fontSize: 15, fontWeight: 900, color: '#fbbf24', fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+                        <span style={{ fontSize: 15, fontWeight: 900, color: '#fbbf24', fontFamily: 'monospace', letterSpacing: '-0.5px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                           {fmtMoney(Math.round(l.unitPrice * l.quantity))}
                           <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginLeft: 2 }}>so'm</span>
                         </span>
@@ -1113,20 +1150,20 @@ function CartPanel({
       <div style={{ background: '#2C2C2D', borderTop: '1px solid rgba(255,255,255,0.07)', padding: '10px 12px 12px', flexShrink: 0 }}>
         {/* Jami blok */}
         <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '11px 14px', marginBottom: 9, border: '1.5px solid rgba(255,255,255,0.09)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>Mahsulotlar</span>
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#ffffff' }}>{fmtMoney(subtotal)} so'm</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)', flexShrink: 0 }}>Mahsulotlar</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>{fmtMoney(subtotal)} so'm</span>
           </div>
           {fee > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>Xizmat ({feePct}%)</span>
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#ffffff' }}>{fmtMoney(fee)} so'm</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)', flexShrink: 0 }}>Xizmat ({feePct}%)</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap' }}>{fmtMoney(fee)} so'm</span>
             </div>
           )}
           <div style={{ height: 1, background: 'rgba(255,255,255,0.10)', margin: '8px 0 7px', borderRadius: 99 }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <span style={{ fontSize: 14, fontWeight: 900, color: '#ffffff' }}>Jami</span>
-            <span style={{ fontSize: 22, fontWeight: 900, color: '#4ade80', fontFamily: 'monospace', letterSpacing: '-1px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 900, color: '#ffffff', flexShrink: 0 }}>Jami</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: '#4ade80', fontFamily: 'monospace', letterSpacing: '-1px', whiteSpace: 'nowrap', flexShrink: 0 }}>
               {fmtMoney(total)}
               <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(74,222,128,0.6)', marginLeft: 3 }}>so'm</span>
             </span>

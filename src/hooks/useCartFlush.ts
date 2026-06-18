@@ -7,12 +7,49 @@ const DEBOUNCE_MS = 10_000
 /**
  * Buyurtma savatidan SQLite + serverga avtomatik flush.
  * 5 ta o'zgarish to'planganda yoki 10 soniya o'tsa — SQLite'ga saqlaydi va serverga yuboradi.
+ * O'chirishlar (removeTriggeredAt o'zgarganda) darhol server sync ishga tushadi.
  */
 export function useCartFlush(): { flushNow: () => Promise<void> } {
-  const orderId = useCart((s) => s.orderId)
-  const lines = useCart((s) => s.lines)
-  const timer = useRef<NodeJS.Timeout | null>(null)
-  const inFlight = useRef(false)
+  const orderId        = useCart((s) => s.orderId)
+  const lines          = useCart((s) => s.lines)
+  const removeTriggeredAt = useCart((s) => s.removeTriggeredAt)
+  const timer          = useRef<NodeJS.Timeout | null>(null)
+  const inFlight       = useRef(false)
+  const syncOnlyFlight = useRef(false)
+
+  /** Faqat server sync — SQLite ga yozish kerak emas (o'chirishda, updateItem IPCda yozilgan) */
+  const syncServerOnly = async (): Promise<void> => {
+    const state = useCart.getState()
+    const oId = state.orderId
+    const roomServerId = state.roomServerId
+    if (!oId || !roomServerId) return
+    if (syncOnlyFlight.current) return
+    if (typeof window === 'undefined' || !window.afisant?.orders?.syncAll) return
+
+    syncOnlyFlight.current = true
+    try {
+      const allLines = state.lines.filter((l) => l.productServerId && l.quantity > 0)
+      const serverMap = new Map<string, number>()
+      for (const l of allLines) {
+        const prev = serverMap.get(l.productServerId!) ?? 0
+        serverMap.set(l.productServerId!, prev + l.quantity)
+      }
+
+      // Savat butunlay bo'sh yoki faqat KG items (patchItems bo'sh) — syncAll bu holni boshqaradi
+      void window.afisant.orders.syncAll({
+        localOrderId: oId,
+        roomServerId,
+        items: Array.from(serverMap.entries()).map(([productServerId, count]) => ({
+          productServerId,
+          count
+        }))
+      }).catch((e: any) => {
+        console.warn('[useCartFlush] syncServerOnly failed:', e?.message)
+      })
+    } finally {
+      syncOnlyFlight.current = false
+    }
+  }
 
   const flushNow = async (): Promise<void> => {
     const state = useCart.getState()
@@ -46,7 +83,6 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
       const roomServerId = useCart.getState().roomServerId
       if (roomServerId && navigator.onLine) {
         const allLines = useCart.getState().lines.filter((l) => l.productServerId && l.quantity > 0)
-        // Dublikat productServerId ni birlashtirish
         const serverMap = new Map<string, number>()
         for (const l of allLines) {
           const prev = serverMap.get(l.productServerId!) ?? 0
@@ -58,7 +94,6 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
             roomServerId,
             items: Array.from(serverMap.entries()).map(([productServerId, count]) => ({ productServerId, count }))
           }).catch((e: any) => {
-            // Server sync xatosi — keyingi background tick da qayta urinadi
             console.warn('[useCartFlush] Server sync failed (will retry):', e?.message)
           })
         }
@@ -68,6 +103,15 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
     }
   }
 
+  // O'chirishdan keyin — darhol server sync (debounce kutmay)
+  useEffect(() => {
+    if (!orderId || !removeTriggeredAt) return
+    if (timer.current) clearTimeout(timer.current)
+    void syncServerOnly()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [removeTriggeredAt, orderId])
+
+  // Yangi/o'zgargan itemlar uchun — batch yoki debounce
   useEffect(() => {
     if (!orderId) return
     const pending = lines.filter((l) => !l.flushed).length
