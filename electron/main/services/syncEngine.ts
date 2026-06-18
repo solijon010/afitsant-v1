@@ -165,7 +165,7 @@ async function syncPendingOrders(): Promise<void> {
       `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
 
       const syncItems = items
-        .filter((it) => it.product_server_id && it.quantity > 0)
+        .filter((it) => it.product_server_id && it.quantity > 0 && Number.isInteger(it.quantity))
         .map((it) => ({ productServerId: it.product_server_id!, count: it.quantity }))
 
       if (syncItems.length === 0) continue
@@ -206,7 +206,7 @@ async function syncPendingOrders(): Promise<void> {
         `).all(order.id) as Array<{ quantity: number; product_server_id: string | null }>
 
         const syncItems = items
-          .filter((it) => it.product_server_id && it.quantity > 0)
+          .filter((it) => it.product_server_id && it.quantity > 0 && Number.isInteger(it.quantity))
           .map((it) => ({ productId: it.product_server_id!, count: it.quantity }))
 
         if (!serverId && order.room_server_id) {
