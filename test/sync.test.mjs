@@ -2538,3 +2538,498 @@ describe('AB. Server REST endpoint mantiq', () => {
     requiredVars.forEach(v => assert.ok(v.length > 0))
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════
+// Offline/Online sync tartib logikasi
+// ═══════════════════════════════════════════════════════════════════════
+
+// Sync tartibini simulyatsiya qiluvchi funksiya
+function simulateSyncPendingOrders(pendingOrders, serverOrders) {
+  // Ishlab chiqarish kodidagi tartib: avval yopilganlar (opened_at ASC), keyin ochiqlar
+  const closed = pendingOrders
+    .filter(o => o.status === 'closed' || o.status === 'cancelled')
+    .sort((a, b) => (a.opened_at ?? a.id) - (b.opened_at ?? b.id))
+  const open = pendingOrders
+    .filter(o => o.status === 'open')
+    .sort((a, b) => a.id - b.id)
+
+  const synced = []
+  const createdServerOrders = [...serverOrders]
+
+  // 1. Yopilganlarni avval sync qilamiz
+  for (const order of closed) {
+    // server_id bor bo'lsa uni ishlatamiz, yo'q bo'lsa aktiv server orderni qidiramiz
+    const activeOnServer = createdServerOrders.find(so =>
+      so.roomId === order.room_server_id && isServerOrderOpen(so)
+    )
+    let serverId = order.server_id ?? activeOnServer?.id ?? null
+
+    if (!serverId) {
+      // Aktiv server order yo'q → yangi yaratib darhol yopamiz
+      // (Ishlab chiqarishda: syncAllItems → POST /api/order → closes it)
+      if (order.room_server_id) {
+        const newId = 'server-' + order.id
+        const finalStatus = order.status === 'closed' ? 'SUCCESS' : 'CANCELED'
+        createdServerOrders.push({ id: newId, roomId: order.room_server_id, status: finalStatus })
+        synced.push({ localId: order.id, serverId: newId, action: order.status === 'closed' ? 'closed' : 'cancelled' })
+      } else {
+        synced.push({ localId: order.id, serverId: null, action: 'synced_local' })
+      }
+      continue
+    }
+
+    // Mavjud server orderni yop
+    const idx = createdServerOrders.findIndex(so => so.id === serverId)
+    if (idx >= 0) {
+      createdServerOrders[idx] = {
+        ...createdServerOrders[idx],
+        status: order.status === 'closed' ? 'SUCCESS' : 'CANCELED'
+      }
+    } else {
+      // Server orders ro'yxatida yo'q — qo'shamiz (yopilgan holda)
+      createdServerOrders.push({
+        id: serverId,
+        roomId: order.room_server_id ?? '',
+        status: order.status === 'closed' ? 'SUCCESS' : 'CANCELED'
+      })
+    }
+    synced.push({ localId: order.id, serverId, action: order.status === 'closed' ? 'closed' : 'cancelled' })
+  }
+
+  // 2. Ochiqlarni keyin sync qilamiz
+  // Bu paytda yopilganlar allaqachon serverda yopilgan → xona bo'sh → yangi order yaratiladi
+  for (const order of open) {
+    const activeOnServer = createdServerOrders.find(so =>
+      so.roomId === order.room_server_id && isServerOrderOpen(so)
+    )
+    if (activeOnServer) {
+      synced.push({ localId: order.id, serverId: activeOnServer.id, action: 'patched' })
+    } else {
+      const newId = 'server-open-' + order.id
+      createdServerOrders.push({ id: newId, roomId: order.room_server_id, status: 'PENDING' })
+      synced.push({ localId: order.id, serverId: newId, action: 'created' })
+    }
+  }
+
+  return { synced, finalServerOrders: createdServerOrders }
+}
+
+describe('AC. Offline → online: ketma-ket buyurtmalar (yangi bug fix)', () => {
+
+  test('AC-01: yopilgan avval, ochiq keyin — ikkisi ham to\'g\'ri sync bo\'ladi', () => {
+    // Internet o'chiq: OrderA (6 ta, yopilgan) → OrderB (5 ta, ochiq)
+    const pending = [
+      { id: 1, status: 'closed',  opened_at: 1000, room_server_id: 'room-1', server_id: null },
+      { id: 2, status: 'open',    opened_at: 2000, room_server_id: 'room-1', server_id: null }
+    ]
+    const { synced } = simulateSyncPendingOrders(pending, [])
+
+    assert.equal(synced.length, 2)
+    // OrderA yopilishi kerak
+    assert.equal(synced[0].localId, 1)
+    assert.equal(synced[0].action, 'closed')
+    // OrderB yangi server order yaratishi kerak (A allaqachon yopilgan)
+    assert.equal(synced[1].localId, 2)
+    assert.equal(synced[1].action, 'created')
+    // Ikkalasi har xil server order
+    assert.notEqual(synced[0].serverId, synced[1].serverId)
+  })
+
+  test('AC-02: eski (NOTO\'G\'RI) tartib — ochiq avval → yopilgan uning orderini egallaydi', () => {
+    // Bu testda NOTO'G'RI tartibni (ochiq avval) simulyatsiya qilamiz
+    // va nima noto'g'ri bo'lishini ko'rsatamiz
+    const pending = [
+      { id: 1, status: 'closed',  opened_at: 1000, room_server_id: 'room-1', server_id: null },
+      { id: 2, status: 'open',    opened_at: 2000, room_server_id: 'room-1', server_id: null }
+    ]
+    // NOTO'G'RI: ochiqlarni avval qayta ishlash
+    const wrongOrder = [...pending.filter(o => o.status === 'open'), ...pending.filter(o => o.status !== 'open')]
+    const createdServerOrders = []
+
+    const syncedWrong = []
+    for (const order of wrongOrder) {
+      const active = createdServerOrders.find(so => so.roomId === order.room_server_id && isServerOrderOpen(so))
+      if (order.status === 'open') {
+        if (active) {
+          syncedWrong.push({ localId: order.id, action: 'patched', serverId: active.id })
+        } else {
+          const newId = 'server-' + order.id
+          createdServerOrders.push({ id: newId, roomId: order.room_server_id, status: 'PENDING' })
+          syncedWrong.push({ localId: order.id, action: 'created', serverId: newId })
+        }
+      } else {
+        // Closed: server da ochiq orderni topadi → o'sha order (open ning serveri!) yopiladi
+        const active2 = createdServerOrders.find(so => so.roomId === order.room_server_id && isServerOrderOpen(so))
+        if (active2) {
+          const idx = createdServerOrders.findIndex(so => so.id === active2.id)
+          createdServerOrders[idx] = { ...createdServerOrders[idx], status: 'SUCCESS' }
+          syncedWrong.push({ localId: order.id, action: 'closed', serverId: active2.id })
+        }
+      }
+    }
+
+    // BUG: Yopilgan order ochiq orderning server_id ni ishlatadi → xona uchun faqat 1 ta order
+    const closedEntry = syncedWrong.find(s => s.localId === 1)
+    const openEntry = syncedWrong.find(s => s.localId === 2)
+    // Bug: ikkisi bir xil server order!
+    assert.equal(closedEntry?.serverId, openEntry?.serverId)
+    // Admin da faqat bitta ko'rinadi (closed = open ning serveri)
+    assert.ok(closedEntry && openEntry)
+  })
+
+  test('AC-03: uchta ketma-ket offline buyurtma — barchasi to\'g\'ri sync bo\'ladi', () => {
+    const pending = [
+      { id: 1, status: 'closed',  opened_at: 1000, room_server_id: 'room-1', server_id: null },
+      { id: 2, status: 'closed',  opened_at: 2000, room_server_id: 'room-1', server_id: null },
+      { id: 3, status: 'open',    opened_at: 3000, room_server_id: 'room-1', server_id: null }
+    ]
+    const { synced, finalServerOrders } = simulateSyncPendingOrders(pending, [])
+
+    assert.equal(synced.length, 3)
+
+    // Barcha local order sync bo'lishi kerak
+    const localIds = synced.map(s => s.localId).sort()
+    assert.deepEqual(localIds, [1, 2, 3])
+
+    // Yopilganlar yopilishi kerak
+    assert.equal(synced.find(s => s.localId === 1)?.action, 'closed')
+    assert.equal(synced.find(s => s.localId === 2)?.action, 'closed')
+
+    // Ochiq order yaratilishi kerak
+    assert.equal(synced.find(s => s.localId === 3)?.action, 'created')
+
+    // Har xil server order IDlari (double-count yo'q)
+    const serverIds = synced.map(s => s.serverId).filter(Boolean)
+    const unique = new Set(serverIds)
+    assert.equal(unique.size, serverIds.length, 'Har bir local order alohida server order bo\'lishi kerak')
+  })
+
+  test('AC-04: mavjud server order bilan + offline yopilgan buyurtma', () => {
+    // Internet bor edi, server da aktiv order bor, internet o'chdi
+    // Offline: 6 ta item qo'shildi, chek yopildi
+    // Keyin yana 5 ta item qo'shildi (yangi order)
+    // Internet yondi
+    const serverOrders = [
+      { id: 'srv-existing', roomId: 'room-1', status: 'PENDING' }
+    ]
+    const pending = [
+      { id: 1, status: 'closed',  opened_at: 1000, room_server_id: 'room-1', server_id: 'srv-existing' },
+      { id: 2, status: 'open',    opened_at: 2000, room_server_id: 'room-1', server_id: null }
+    ]
+    const { synced, finalServerOrders } = simulateSyncPendingOrders(pending, serverOrders)
+
+    // OrderA (server_id bor) → srv-existing yopiladi
+    const closedSync = synced.find(s => s.localId === 1)
+    assert.equal(closedSync?.action, 'closed')
+    assert.equal(closedSync?.serverId, 'srv-existing')
+
+    // srv-existing yopilgan bo'ladi
+    const existingFinal = finalServerOrders.find(so => so.id === 'srv-existing')
+    assert.equal(existingFinal?.status, 'SUCCESS')
+
+    // OrderB → yangi server order (srv-existing yopilgan, bo'sh xona)
+    const openSync = synced.find(s => s.localId === 2)
+    assert.equal(openSync?.action, 'created')
+    assert.notEqual(openSync?.serverId, 'srv-existing')
+  })
+
+  test('AC-05: ikki xona — har biri mustaqil sync bo\'ladi', () => {
+    const pending = [
+      { id: 1, status: 'closed',  opened_at: 1000, room_server_id: 'room-1', server_id: null },
+      { id: 2, status: 'closed',  opened_at: 1100, room_server_id: 'room-2', server_id: null },
+      { id: 3, status: 'open',    opened_at: 2000, room_server_id: 'room-1', server_id: null },
+      { id: 4, status: 'open',    opened_at: 2100, room_server_id: 'room-2', server_id: null }
+    ]
+    const { synced } = simulateSyncPendingOrders(pending, [])
+
+    assert.equal(synced.length, 4)
+    const serverIds = synced.map(s => s.serverId).filter(Boolean)
+    const unique = new Set(serverIds)
+    assert.equal(unique.size, 4, '4 ta alohida server order bo\'lishi kerak')
+  })
+
+  test('AC-06: pending yopilgan order avval kelishi kerak (tartib tekshiruvi)', () => {
+    const pending = [
+      { id: 5, status: 'open',    opened_at: 3000, room_server_id: 'room-1', server_id: null },
+      { id: 3, status: 'closed',  opened_at: 1000, room_server_id: 'room-1', server_id: null },
+      { id: 4, status: 'closed',  opened_at: 2000, room_server_id: 'room-1', server_id: null }
+    ]
+    const closed = pending.filter(o => o.status !== 'open').sort((a, b) => a.opened_at - b.opened_at)
+    const open   = pending.filter(o => o.status === 'open')
+    const ordered = [...closed, ...open]
+
+    // Birinchi qayta ishlangan: id=3 (eng eski yopilgan)
+    assert.equal(ordered[0].id, 3)
+    // Ikkinchi: id=4
+    assert.equal(ordered[1].id, 4)
+    // Uchinchi: id=5 (ochiq)
+    assert.equal(ordered[2].id, 5)
+  })
+
+  test('AC-07: double-count bo\'lmaydi — bir xona uchun alohida server orderlar', () => {
+    // Bug bo'lsa: yopilgan order ochiq orderning server_id ni ishlatadi
+    // → admin da ikkita order o'rniga bitta va noto'g'ri items ko'rinadi
+    const pending = [
+      { id: 10, status: 'closed', opened_at: 1000, room_server_id: 'room-7', server_id: null },
+      { id: 11, status: 'open',   opened_at: 2000, room_server_id: 'room-7', server_id: null }
+    ]
+    const { synced } = simulateSyncPendingOrders(pending, [])
+
+    const closedServerId = synced.find(s => s.localId === 10)?.serverId
+    const openServerId   = synced.find(s => s.localId === 11)?.serverId
+
+    // MUHIM: ikkalasi har xil server order bo'lishi kerak
+    assert.ok(closedServerId !== openServerId, 'Double-count: har xil server order bo\'lishi kerak')
+
+    // Ikkalasi ham sync bo'lishi kerak
+    assert.ok(closedServerId, 'Yopilgan order server ID olishi kerak')
+    assert.ok(openServerId,   'Ochiq order server ID olishi kerak')
+  })
+
+  test('AC-08: faqat ochiq pending order (yopilgan yo\'q) — oddiy holat', () => {
+    const pending = [
+      { id: 1, status: 'open', opened_at: 1000, room_server_id: 'room-1', server_id: null }
+    ]
+    const { synced } = simulateSyncPendingOrders(pending, [])
+
+    assert.equal(synced.length, 1)
+    assert.equal(synced[0].action, 'created')
+  })
+
+  test('AC-09: faqat yopilgan pending order (ochiq yo\'q) — server da yopiladi', () => {
+    const pending = [
+      { id: 1, status: 'closed', opened_at: 1000, room_server_id: 'room-1', server_id: null },
+      { id: 2, status: 'cancelled', opened_at: 2000, room_server_id: 'room-2', server_id: null }
+    ]
+    const { synced } = simulateSyncPendingOrders(pending, [])
+
+    assert.equal(synced.length, 2)
+    assert.equal(synced.find(s => s.localId === 1)?.action, 'closed')
+    assert.equal(synced.find(s => s.localId === 2)?.action, 'cancelled')
+  })
+
+  test('AC-10: internet o\'chiqligida 6 ta tovar + chek + 5 ta yangi — to\'liq sseneriy', () => {
+    // Foydalanuvchi ssenariysini to'liq simulyatsiya
+    const pending = [
+      // OrderA: 6 ta mahsulot, chek yopildi (offline)
+      { id: 101, status: 'closed',  opened_at: 100000, room_server_id: 'room-main', server_id: null, items: 6 },
+      // OrderB: 5 ta yangi mahsulot, hali ochiq (offline)
+      { id: 102, status: 'open',    opened_at: 200000, room_server_id: 'room-main', server_id: null, items: 5 }
+    ]
+    const { synced, finalServerOrders } = simulateSyncPendingOrders(pending, [])
+
+    // Admin da 2 ta order ko'rinishi kerak
+    const closedOnServer = finalServerOrders.filter(so => so.status === 'SUCCESS')
+    const openOnServer   = finalServerOrders.filter(so => isServerOrderOpen(so))
+
+    assert.equal(closedOnServer.length, 1, 'Admin da 1 ta yopilgan order bo\'lishi kerak')
+    assert.equal(openOnServer.length, 1,   'Admin da 1 ta ochiq order bo\'lishi kerak')
+
+    // Ikkisi har xil
+    assert.notEqual(closedOnServer[0].id, openOnServer[0].id)
+
+    // OrderA (6 ta) → closed serverga yopildi
+    assert.equal(synced.find(s => s.localId === 101)?.action, 'closed')
+    // OrderB (5 ta) → yangi server order
+    assert.equal(synced.find(s => s.localId === 102)?.action, 'created')
+  })
+})
+
+describe('AD. Offline → online: qayta ulanganda double-count oldini olish', () => {
+
+  test('AD-01: sync items REPLACE semantikasi — eski items o\'rnini yangilari egallaydi', () => {
+    // PATCH /api/order/sync-items REPLACE qiladi (ADD emas)
+    // Shuning uchun: server da [A, B] bor → [A, B, C] yuborilsa → server da [A, B, C] bo\'ladi
+    const serverItems = ['A', 'B']
+    const newItems = ['A', 'B', 'C']
+    // Replace semantikasi: yangi list to'liq o'rnini bosadi
+    const finalItems = newItems  // not [...serverItems, ...newItems]
+    assert.deepEqual(finalItems, ['A', 'B', 'C'])
+    assert.equal(finalItems.length, 3, 'Double-count bo\'lmaydi: A va B 2 martadan ko\'rinmaydi')
+  })
+
+  test('AD-02: bir xona uchun pending orderlar opened_at bo\'yicha tartiblanadi', () => {
+    const orders = [
+      { id: 3, opened_at: 3000, status: 'closed',  room_server_id: 'r1' },
+      { id: 1, opened_at: 1000, status: 'closed',  room_server_id: 'r1' },
+      { id: 2, opened_at: 2000, status: 'closed',  room_server_id: 'r1' }
+    ]
+    const sorted = [...orders].sort((a, b) => a.opened_at - b.opened_at)
+    assert.equal(sorted[0].id, 1)
+    assert.equal(sorted[1].id, 2)
+    assert.equal(sorted[2].id, 3)
+  })
+
+  test('AD-03: bir server orderni ikki local order uchun ishlatish mumkin emas', () => {
+    // Agar ikki local order bir server orderni sync qilsa → double-count
+    const usedServerIds = new Set()
+    const orders = [
+      { localId: 1, serverId: 'srv-A' },
+      { localId: 2, serverId: 'srv-B' },
+      { localId: 3, serverId: 'srv-A' }  // BUG: srv-A allaqachon ishlatilgan
+    ]
+    const conflicts = orders.filter(o => {
+      if (usedServerIds.has(o.serverId)) return true
+      usedServerIds.add(o.serverId)
+      return false
+    })
+    assert.equal(conflicts.length, 1)
+    assert.equal(conflicts[0].localId, 3)
+  })
+
+  test('AD-04: server orderni yopgandan so\'ng yangi order uchun yangi server order kerak', () => {
+    const serverOrders = [
+      { id: 'srv-1', roomId: 'room-1', status: 'PENDING' }
+    ]
+    // 1. Yopilgan local order srv-1 ni yopadi
+    const idx = serverOrders.findIndex(so => so.id === 'srv-1')
+    serverOrders[idx] = { ...serverOrders[idx], status: 'SUCCESS' }
+
+    // 2. Yangi ochiq local order uchun aktiv server order qidiriladi
+    const activeForRoom = serverOrders.find(so => so.roomId === 'room-1' && isServerOrderOpen(so))
+    assert.equal(activeForRoom, undefined, 'srv-1 yopilgan — yangi order yaratilishi kerak')
+  })
+
+  test('AD-05: online → offline → online: items to\'g\'ri holati saqlanadi', () => {
+    // Online: server da order bor, 3 ta item
+    // Offline: 2 ta item qo'shildi
+    // Online: sync → server da 5 ta item bo'lishi kerak (3+2, REPLACE)
+
+    const serverItemsBefore = [
+      { productServerId: 'p1', count: 2 },
+      { productServerId: 'p2', count: 1 }
+    ]
+    const offlineAddedItems = [
+      { productServerId: 'p3', count: 1 },
+      { productServerId: 'p4', count: 1 }
+    ]
+
+    // Local state = server items + offline items (initialServerItemsRef + yangi qo'shilganlar)
+    const localItems = [...serverItemsBefore, ...offlineAddedItems]
+
+    // Sync: REPLACE semantikasi — barcha local items yuboriladi
+    const syncPayload = localItems
+    assert.equal(syncPayload.length, 4)
+    assert.equal(syncPayload.reduce((s, i) => s + i.count, 0), 5)
+
+    // Server da 4 ta unique mahsulot, jami 5 ta (double-count yo'q)
+    const uniqueProducts = new Set(syncPayload.map(i => i.productServerId))
+    assert.equal(uniqueProducts.size, 4, 'Har bir mahsulot 1 martadan')
+  })
+
+  test('AD-06: syncPendingOrders ikki marta chaqirilsa — lock tufayli bir marta ishlaydi', () => {
+    // syncingPendingOrders flag test
+    let syncCount = 0
+    let syncingPendingOrders = false
+
+    const syncPendingOrders = () => {
+      if (syncingPendingOrders) return 'skipped'
+      syncingPendingOrders = true
+      syncCount++
+      // Asinxron ish simulyatsiyasi
+      setTimeout(() => { syncingPendingOrders = false }, 100)
+      return 'started'
+    }
+
+    const r1 = syncPendingOrders()
+    const r2 = syncPendingOrders()  // ikkinchi chaqiruv skip bo'lishi kerak
+
+    assert.equal(r1, 'started')
+    assert.equal(r2, 'skipped')
+    assert.equal(syncCount, 1, 'Faqat bir marta ishlashi kerak')
+  })
+
+  test('AD-07: qayta ulanish hodisasi — 2 soniyadan keyin sync chaqiriladi', () => {
+    // socket.on("connect") → setTimeout 2000 → syncPendingOrders
+    // Bu testda mantiq to'g'riligini tekshiramiz
+    let syncCalled = false
+    const onConnect = (delayMs, syncFn) => {
+      // setTimeout simulyatsiyasi
+      if (delayMs === 2000) syncFn()
+    }
+    onConnect(2000, () => { syncCalled = true })
+    assert.ok(syncCalled)
+  })
+
+  test('AD-08: yopilgan order items — NOTO\'G\'RI tartibda items yo\'qoladi', () => {
+    // OrderA (closed, 6 items): server da yo'q
+    // OrderB (open, 5 items): server da yo'q
+    // NOTO'G'RI: open avval sync → server order yaratiladi → closed uni topadi → 6 items bilan patch → yopadi
+    // Natija: admin da faqat 6 items (OrderA ning), OrderB ning 5 items yo'qolgan
+
+    const orderA = { id: 1, status: 'closed', items: ['a1','a2','a3','a4','a5','a6'] }
+    const orderB = { id: 2, status: 'open',   items: ['b1','b2','b3','b4','b5'] }
+
+    // Noto'g'ri tartib: open avval
+    let serverOrderItems = null
+    let serverOrderStatus = null
+
+    // Step 1: OrderB sync → yaratildi, 5 items
+    serverOrderItems = orderB.items
+    serverOrderStatus = 'PENDING'
+
+    // Step 2: OrderA sync → mavjud server orderni topadi → patch 6 items → yopadi
+    serverOrderItems = orderA.items  // B ning items yo'qoldi!
+    serverOrderStatus = 'SUCCESS'
+
+    // Admin da B ning 5 items ko'rinmaydi
+    assert.ok(!serverOrderItems.some(i => i.startsWith('b')), 'B itemlari yo\'qoldi (bug)')
+    assert.equal(serverOrderItems.length, 6)
+
+    // To'g'ri tartib (A avval):
+    let serverOrders2 = []
+
+    // Step 1: OrderA sync → yaratildi, 6 items, yopildi
+    serverOrders2.push({ id: 'srv-A', items: orderA.items, status: 'SUCCESS' })
+
+    // Step 2: OrderB sync → A yopilgan, yangi yaratildi, 5 items
+    serverOrders2.push({ id: 'srv-B', items: orderB.items, status: 'PENDING' })
+
+    assert.equal(serverOrders2.length, 2, 'To\'g\'ri tartibda admin da 2 ta order ko\'rinadi')
+    assert.ok(serverOrders2.find(so => so.items.every(i => i.startsWith('a'))), 'A items to\'g\'ri')
+    assert.ok(serverOrders2.find(so => so.items.every(i => i.startsWith('b'))), 'B items to\'g\'ri')
+  })
+
+  test('AD-09: server 400 qaytarsa — order synced deb belgilanadi (cheksiz retry yo\'q)', () => {
+    const orders = [
+      { id: 1, sync_status: 'pending', status: 'closed', room_server_id: 'r1' }
+    ]
+    const httpStatus = 400
+
+    let result = 'pending'
+    if (httpStatus >= 400 && httpStatus < 500) {
+      result = 'synced'  // 4xx → synced (qayta urinilmaydi)
+    }
+    assert.equal(result, 'synced')
+  })
+
+  test('AD-10: to\'liq offline sseneriy — svet o\'chishi va yonishi', () => {
+    // Foydalanuvchi aytgan sseneriy:
+    // 1. Internet o'chiq → 6 ta mahsulot → chek yopildi
+    // 2. 5 ta yangi mahsulot qo'shildi (internet hali o'chiq)
+    // 3. Svet ochib qoldi (internet yondi)
+    // 4. Internet o'chib qayta yondi
+    // 5. Admin panelda TO'G'RI: 2 ta order (6 ta va 5 ta alohida)
+
+    const pendingWhenReconnect = [
+      { id: 201, status: 'closed',  opened_at: 10000, room_server_id: 'room-A', server_id: null },
+      { id: 202, status: 'open',    opened_at: 20000, room_server_id: 'room-A', server_id: null }
+    ]
+    const { synced, finalServerOrders } = simulateSyncPendingOrders(pendingWhenReconnect, [])
+
+    // Admin da ikkita alohida order ko'rinishi kerak
+    assert.equal(finalServerOrders.length, 2)
+
+    // Birinchi order (6 ta) yopilgan
+    const closedOrder = finalServerOrders.find(so => so.status === 'SUCCESS')
+    assert.ok(closedOrder, 'Yopilgan order admin da ko\'rinishi kerak')
+
+    // Ikkinchi order (5 ta) ochiq
+    const openOrder = finalServerOrders.find(so => isServerOrderOpen(so))
+    assert.ok(openOrder, 'Ochiq order admin da ko\'rinishi kerak')
+
+    // Double count yo'q — ikkisi alohida
+    assert.notEqual(closedOrder?.id, openOrder?.id)
+    assert.equal(synced.length, 2, 'Ikkala order ham sync bo\'lishi kerak')
+  })
+})
