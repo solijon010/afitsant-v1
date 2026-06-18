@@ -51,7 +51,7 @@ function branchLine(): string {
   }
 }
 
-function parseAxiosError(err: any): { status: string; endpoint: string; body: string; message: string } {
+function parseAxiosError(err: any): { status: string; endpoint: string; body: string; message: string; stack: string } {
   const status = err?.response?.status ? `HTTP ${err.response.status}` : (err?.code ?? 'NETWORK_ERROR')
   const method = (err?.config?.method ?? '').toUpperCase()
   const url = err?.config?.url ?? err?.request?.path ?? ''
@@ -62,7 +62,42 @@ function parseAxiosError(err: any): { status: string; endpoint: string; body: st
     body = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
   }
   const message = err?.message ?? 'Noma\'lum xato'
-  return { status, endpoint, body, message }
+  const stack = (err?.stack ?? '').replace(/^[^\n]+\n/, '').trim()
+  return { status, endpoint, body, message, stack }
+}
+
+function buildErrorLines(icon: string, title: string, context: string, errOrMsg: any): string[] {
+  const raw = typeof errOrMsg === 'string' ? errOrMsg : null
+  const parsed = raw ? null : parseAxiosError(errOrMsg)
+
+  const lines: string[] = []
+  lines.push(`${icon} <b>${escHtml(title)}</b> ${icon}`)
+  lines.push(``)
+  lines.push(`🏪 <b>Filial:</b> ${branchLine()}`)
+  lines.push(`📍 <b>Joy:</b> ${escHtml(context)}`)
+  lines.push(``)
+
+  if (raw) {
+    lines.push(`✍️ <b>Xabar:</b> ${escHtml(raw)}`)
+  } else if (parsed) {
+    lines.push(`✍️ <b>Xabar:</b> ${escHtml(parsed.message)}`)
+    if (parsed.status) lines.push(`🔢 <b>Status:</b> <code>${escHtml(parsed.status)}</code>`)
+    if (parsed.endpoint) lines.push(`🌐 <b>Endpoint:</b> <code>${escHtml(parsed.endpoint)}</code>`)
+    if (parsed.body) {
+      lines.push(``)
+      lines.push(`🔖 <b>Server javobi:</b>`)
+      lines.push(`<pre>${escHtml(parsed.body.slice(0, 1200))}</pre>`)
+    }
+    if (parsed.stack) {
+      lines.push(``)
+      lines.push(`📋 <b>Stack Trace:</b>`)
+      lines.push(`<pre>${escHtml(parsed.stack.slice(0, 1200))}</pre>`)
+    }
+  }
+
+  lines.push(``)
+  lines.push(`🕐 <b>Vaqt:</b> ${nowStr()}`)
+  return lines
 }
 
 export function tgError(context: string, errOrMsg: any): void {
@@ -74,29 +109,7 @@ export function tgError(context: string, errOrMsg: any): void {
   if (Date.now() - last < DEDUP_MS) return
   recentErrors.set(key, Date.now())
 
-  const lines: string[] = []
-  lines.push(`❌ <b>Xatolik Ogohlantirishi</b> ❌`)
-  lines.push(``)
-  lines.push(`🏪 <b>Filial:</b> ${branchLine()}`)
-  lines.push(`📍 <b>Joy:</b> ${escHtml(context)}`)
-  lines.push(``)
-
-  if (raw) {
-    lines.push(`✍️ <b>Xabar:</b> ${escHtml(raw)}`)
-  } else if (parsed) {
-    lines.push(`✍️ <b>Xabar:</b> ${escHtml(parsed.message)}`)
-    if (parsed.status) lines.push(`🔢 <b>Status:</b> ${escHtml(parsed.status)}`)
-    if (parsed.endpoint) lines.push(`🌐 <b>Endpoint:</b> <code>${escHtml(parsed.endpoint)}</code>`)
-    if (parsed.body) {
-      lines.push(`🔖 <b>Server javobi:</b>`)
-      lines.push(`<pre>${escHtml(parsed.body.slice(0, 800))}</pre>`)
-    }
-  }
-
-  lines.push(``)
-  lines.push(`🕐 <b>Vaqt:</b> ${nowStr()}`)
-
-  sendToTelegram(lines.join('\n'))
+  sendToTelegram(buildErrorLines('❌', 'Xatolik Ogohlantirishi', context, errOrMsg).join('\n'))
 }
 
 export function tgWarn(context: string, errOrMsg: any): void {
@@ -108,29 +121,7 @@ export function tgWarn(context: string, errOrMsg: any): void {
   if (Date.now() - last < DEDUP_MS) return
   recentErrors.set(key, Date.now())
 
-  const lines: string[] = []
-  lines.push(`⚠️ <b>Ogohlantirish</b> ⚠️`)
-  lines.push(``)
-  lines.push(`🏪 <b>Filial:</b> ${branchLine()}`)
-  lines.push(`📍 <b>Joy:</b> ${escHtml(context)}`)
-  lines.push(``)
-
-  if (raw) {
-    lines.push(`✍️ <b>Xabar:</b> ${escHtml(raw)}`)
-  } else if (parsed) {
-    lines.push(`✍️ <b>Xabar:</b> ${escHtml(parsed.message)}`)
-    if (parsed.status) lines.push(`🔢 <b>Status:</b> ${escHtml(parsed.status)}`)
-    if (parsed.endpoint) lines.push(`🌐 <b>Endpoint:</b> <code>${escHtml(parsed.endpoint)}</code>`)
-    if (parsed.body) {
-      lines.push(`🔖 <b>Server javobi:</b>`)
-      lines.push(`<pre>${escHtml(parsed.body.slice(0, 800))}</pre>`)
-    }
-  }
-
-  lines.push(``)
-  lines.push(`🕐 <b>Vaqt:</b> ${nowStr()}`)
-
-  sendToTelegram(lines.join('\n'))
+  sendToTelegram(buildErrorLines('⚠️', 'Ogohlantirish', context, errOrMsg).join('\n'))
 }
 
 export function tgOfflineClose(tableId: number, total: number): void {

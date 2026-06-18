@@ -99,9 +99,13 @@ export const useCart = create<CartState>((set, get) => ({
     })
   },
   setQuantity: (localUuid, quantity) => {
+    if (quantity <= 0) {
+      get().remove(localUuid)
+      return
+    }
     set({
       lines: get().lines.map((l) =>
-        l.localUuid === localUuid ? { ...l, quantity: Math.max(0, quantity), flushed: false } : l
+        l.localUuid === localUuid ? { ...l, quantity, flushed: false } : l
       )
     })
   },
