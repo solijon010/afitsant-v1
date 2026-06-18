@@ -7,6 +7,7 @@ import { dequeueBatch, markDone, markFailed, queuedCount } from './syncQueue'
 import { syncWaitersForBranch } from './auth'
 import { applyProductCategoryOverrides } from './categoryConfig'
 import { syncAllItems, closeOrderOnServer, cancelOrderOnServer } from './orders'
+import { fetchVisibleOrders } from './orderApi'
 import { tgError, tgWarn, tgConnectStatus, tgOfflineClose } from './telegramLogger'
 
 let socket: Socket | null = null
@@ -209,6 +210,8 @@ async function syncPendingOrders(): Promise<void> {
           .filter((it) => it.product_server_id && it.quantity > 0 && Number.isInteger(it.quantity))
           .map((it) => ({ productId: it.product_server_id!, count: it.quantity }))
 
+        const CLOSED_STATUSES = ['CANCELED', 'CANCELLED', 'SUCCESS', 'COMPLETED', 'CLOSED', 'DONE', 'FINISHED']
+
         if (!serverId && order.room_server_id) {
           // Server ID yo'q — avval items sync qilib server ID olamiz
           if (syncItems.length > 0) {
@@ -230,10 +233,26 @@ async function syncPendingOrders(): Promise<void> {
               throw e  // 5xx — keyingi tickda qayta urinish
             }
           }
-          // syncAllItems serverId qaytarmagan (nofaol mahsulot sabab) — synced
+          // Server ID hali ham yo'q (faqat KG items yoki nofaol mahsulotlar) —
+          // xonadagi mavjud OPEN orderni topib yopamiz (700k double-count oldini olish)
+          if (!serverId) {
+            try {
+              const allOrders = await fetchVisibleOrders(500)
+              const found = allOrders.find((o: any) =>
+                (o.room?.id === order.room_server_id || o.roomId === order.room_server_id) &&
+                !CLOSED_STATUSES.includes((o.status ?? '').toUpperCase())
+              )
+              if (found) {
+                serverId = String(found.id)
+                console.log(`[SYNC] Found open server order for room ${order.room_server_id}: ${serverId}`)
+              }
+            } catch (fetchErr: any) {
+              console.warn(`[SYNC] Order ${order.id} — fetch for close failed: ${fetchErr?.message}`)
+            }
+          }
           if (!serverId) {
             db.prepare(`UPDATE orders SET sync_status = 'synced', updated_at = ? WHERE id = ?`).run(Date.now(), order.id)
-            console.log(`[SYNC] Order ${order.id} — no serverId after sync, marked synced`)
+            console.log(`[SYNC] Order ${order.id} — no serverId, marked synced locally`)
             continue
           }
         } else if (serverId && syncItems.length > 0) {
