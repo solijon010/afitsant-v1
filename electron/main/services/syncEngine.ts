@@ -242,7 +242,7 @@ async function syncPendingOrders(): Promise<void> {
           // xonadagi mavjud OPEN orderni topib yopamiz (700k double-count oldini olish)
           if (!serverId) {
             try {
-              const allOrders = await fetchVisibleOrders(500)
+              const allOrders = await fetchVisibleOrders()
               const found = allOrders.find((o: any) =>
                 (o.room?.id === order.room_server_id || o.roomId === order.room_server_id) &&
                 !CLOSED_STATUSES.includes((o.status ?? '').toUpperCase())

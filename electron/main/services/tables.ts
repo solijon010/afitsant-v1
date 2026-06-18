@@ -47,7 +47,7 @@ export async function snapshot(): Promise<TableWithOrder[]> {
 
   let activeOrders: any[] = []
   try {
-    const all = await fetchVisibleOrders(500)
+    const all = await fetchVisibleOrders()
     activeOrders = all.filter((o: any) => o.status === 'PENDING' || o.status === 'READY')
   } catch (e: any) {
     console.error('snapshot orders fetch error:', e?.message)
