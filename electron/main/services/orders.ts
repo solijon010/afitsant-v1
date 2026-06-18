@@ -177,14 +177,31 @@ export async function syncAllItems(input: {
     if (activeItems.length === 0) {
       // Savat bo'sh — mavjud orderni bekor qilamiz
       await updateServerOrderStatus(existing.id, 'CANCELED')
+      if (localOrderId) markOrderSynced(localOrderId, existing.id)
       return { serverId: existing.id }
     }
+
+    // BUG FIX: faqat KG items qolsa (patchItems bo'sh) — server orderni bekor qilamiz
+    // Chunki `{items:[]}` serverga yuborib 400 olish mumkin, va server eski itemlarni ko'rsatishda davom etadi
+    // To'g'ri xulosa: integer items yo'q = server order bekor; keyingi integer item qo'shilganda yangi order yaratiladi
+    if (patchItems.length === 0) {
+      console.log(`[ORDER] KG-only: cancelling server order ${existing.id} (no integer items to sync)`)
+      try {
+        await updateServerOrderStatus(existing.id, 'CANCELED')
+      } catch (cancelErr: any) {
+        // Server allaqachon yopilgan bo'lishi mumkin — e'tibor bermay davom etamiz
+        console.warn(`[ORDER] KG-only cancel failed (${existing.id}): ${cancelErr?.message}`)
+      }
+      if (localOrderId) markOrderSynced(localOrderId, existing.id)
+      return { serverId: existing.id }
+    }
+
     // Mavjud orderni yangilash — sync-items endpointi (faqat butun sonli itemlar)
     try {
       await api.patch(`/api/order/sync-items/${existing.id}`, {
         items: patchItems.map((it) => ({ productId: it.productServerId, count: it.count }))
       })
-      console.log(`[ORDER] Updated existing order ${existing.id}`)
+      console.log(`[ORDER] Updated existing order ${existing.id} with ${patchItems.length} items`)
       if (localOrderId) markOrderSynced(localOrderId, existing.id)
     } catch (e: any) {
       const patchStatus = e?.response?.status
@@ -200,21 +217,18 @@ export async function syncAllItems(input: {
           'Server order_id': existing.id,
           'Yuborilgan itemlar': patchItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
         })
-        if (patchItems.length > 0) {
-          try {
-            await api.patch(`/api/order/sync-items/${existing.id}`, {
-              items: patchItems.map((it) => ({ productId: it.productServerId, count: it.count }))
-            })
-            console.log(`[ORDER] sync-items retry OK for order ${existing.id}`)
-            if (localOrderId) markOrderSynced(localOrderId, existing.id)
-          } catch (retryErr: any) {
-            tgError(`sync-items PATCH retry xato (order ${existing.id})`, retryErr, {
-              'Server order_id': existing.id,
-              'Itemlar': patchItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
-            })
-            if (localOrderId) markOrderSynced(localOrderId, existing.id)
-          }
-        } else {
+        // patchItems allaqachon integer filterlangan — qayta urinib ko'ramiz
+        try {
+          await api.patch(`/api/order/sync-items/${existing.id}`, {
+            items: patchItems.map((it) => ({ productId: it.productServerId, count: it.count }))
+          })
+          console.log(`[ORDER] sync-items retry OK for order ${existing.id}`)
+          if (localOrderId) markOrderSynced(localOrderId, existing.id)
+        } catch (retryErr: any) {
+          tgError(`sync-items PATCH retry xato (order ${existing.id})`, retryErr, {
+            'Server order_id': existing.id,
+            'Itemlar': patchItems.map(i => `${i.productServerId.slice(-6)}×${i.count}`).join(', ')
+          })
           if (localOrderId) markOrderSynced(localOrderId, existing.id)
         }
       } else {

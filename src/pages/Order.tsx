@@ -95,6 +95,25 @@ export default function OrderPage(): JSX.Element {
           if (localOrder && localOrder.items.length > 0) {
             // Foydalanuvchi bu qurilmada saqlagan — local versiyani ishlatamiz
             // Server order ID ni saqlab qolamiz, future sync uchun
+
+            // BUG FIX: initialServerItemsRef ni SERVER dan yuklaymiz (local emas!)
+            // Bu holda o'chirilgan mahsulotlar handleSave da to'g'ri aniqlanadi
+            initialServerItemsRef.current = existingOrder.items.map<CartLine>((it) => {
+              const product = products.find((p) => p.id === it.productId || (it.serverId != null && p.serverId === it.serverId))
+              return {
+                localUuid: it.localUuid,
+                productId: it.productId,
+                productServerId: product?.serverId ?? null,
+                productName: it.productName,
+                unitPrice: it.unitPrice,
+                quantity: it.quantity,
+                notes: it.notes,
+                flushed: true,
+                itemId: it.id,
+                addedAt: it.createdAt
+              }
+            })
+
             cart.setOrder(localOrder.id, tId, existingOrder.serverId ?? null, roomServerId)
             cart.hydrateFromOrder(
               localOrder.items.map<CartLine>((it) => {
@@ -285,6 +304,21 @@ export default function OrderPage(): JSX.Element {
 
   const handleSave = async (): Promise<void> => {
     if (cart.lines.length === 0) {
+      // BUG FIX: savat bo'sh bo'lsa server orderni bekor qilamiz (admin'da eski items qolmaslik uchun)
+      const emptyServerOrderId = useCart.getState().serverOrderId
+      const emptyOrderId = useCart.getState().orderId
+      if (emptyServerOrderId || emptyOrderId) {
+        setSaving(true)
+        try {
+          await window.afisant.orders.cancel(emptyOrderId ?? 0, emptyServerOrderId ?? undefined)
+        } catch (e: any) {
+          console.warn('[handleSave] Empty cart cancel failed:', e?.message)
+        } finally {
+          setSaving(false)
+        }
+      }
+      cart.clear()
+      cart.setOrder(null, null)
       navigate('/tables')
       return
     }
