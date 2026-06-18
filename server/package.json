@@ -1,0 +1,26 @@
+{
+  "name": "afisant-server",
+  "version": "1.0.0",
+  "description": "Afisant POS — standalone REST API server",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}
