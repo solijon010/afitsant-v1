@@ -64,7 +64,7 @@ export async function getOrderByRoom(roomServerId: string): Promise<OrderWithIte
   if (!s.apiToken) return null
 
   try {
-    const orders = await fetchVisibleOrders(500)
+    const orders = await fetchVisibleOrders()
     const active = orders.find(
       (o: any) =>
         o.room?.id === roomServerId &&
@@ -157,7 +157,7 @@ export async function syncAllItems(input: {
   let allOrders: any[] = []
   let existing: any = null
   try {
-    allOrders = await fetchVisibleOrders(500)
+    allOrders = await fetchVisibleOrders()
     existing = allOrders.find((o: any) =>
       (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
     ) ?? null
@@ -267,7 +267,7 @@ export async function syncAllItems(input: {
     if (status === 403) {
       console.warn('[ORDER] 403 — fresh fetch bilan xonadagi aktiv orderni topamiz...')
       try {
-        const freshOrders = await fetchVisibleOrders(500)
+        const freshOrders = await fetchVisibleOrders()
         const found = freshOrders.find((o: any) =>
           (o.room?.id === roomServerId || o.roomId === roomServerId) && isActive(o)
         )
