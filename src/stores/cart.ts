@@ -103,11 +103,16 @@ export const useCart = create<CartState>((set, get) => ({
   },
 
   increment: (localUuid) => {
+    const line = get().lines.find((l) => l.localUuid === localUuid)
+    if (!line) return
+    const newQty = line.quantity + 1
     set({
       lines: get().lines.map((l) =>
-        l.localUuid === localUuid ? { ...l, quantity: l.quantity + 1, flushed: false } : l
+        l.localUuid === localUuid ? { ...l, quantity: newQty, flushed: false } : l
       )
     })
+    // SQLite ni darhol yangilaymiz — decrement kabi
+    if (line.itemId) ipcUpdateItem(line.itemId, newQty)
   },
 
   decrement: (localUuid) => {

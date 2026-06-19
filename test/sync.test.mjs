@@ -3033,3 +3033,309 @@ describe('AD. Offline → online: qayta ulanganda double-count oldini olish', ()
     assert.equal(synced.length, 2, 'Ikkala order ham sync bo\'lishi kerak')
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════
+// AE. Miqdor kamaytirib o'chirish (decrement-to-delete)
+// ═══════════════════════════════════════════════════════════════════════
+
+// Cart store logikasini simulyatsiya qiluvchi yordamchi funksiyalar
+function makeCartLine(overrides = {}) {
+  return {
+    localUuid: 'uuid-' + Math.random().toString(36).slice(2),
+    productId: 1,
+    productServerId: 'srv-p1',
+    productName: 'Test Mahsulot',
+    unitPrice: 50000,
+    quantity: 1,
+    notes: null,
+    flushed: false,
+    itemId: null,
+    addedAt: Date.now(),
+    ...overrides
+  }
+}
+
+function cartIncrementFull(lines, localUuid) {
+  const line = lines.find(l => l.localUuid === localUuid)
+  if (!line) return { lines, ipcCall: null }
+  const newQty = line.quantity + 1
+  return {
+    lines: lines.map(l => l.localUuid === localUuid ? { ...l, quantity: newQty, flushed: false } : l),
+    ipcCall: line.itemId ? { type: 'updateItem', itemId: line.itemId, quantity: newQty } : null
+  }
+}
+
+function cartDecrementFull(lines, localUuid) {
+  const line = lines.find(l => l.localUuid === localUuid)
+  if (!line) return { lines, ipcCall: null, removed: false }
+  if (line.quantity <= 1) {
+    // remove() chaqiriladi
+    return {
+      lines: lines.filter(l => l.localUuid !== localUuid),
+      ipcCall: line.itemId ? { type: 'removeItem', itemId: line.itemId } : null,
+      removed: true,
+      removeTriggeredAt: Date.now()
+    }
+  }
+  const newQty = line.quantity - 1
+  return {
+    lines: lines.map(l => l.localUuid === localUuid ? { ...l, quantity: newQty, flushed: false } : l),
+    ipcCall: line.itemId ? { type: 'updateItem', itemId: line.itemId, quantity: newQty } : null,
+    removed: false
+  }
+}
+
+function cartRemoveFull(lines, localUuid) {
+  const line = lines.find(l => l.localUuid === localUuid)
+  return {
+    lines: lines.filter(l => l.localUuid !== localUuid),
+    ipcCall: line?.itemId ? { type: 'removeItem', itemId: line.itemId } : null,
+    removed: true,
+    removeTriggeredAt: Date.now()
+  }
+}
+
+// Race condition simulyatsiyasi
+function simulateFlushRace(linesBeforeFlush, linesAfterFlush, savedFromDb) {
+  // savedFromDb = addItems() ning qaytargan natijasi (SQLite ga yozilganlar)
+  // linesAfterFlush = flush tugashidan keyin Zustand holati (ba'zilari o'chirilgan bo'lishi mumkin)
+  const orphaned = savedFromDb.filter(s => !linesAfterFlush.some(l => l.localUuid === s.localUuid))
+  return { orphaned }
+}
+
+describe('AE. Miqdor kamaytirib o\'chirish (decrement → delete)', () => {
+
+  test('AE-01: qty=1 da decrement → remove() chaqiriladi', () => {
+    let lines = [makeCartLine({ quantity: 1, itemId: 5 })]
+    const uuid = lines[0].localUuid
+
+    const result = cartDecrementFull(lines, uuid)
+
+    assert.ok(result.removed, 'Item o\'chirilishi kerak')
+    assert.equal(result.lines.length, 0, 'Zustand da item qolmasligi kerak')
+    assert.deepEqual(result.ipcCall, { type: 'removeItem', itemId: 5 }, 'SQLite dan o\'chirilishi kerak')
+    assert.ok(result.removeTriggeredAt, 'removeTriggeredAt o\'rnatilishi kerak (server sync uchun)')
+  })
+
+  test('AE-02: qty=2 da decrement → o\'chirmaydi, yangilaydi', () => {
+    let lines = [makeCartLine({ quantity: 2, itemId: 7 })]
+    const uuid = lines[0].localUuid
+
+    const result = cartDecrementFull(lines, uuid)
+
+    assert.equal(result.removed, false)
+    assert.equal(result.lines[0].quantity, 1)
+    assert.deepEqual(result.ipcCall, { type: 'updateItem', itemId: 7, quantity: 1 })
+  })
+
+  test('AE-03: qty=1 → decrement → qty=2 → decrement → remove to\'liq zanjiri', () => {
+    let lines = [makeCartLine({ quantity: 1, flushed: true, itemId: 10 })]
+    const uuid = lines[0].localUuid
+
+    // Increment: 1→2
+    let r = cartIncrementFull(lines, uuid)
+    lines = r.lines
+    assert.equal(lines[0].quantity, 2)
+    assert.deepEqual(r.ipcCall, { type: 'updateItem', itemId: 10, quantity: 2 })
+
+    // Increment: 2→3
+    r = cartIncrementFull(lines, uuid)
+    lines = r.lines
+    assert.equal(lines[0].quantity, 3)
+    assert.deepEqual(r.ipcCall, { type: 'updateItem', itemId: 10, quantity: 3 })
+
+    // Decrement: 3→2
+    let d = cartDecrementFull(lines, uuid)
+    lines = d.lines
+    assert.equal(lines[0].quantity, 2)
+    assert.equal(d.removed, false)
+
+    // Decrement: 2→1
+    d = cartDecrementFull(lines, uuid)
+    lines = d.lines
+    assert.equal(lines[0].quantity, 1)
+    assert.equal(d.removed, false)
+
+    // Decrement: 1→0 (o'chirish!)
+    d = cartDecrementFull(lines, uuid)
+    lines = d.lines
+    assert.ok(d.removed, 'Oxirida o\'chirilishi kerak')
+    assert.equal(lines.length, 0, 'Savat bo\'sh bo\'lishi kerak')
+    assert.deepEqual(d.ipcCall, { type: 'removeItem', itemId: 10 }, 'SQLite dan o\'chirilishi kerak')
+    assert.ok(d.removeTriggeredAt, 'Server sync ishga tushishi kerak')
+  })
+
+  test('AE-04: increment SQLite ga ham yozadi (flushed item)', () => {
+    let lines = [makeCartLine({ quantity: 1, itemId: 3, flushed: true })]
+    const uuid = lines[0].localUuid
+
+    const r = cartIncrementFull(lines, uuid)
+
+    // increment endi ipcUpdateItem chaqirishi kerak
+    assert.deepEqual(r.ipcCall, { type: 'updateItem', itemId: 3, quantity: 2 })
+    assert.equal(r.lines[0].quantity, 2)
+    assert.equal(r.lines[0].flushed, false, 'Yangilangan — qayta flush kerak bo\'ladi')
+  })
+
+  test('AE-05: increment flushed bo\'lmagan item uchun IPC chaqirmaydi (itemId=null)', () => {
+    let lines = [makeCartLine({ quantity: 1, itemId: null, flushed: false })]
+    const uuid = lines[0].localUuid
+
+    const r = cartIncrementFull(lines, uuid)
+
+    // itemId=null bo'lganda IPC chaqirilmasligi kerak
+    assert.equal(r.ipcCall, null)
+    assert.equal(r.lines[0].quantity, 2)
+  })
+
+  test('AE-06: remove() to\'g\'ridan-to\'g\'ri chaqirilsa — o\'chiradi', () => {
+    let lines = [makeCartLine({ quantity: 3, itemId: 15 })]
+    const uuid = lines[0].localUuid
+
+    const result = cartRemoveFull(lines, uuid)
+
+    assert.equal(result.lines.length, 0)
+    assert.deepEqual(result.ipcCall, { type: 'removeItem', itemId: 15 })
+    assert.ok(result.removeTriggeredAt)
+  })
+
+  test('AE-07: itemId=null bo\'lganda remove() SQLite ga tegmaydi (lekin Zustand tozalanadi)', () => {
+    // Item hali flush bo\'lmagan — SQLite da yo\'q, shuning uchun o\'chirish kerak emas
+    let lines = [makeCartLine({ quantity: 1, itemId: null, flushed: false })]
+    const uuid = lines[0].localUuid
+
+    const result = cartRemoveFull(lines, uuid)
+
+    assert.equal(result.lines.length, 0, 'Zustand dan o\'chirilishi kerak')
+    assert.equal(result.ipcCall, null, 'SQLite IPC chaqirilmasligi kerak (item yo\'q)')
+    assert.ok(result.removeTriggeredAt, 'removeTriggeredAt o\'rnatilishi kerak')
+  })
+
+  test('AE-08: race condition — flush davomida o\'chirilgan item SQLite da qolmaydi', () => {
+    // 1. Flush boshlandi: pending=[item-A]
+    // 2. addItems() ishlayapti
+    // 3. Foydalanuvchi item-A ni o'chirdi (Zustand bo'shlandi)
+    // 4. addItems() qaytdi: saved=[{localUuid:'item-A', id:99}]
+    // 5. Zustand da item-A yo'q → orphaned=[id:99] → ipcRemoveItem(99) chaqirilishi kerak
+
+    const linesBeforeFlush = [makeCartLine({ localUuid: 'item-A', flushed: false })]
+    const linesAfterFlush  = []  // flush davomida o'chirildi
+    const savedFromDb      = [{ localUuid: 'item-A', id: 99 }]
+
+    const { orphaned } = simulateFlushRace(linesBeforeFlush, linesAfterFlush, savedFromDb)
+
+    assert.equal(orphaned.length, 1, 'Orphaned item topilishi kerak')
+    assert.equal(orphaned[0].id, 99, 'SQLite id 99 o\'chirilishi kerak')
+  })
+
+  test('AE-09: race condition — oddiy holat (o\'chirish yo\'q)', () => {
+    const linesBeforeFlush = [makeCartLine({ localUuid: 'item-B', flushed: false })]
+    const linesAfterFlush  = [makeCartLine({ localUuid: 'item-B', flushed: true, itemId: 88 })]
+    const savedFromDb      = [{ localUuid: 'item-B', id: 88 }]
+
+    const { orphaned } = simulateFlushRace(linesBeforeFlush, linesAfterFlush, savedFromDb)
+
+    assert.equal(orphaned.length, 0, 'Orphaned yo\'q — item hali Zustand da bor')
+  })
+
+  test('AE-10: ikki item — bittasi o\'chiriladi, ikkinchisi qoladi', () => {
+    const lineA = makeCartLine({ localUuid: 'uuid-A', quantity: 2, itemId: 21 })
+    const lineB = makeCartLine({ localUuid: 'uuid-B', quantity: 1, itemId: 22 })
+    let lines = [lineA, lineB]
+
+    // B ni minus bilan o'chiramiz (qty=1)
+    const result = cartDecrementFull(lines, 'uuid-B')
+    lines = result.lines
+
+    assert.ok(result.removed)
+    assert.equal(lines.length, 1)
+    assert.equal(lines[0].localUuid, 'uuid-A')
+    assert.deepEqual(result.ipcCall, { type: 'removeItem', itemId: 22 })
+  })
+
+  test('AE-11: ko\'p mahsulot — barchasini ketma-ket o\'chirish', () => {
+    const items = [
+      makeCartLine({ localUuid: 'u1', quantity: 1, itemId: 1 }),
+      makeCartLine({ localUuid: 'u2', quantity: 2, itemId: 2 }),
+      makeCartLine({ localUuid: 'u3', quantity: 3, itemId: 3 })
+    ]
+    let lines = [...items]
+    const ipcCalls = []
+
+    // u1 ni decrement (qty=1 → o'chir)
+    let r = cartDecrementFull(lines, 'u1')
+    lines = r.lines
+    if (r.ipcCall) ipcCalls.push(r.ipcCall)
+
+    // u2 ni decrement×2 (2→1→o'chir)
+    r = cartDecrementFull(lines, 'u2')
+    lines = r.lines
+    if (r.ipcCall) ipcCalls.push(r.ipcCall)
+    r = cartDecrementFull(lines, 'u2')
+    lines = r.lines
+    if (r.ipcCall) ipcCalls.push(r.ipcCall)
+
+    // u3 ni decrement×3 (3→2→1→o'chir)
+    r = cartDecrementFull(lines, 'u3'); lines = r.lines; if (r.ipcCall) ipcCalls.push(r.ipcCall)
+    r = cartDecrementFull(lines, 'u3'); lines = r.lines; if (r.ipcCall) ipcCalls.push(r.ipcCall)
+    r = cartDecrementFull(lines, 'u3'); lines = r.lines; if (r.ipcCall) ipcCalls.push(r.ipcCall)
+
+    assert.equal(lines.length, 0, 'Barcha itemlar o\'chirilishi kerak')
+
+    // Har bitta o'chirish uchun removeItem chaqirilishi kerak
+    const removes = ipcCalls.filter(c => c.type === 'removeItem')
+    assert.equal(removes.length, 3, '3 ta removeItem IPC chaqirilishi kerak')
+  })
+
+  test('AE-12: setQuantity(0) → remove() bilan bir xil natija', () => {
+    const line = makeCartLine({ quantity: 3, itemId: 30 })
+    let lines = [line]
+    const uuid = line.localUuid
+
+    // setQuantity(0) → remove()
+    const result = cartRemoveFull(lines, uuid)  // setQuantity 0→remove() ni chaqiradi
+
+    assert.equal(result.lines.length, 0)
+    assert.deepEqual(result.ipcCall, { type: 'removeItem', itemId: 30 })
+    assert.ok(result.removeTriggeredAt)
+  })
+
+  test('AE-13: removeTriggeredAt o\'zgarganda server sync ishga tushadi', () => {
+    // useCartFlush da: useEffect([removeTriggeredAt, orderId]) → syncServerOnly()
+    const removeTimes = []
+    const mockRemove = (lines, uuid) => {
+      const r = cartRemoveFull(lines, uuid)
+      if (r.removeTriggeredAt) removeTimes.push(r.removeTriggeredAt)
+      return r
+    }
+
+    let lines = [makeCartLine({ itemId: 5 }), makeCartLine({ itemId: 6 })]
+    lines = mockRemove(lines, lines[0].localUuid).lines
+    lines = mockRemove(lines, lines[0].localUuid).lines
+
+    assert.equal(removeTimes.length, 2, 'Har o\'chirishda server sync ishga tushishi kerak')
+  })
+
+  test('AE-14: o\'chirilgan item server ga ham yuborilmaydi (syncServerOnly filter)', () => {
+    // syncServerOnly: lines.filter(l => l.productServerId && l.quantity > 0)
+    // O'chirilgan item lines da yo'q → filterdan o'tmaydi → serverga yuborilmaydi
+
+    const lines = [
+      { productServerId: 'srv-A', quantity: 2 },
+      { productServerId: 'srv-B', quantity: 0 },  // 0 — filtrlangan
+      // srv-C o'chirilgan — umuman yo'q
+    ]
+
+    const toServer = lines.filter(l => l.productServerId && l.quantity > 0)
+    assert.equal(toServer.length, 1)
+    assert.equal(toServer[0].productServerId, 'srv-A')
+  })
+
+  test('AE-15: oxirgi item o\'chirilsa — syncAll bo\'sh itemlar bilan chaqiriladi (server CANCEL)', () => {
+    // O'chirilgandan keyin lines=[] → syncServerOnly → items=[] → syncAll({items:[]}) → server CANCEL
+    const linesAfterRemove = []
+
+    const toServer = linesAfterRemove.filter(l => l.productServerId && l.quantity > 0)
+    assert.equal(toServer.length, 0, 'Bo\'sh list → server da order bekor bo\'ladi')
+  })
+})

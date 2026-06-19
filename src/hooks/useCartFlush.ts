@@ -72,6 +72,14 @@ export function useCartFlush(): { flushNow: () => Promise<void> } {
           localUuid: l.localUuid
         }))
       )
+      // Race condition: flush davomida o'chirilgan itemlar SQLite da qolishi mumkin.
+      // Zustand da yo'q, lekin addItems() allaqachon SQLite ga yozgan → tozalaymiz.
+      const currentLines = useCart.getState().lines
+      const orphaned = saved.filter((s) => !currentLines.some((l) => l.localUuid === s.localUuid))
+      for (const orphan of orphaned) {
+        void window.afisant.orders.removeItem(orphan.id).catch(() => {})
+      }
+
       useCart.setState({
         lines: useCart.getState().lines.map((l) => {
           const match = saved.find((c) => c.localUuid === l.localUuid)
