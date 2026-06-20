@@ -212,7 +212,7 @@ async function syncPendingOrders(): Promise<void> {
 
           if (!serverId) {
             try {
-              const allOrders = await fetchVisibleOrders(500)
+              const allOrders = await fetchVisibleOrders()
               const found = allOrders.find((o: any) =>
                 (o.room?.id === order.room_server_id || o.roomId === order.room_server_id) &&
                 !CLOSED_STATUSES.includes((o.status ?? '').toUpperCase())
